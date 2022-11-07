@@ -103,13 +103,17 @@ contract Pool is Ownable, ReentrancyGuard, NonblockingLzApp {
     mapping(uint16 => mapping(bytes32 => uint)) public chains;
     mapping(address => bytes32[]) public users;
 
-    constructor(address _lzEndpoint) NonblockingLzApp(_lzEndpoint) {
+    constructor(address _lzEndpoint, address _treasury) NonblockingLzApp(_lzEndpoint) {
+        treasury = _treasury;
     }
 
     function initPool(bytes32 id, Data.ConfigData memory config, address _ceToken, address _debtToken) external onlyOwner {
         configs[id] = config;
-        reserves[id].ceToken = _ceToken;
-        reserves[id].debtToken = _debtToken;
+        Data.ReserveData storage reserve = reserves[id];
+        reserve.ceToken = _ceToken;
+        reserve.debtToken = _debtToken;
+        reserve.ceScaled = 1e18;
+        reserve.dtScaled = 1e18;
     }
 
     function changePoolStatus(bytes32 id, bool enable) external onlyOwner {
@@ -165,19 +169,26 @@ contract Pool is Ownable, ReentrancyGuard, NonblockingLzApp {
     function updateInterestRate(bytes32 id) internal {
         Data.ReserveData storage reserve = reserves[id];
         Data.ConfigData memory config = configs[id];
-        uint totalDeposit = reserve.ceSupply.mul(reserve.ceScaled).div(1e18);
-        uint totalBorrow = reserve.debtSupply.mul(reserve.dtScaled).div(1e18);
-        uint currentRatio = totalBorrow.mul(1e18).div(totalDeposit);
+        if(reserve.debtSupply > 0) {
+            
+            uint totalDeposit = reserve.ceSupply.mul(reserve.ceScaled).div(1e18);
+            uint totalBorrow = reserve.debtSupply.mul(reserve.dtScaled).div(1e18);
+            uint currentRatio = totalBorrow.mul(1e18).div(totalDeposit);
 
-        if(currentRatio <= config.bestRatio) {
-            //Rt = R0 + (Ut / Ub) * Rslope1
-            reserve.interestRate = config.baseRate.add(currentRatio.mul(config.slope1).div(config.bestRatio));
+            if(currentRatio <= config.bestRatio) {
+                //Rt = R0 + (Ut / Ub) * Rslope1
+                reserve.interestRate = config.baseRate.add(currentRatio.mul(config.slope1).div(config.bestRatio));
+            } else {
+                uint one = 1e18;
+                //Rt = R0 + Rslope1 + (Ut - Ub) / (1 - Ut) * Rslope2
+                reserve.interestRate = config.baseRate.add(config.slope1).add(currentRatio.sub(config.bestRatio).mul(config.slope2).div(one.sub(currentRatio)));
+            }
+            reserve.currentRatio = currentRatio;
         } else {
-            uint one = 1e18;
-            //Rt = R0 + Rslope1 + (Ut - Ub) / (1 - Ut) * Rslope2
-            reserve.interestRate = config.baseRate.add(config.slope1).add(currentRatio.sub(config.bestRatio).mul(config.slope2).div(one.sub(currentRatio)));
+            reserve.interestRate = 0;
+            reserve.currentRatio = 0;
         }
-        reserve.currentRatio = currentRatio;
+        
     }
 
     function addToken(address user, bytes32 id) internal {
@@ -220,7 +231,7 @@ contract Pool is Ownable, ReentrancyGuard, NonblockingLzApp {
 
 
     function checkHealth(address user) view public {
-        require(healthFactor(user).factor <= MAX_HEALTH_FACTOR, "HEALTH CHECK FAILED");
+        require(healthFactor(user).factor <= MAX_HEALTH_FACTOR, "Health check failed");
     }
 
     function withdraw(bytes32 id, uint16 chainId, uint ceAmount) refresh(id) payable nonReentrant external {
@@ -278,24 +289,28 @@ contract Pool is Ownable, ReentrancyGuard, NonblockingLzApp {
         params.debtAmount = IDebtToken(params.debtToken).balanceOf(user);
         params.repayAmount = params.debtAmount.mul(params.dtScaled).div(1e18);
         params.tokenAmount = tokenAmount;
+        params.user = user;
     }
 
 
     function _repay(bytes32 id, uint16 chainId, address user, uint tokenAmount) refresh(id) internal {
         Data.RepayParams memory params = _buildRepayParams(id, user, tokenAmount);
-
-        uint ceAmount = 0;
+        Data.ReserveData storage reserve = reserves[id];
+        uint ceAmount = 0;  
         if(params.tokenAmount >= params.repayAmount) {
-            ceAmount = params.repayAmount.sub(params.tokenAmount).mul(1e18).div(params.ceScaled);
+            ceAmount = params.tokenAmount.sub(params.repayAmount).mul(1e18).div(params.ceScaled);
             if(ceAmount > 0) {
                 ICEToken(params.ceToken).mint(params.user, ceAmount);
+                reserve.ceSupply = reserve.ceSupply.add(ceAmount);
             }
         } else {
             params.repayAmount = params.tokenAmount;
             params.debtAmount = params.repayAmount.mul(1e18).div(params.dtScaled);
         }
 
+        chains[chainId][id] += tokenAmount;
         IDebtToken(params.debtToken).burn(params.user, params.debtAmount);
+        reserve.debtSupply -= params.debtAmount;
         emit Data.Repay(user, id, chainId, params.repayAmount, params.debtAmount, ceAmount);
     }
 
@@ -303,7 +318,7 @@ contract Pool is Ownable, ReentrancyGuard, NonblockingLzApp {
         Data.ReserveData storage reserve = reserves[id];
         require(reserve.enable, "Not enable now");
 
-        uint ceAmount = reserve.ceScaled > 0 ? tokenAmount.mul(1e18).div(reserve.ceScaled): tokenAmount;
+        uint ceAmount = tokenAmount.mul(1e18).div(reserve.ceScaled);
         ICEToken(reserve.ceToken).mint(user, ceAmount);
         reserve.ceSupply = reserve.ceSupply.add(ceAmount);
         chains[chainId][id] += tokenAmount;

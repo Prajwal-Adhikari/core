@@ -5,9 +5,13 @@ import "../layerZero/lzApp/NonblockingLzApp.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
+// todo
+// 1.decimal
+// 2.emergency withdraw
+
 contract Client is LzApp {
     uint8 internal constant TYPE_DEPOSIT = 1;
-    uint8 internal constant TYPE_REPAY = 3;
+    uint8 internal constant TYPE_REPAY = 2;
 
     uint public GAS_USAGE = 200000;
     uint16 public serverChainId;
@@ -46,7 +50,7 @@ contract Client is LzApp {
             revert("Unsupport functionType");
         }
 
-        (uint fees, ) = lzEndpoint.estimateFees(serverChainId, address(this), payload, false, abi.encodePacked(uint16(1), GAS_USAGE));
+        (uint fees, ) = lzEndpoint.estimateFees(serverChainId, address(this), payload, false, abi.encodePacked(bytes32(""), GAS_USAGE));
         return fees;
     }
 

@@ -10,7 +10,6 @@ import "./interfaces/IPool.sol";
 
 contract DebtToken is ERC20, Ownable {
     address public pool;
-    address public treasury;
     uint public balanceScale = 1e18;
     uint constant public MAG = 1e18;
 
@@ -24,9 +23,8 @@ contract DebtToken is ERC20, Ownable {
         _;
     }
 
-    function initialize(address _pool, address _treasury) external onlyOwner {
+    function initialize(address _pool) external onlyOwner {
         pool = _pool;
-        treasury = _treasury;
     }
 
     function _transfer(
