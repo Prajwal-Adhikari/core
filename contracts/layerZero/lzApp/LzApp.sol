@@ -29,7 +29,6 @@ contract LzApp is Ownable, ILayerZeroReceiver, ILayerZeroUserApplicationConfig {
         require(_srcAddress.length == trustedRemote.length && keccak256(_srcAddress) == keccak256(trustedRemote), "LzApp: invalid source sending contract");
 
         _blockingLzReceive(_srcChainId, _srcAddress, _nonce, _payload);
-        
     }
 
     // abstract function - the default behaviour of LayerZero is blocking. See: NonblockingLzApp if you dont need to enforce ordered messaging

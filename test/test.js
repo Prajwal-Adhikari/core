@@ -160,6 +160,10 @@ describe("Ready", function () {
         await this.clientB.connect(alice).repayRequest(FTM, toTokenAmount(50000), {value: fees})
         await printInfo();
 
+        await this.clientB.connect(alice).repayRequest(FTM, toTokenAmount(200000), {value: fees})
+        await printInfo();
+
+
         console.log("alice deposit matic");
         await this.clientA.connect(alice).depositRequest(MATIC, toTokenAmount(500000), {value: fees})
         await printInfo();

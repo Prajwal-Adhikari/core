@@ -2,7 +2,6 @@
 pragma solidity ^0.8.9;
 
 // Uncomment this line to use console.log
-// import "hardhat/console.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
@@ -13,6 +12,7 @@ import './interfaces/IDebtToken.sol';
 import './interfaces/IOracle.sol';
 
 library Data {
+    using SafeMath for uint256;
     struct ReserveData {
         //current interest rate
         uint interestRate;
@@ -48,6 +48,8 @@ library Data {
         uint lts;
         //percent to treasury
         uint tsuPercent;
+        //liquidity bonus
+        uint ltBonus;
     }
 
     struct HealthData {
@@ -79,15 +81,26 @@ library Data {
         address user;
     }
 
+
+    //using to avoid stack too dept 
+    struct LiquidateParams {
+        uint debtValue;
+        uint ceDebtAmount;
+        uint collateralValue;
+        uint ceCollateralAmount;
+    }
+
     event MintToTreasury(bytes32 id, uint tokenAmount, uint ceAmount);
     event Deposit(address user, bytes32 id, uint16 chainId, uint tokenAmount, uint ceAmount);
     event Withdraw(address user, bytes32 id, uint16 chainId, uint tokenAmount, uint ceAmount);
     event Borrow(address user, bytes32 id, uint16 chainId, uint tokenAmount, uint debtAmount);
     event Repay(address user, bytes32 id, uint16 chainId, uint tokenAmount, uint debtAmount, uint ceAmount);
+    event Liquidate(address user, address liquidator, bytes32 debtId, bytes32 collateralId, 
+        uint debtAmount, uint ceDebtAmount, uint ceCollateralAmount);
     event ChangePoolStatus(bytes32 id, bool enable);
 }
 
-contract Pool is Ownable, ReentrancyGuard, NonblockingLzApp {
+contract Pool is Ownable, ReentrancyGuard, LzApp {
     using SafeMath for uint256;
 
     IOracle public oracle;
@@ -103,8 +116,16 @@ contract Pool is Ownable, ReentrancyGuard, NonblockingLzApp {
     mapping(uint16 => mapping(bytes32 => uint)) public chains;
     mapping(address => bytes32[]) public users;
 
-    constructor(address _lzEndpoint, address _treasury) NonblockingLzApp(_lzEndpoint) {
+    uint public GAS_USAGE = 200000;
+
+    constructor(address _lzEndpoint, address _treasury) LzApp(_lzEndpoint) {
         treasury = _treasury;
+    }
+
+    function estimateFees(uint16 chainId) public view returns (uint) {
+        bytes memory payload = abi.encode("", chainId, msg.sender, 0);
+        (uint fees, ) = lzEndpoint.estimateFees(chainId, address(this), payload, false, abi.encodePacked(uint16(1), GAS_USAGE));
+        return fees;
     }
 
     function initPool(bytes32 id, Data.ConfigData memory config, address _ceToken, address _debtToken) external onlyOwner {
@@ -119,10 +140,6 @@ contract Pool is Ownable, ReentrancyGuard, NonblockingLzApp {
     function changePoolStatus(bytes32 id, bool enable) external onlyOwner {
         reserves[id].enable = enable;
         emit Data.ChangePoolStatus(id, enable);
-    }
-
-    function _nonblockingLzReceive(uint16 _srcChainId, bytes memory , uint64 , bytes memory _payload) internal override {
-
     }
 
 
@@ -141,7 +158,7 @@ contract Pool is Ownable, ReentrancyGuard, NonblockingLzApp {
         } 
     }
 
-    modifier refresh(bytes32 id) {
+    function refresh(bytes32 id) internal {
         Data.ReserveData storage reserve = reserves[id];
         if(reserve.ceSupply > 0) {
             uint second = block.timestamp.sub(reserve.lastUpdateTime);
@@ -158,8 +175,8 @@ contract Pool is Ownable, ReentrancyGuard, NonblockingLzApp {
             emit Data.MintToTreasury(id, tokenAmountTreasury, ceAmountTreasury);
         }
         reserve.lastUpdateTime = block.timestamp;
-        
-        _;
+         
+        // _;
     }
 
     function setOracle(IOracle _oracle) external onlyOwner {
@@ -231,10 +248,11 @@ contract Pool is Ownable, ReentrancyGuard, NonblockingLzApp {
 
 
     function checkHealth(address user) view public {
-        require(healthFactor(user).factor <= MAX_HEALTH_FACTOR, "Health check failed");
+        require(healthFactor(user).factor < MAX_HEALTH_FACTOR, "Health failed");
     }
 
-    function withdraw(bytes32 id, uint16 chainId, uint ceAmount) refresh(id) payable nonReentrant external {
+    function withdraw(bytes32 id, uint16 chainId, uint ceAmount) payable nonReentrant external {
+        refresh(id);
         Data.ReserveData storage reserve = reserves[id];
         require(reserve.enable, "Not enable now");
 
@@ -262,7 +280,8 @@ contract Pool is Ownable, ReentrancyGuard, NonblockingLzApp {
     }
 
 
-    function borrow(bytes32 id, uint16 chainId, uint tokenAmount) refresh(id) payable nonReentrant external {
+    function borrow(bytes32 id, uint16 chainId, uint tokenAmount) payable nonReentrant external {
+        refresh(id);
         Data.BorrowParams memory params = _buildBorrowParams(id, chainId, tokenAmount);    
 
         require(params.liquidity >= tokenAmount, "No enough liquidity");
@@ -280,8 +299,39 @@ contract Pool is Ownable, ReentrancyGuard, NonblockingLzApp {
     }
 
     // avoid stack too deep error
-    function _buildRepayParams(bytes32 id, address user, uint tokenAmount) view internal returns(Data.RepayParams memory params) {
-        Data.ReserveData memory reserve = reserves[id];
+    function _buildLiquidateParams(bytes32 collateralId, bytes32 debtId, uint debtAmount) view internal returns(Data.LiquidateParams memory params) {
+        Data.ReserveData memory debtReserve = reserves[debtId];
+        params.debtValue = debtAmount.mul(debtReserve.dtScaled).div(1e18);
+        params.ceDebtAmount = params.debtValue.mul(1e18).div(debtReserve.ceScaled);
+ 
+        uint collateralValue = params.debtValue.mul(1e18).div(oracle.getSinglePrice(collateralId));
+        params.ceCollateralAmount = collateralValue.add(collateralValue.mul(configs[collateralId].ltBonus).div(1e18));
+    }
+
+    function liquidate(address user, bytes32 collateralId, bytes32 debtId, uint debtAmount) external nonReentrant {
+        require(user != msg.sender, "Same address");
+        refresh(collateralId);
+        refresh(debtId);
+        Data.HealthData memory healthData = healthFactor(user);
+        require(healthData.factor >= MAX_HEALTH_FACTOR, "Cannot liquidate now");
+        Data.ReserveData storage debtReserve = reserves[debtId];
+        Data.ReserveData memory collateralReserve = reserves[collateralId];
+        Data.LiquidateParams memory params = _buildLiquidateParams(collateralId, debtId, debtAmount);
+        
+        IDebtToken(debtReserve.debtToken).burn(user, debtAmount);
+        IDebtToken(debtReserve.ceToken).burn(msg.sender, params.ceDebtAmount);
+
+        debtReserve.debtSupply = debtReserve.debtSupply.sub(debtAmount);
+        debtReserve.ceSupply = debtReserve.ceSupply.sub(params.ceDebtAmount);
+        
+        IDebtToken(collateralReserve.ceToken).burn(user, params.ceCollateralAmount);
+        IDebtToken(collateralReserve.ceToken).mint(msg.sender, params.ceCollateralAmount);
+        
+        emit Data.Liquidate(user, msg.sender, debtId, collateralId, debtAmount, params.ceDebtAmount, params.ceCollateralAmount);
+    }
+
+    // avoid stack too deep error
+    function _buildRepayParams(Data.ReserveData memory reserve, address user, uint tokenAmount) view internal returns(Data.RepayParams memory params) {
         params.ceToken = reserve.ceToken;
         params.debtToken = reserve.debtToken;
         params.dtScaled = reserve.dtScaled;
@@ -293,8 +343,9 @@ contract Pool is Ownable, ReentrancyGuard, NonblockingLzApp {
     }
 
 
-    function _repay(bytes32 id, uint16 chainId, address user, uint tokenAmount) refresh(id) internal {
-        Data.RepayParams memory params = _buildRepayParams(id, user, tokenAmount);
+    function _repay(bytes32 id, uint16 chainId, address user, uint tokenAmount) internal {
+        refresh(id);
+        Data.RepayParams memory params = _buildRepayParams(reserves[id], user, tokenAmount);
         Data.ReserveData storage reserve = reserves[id];
         uint ceAmount = 0;  
         if(params.tokenAmount >= params.repayAmount) {
@@ -314,7 +365,8 @@ contract Pool is Ownable, ReentrancyGuard, NonblockingLzApp {
         emit Data.Repay(user, id, chainId, params.repayAmount, params.debtAmount, ceAmount);
     }
 
-    function _deposit(bytes32 id, uint16 chainId, address user, uint tokenAmount) refresh(id) internal {
+    function _deposit(bytes32 id, uint16 chainId, address user, uint tokenAmount) internal {
+        refresh(id);
         Data.ReserveData storage reserve = reserves[id];
         require(reserve.enable, "Not enable now");
 

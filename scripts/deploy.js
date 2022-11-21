@@ -56,7 +56,7 @@ const networks = {
   "fantom": {
     "name": "fantom",
     "chainId": 4002,
-    "ensAddress": "https://rpc.testnet.fantom.network"
+    "ensAddress": "https://xapi.testnet.fantom.network/lachesis/"
   },
 }
 
@@ -107,11 +107,11 @@ function getAddress(b, a) {
 async function deployToken(name) {
   console.log(`deploy token`);
   let CEToken = new ethers.ContractFactory(CeFile.abi, CeFile.bytecode, wallet);
-  let ceToken = await CEToken.deploy("CE" + name, "CE" + name);
+  let ceToken = await CEToken.deploy("ce" + name, "ce" + name);
   let DebtToken = new ethers.ContractFactory(DebtFile.abi, DebtFile.bytecode, wallet);
-  let debtToken = await DebtToken.deploy("Debt" + name, "Debt" + name);
+  let debtToken = await DebtToken.deploy("debt" + name, "debt" + name);
   await server.initPool(getId(name), [toTokenAmount(0.5), toTokenAmount(0.1),
-   toTokenAmount(0.5), 0, toTokenAmount(0.5), toTokenAmount(0.8), toTokenAmount(0.1)],
+   toTokenAmount(0.5), 0, toTokenAmount(0.5), toTokenAmount(0.8), toTokenAmount(0.1), toTokenAmount(0.05)],
     ceToken.address, debtToken.address);
   await ceToken.initialize(this.server.address);
   await debtToken.initialize(this.server.address);
@@ -138,7 +138,7 @@ async function config() {
   this.avax = new ethers.Contract(deployed.avax.AVAX, ERC20File.abi, provider);
   await (await this.avax.connect(wallet).mint(owner, toTokenAmount(1000000))).wait();
   await (await this.avax.connect(wallet).approve(deployed.clientA, toTokenAmount(1000000))).wait();
-  
+  console.log(getId("FTM"), getId("USDC"));
   changeNetwork("fantom")
   console.log("config clientB")
   this.clientB = new ethers.Contract(deployed.clientB, ClientFile.abi, provider); 
@@ -163,7 +163,7 @@ async function test() {
   changeNetwork("polygon");
   this.server = new ethers.Contract(deployed.server, ServerFile.abi, provider);
   console.log("withdraw")
-  await (await this.clientA.connect(wallet).withdraw(getId("AVAX"), chainIdClientA, toTokenAmount(500), {value: ethers.utils.parseEther("10")})).wait()
+  await (await this.server.connect(wallet).withdraw(getId("AVAX"), chainIdClientA, toTokenAmount(500), {value: ethers.utils.parseEther("10")})).wait()
 }
 
 // console.log(getAddress(deployed.server, deployed.clientA))
@@ -173,7 +173,7 @@ async function test() {
 
 // We recommend this pattern to be able to use async/await everywhere
 // and properly handle errors.
-test().catch((error) => {
+main().catch((error) => {
   console.error(error);
 });
 // test()

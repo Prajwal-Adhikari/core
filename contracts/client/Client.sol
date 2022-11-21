@@ -13,7 +13,7 @@ contract Client is LzApp {
     uint8 internal constant TYPE_DEPOSIT = 1;
     uint8 internal constant TYPE_REPAY = 2;
 
-    uint public GAS_USAGE = 200000;
+    uint public GAS_USAGE = 300000;
     uint16 public serverChainId;
     using SafeERC20 for IERC20;
 
@@ -50,7 +50,7 @@ contract Client is LzApp {
             revert("Unsupport functionType");
         }
 
-        (uint fees, ) = lzEndpoint.estimateFees(serverChainId, address(this), payload, false, abi.encodePacked(bytes32(""), GAS_USAGE));
+        (uint fees, ) = lzEndpoint.estimateFees(serverChainId, address(this), payload, false, abi.encodePacked(uint16(1), GAS_USAGE));
         return fees;
     }
 
