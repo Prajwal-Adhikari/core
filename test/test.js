@@ -66,8 +66,8 @@ describe("Ready", function () {
         await server.setOracle(this.oracle.address);
         await this.oracle.setPrice([MATIC, FTM], [toTokenAmount(1), toTokenAmount(1)])
 
-        await server.initPool(MATIC, [toTokenAmount(0.5), toTokenAmount(0.1), toTokenAmount(0.5), 0, toTokenAmount(0.5), toTokenAmount(0.5), 0], this.ceMATIC.address, this.debtMATIC.address);
-        await server.initPool(FTM, [toTokenAmount(0.5), toTokenAmount(0.1), toTokenAmount(0.5), 0, toTokenAmount(0.5), toTokenAmount(0.5), 0], this.ceFTM.address, this.debtFTM.address);
+        await server.initPool(MATIC, [toTokenAmount(0.5), toTokenAmount(0.1), toTokenAmount(0.5), 0, toTokenAmount(0.5), toTokenAmount(0.5), toTokenAmount(0.1), toTokenAmount(0.05)], this.ceMATIC.address, this.debtMATIC.address);
+        await server.initPool(FTM, [toTokenAmount(0.5), toTokenAmount(0.1), toTokenAmount(0.5), 0, toTokenAmount(0.5), toTokenAmount(0.5), toTokenAmount(0.1), toTokenAmount(0.05)], this.ceFTM.address, this.debtFTM.address);
         await server.changePoolStatus(MATIC, true);
         await server.changePoolStatus(FTM, true);
 

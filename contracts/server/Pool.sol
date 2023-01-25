@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.9;
-
+import "hardhat/console.sol";
 // Uncomment this line to use console.log
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
@@ -129,6 +129,7 @@ contract Pool is Ownable, ReentrancyGuard, LzApp {
     }
 
     function initPool(bytes32 id, Data.ConfigData memory config, address _ceToken, address _debtToken) external onlyOwner {
+        updateInterestRate(id);
         configs[id] = config;
         Data.ReserveData storage reserve = reserves[id];
         reserve.ceToken = _ceToken;
@@ -168,11 +169,13 @@ contract Pool is Ownable, ReentrancyGuard, LzApp {
             uint increasedAPY = increasedDebt.mul(reserve.debtSupply).div(1e18);
             uint tokenAmountTreasury = increasedAPY.mul(configs[id].tsuPercent).div(1e18);
             reserve.ceScaled = reserve.ceScaled.add(increasedAPY.sub(tokenAmountTreasury).mul(1e18).div(reserve.ceSupply));
-        
-            uint ceAmountTreasury = tokenAmountTreasury.div(reserve.ceScaled);
+            
+
+            uint ceAmountTreasury = tokenAmountTreasury.mul(1e18).div(reserve.ceScaled);
             ICEToken(reserve.ceToken).mint(treasury, ceAmountTreasury);
             reserve.ceSupply = reserve.ceSupply.add(ceAmountTreasury);
             emit Data.MintToTreasury(id, tokenAmountTreasury, ceAmountTreasury);
+            console.log(increasedAPY, tokenAmountTreasury, ceAmountTreasury, reserve.ceScaled);
         }
         reserve.lastUpdateTime = block.timestamp;
          
@@ -197,8 +200,8 @@ contract Pool is Ownable, ReentrancyGuard, LzApp {
                 reserve.interestRate = config.baseRate.add(currentRatio.mul(config.slope1).div(config.bestRatio));
             } else {
                 uint one = 1e18;
-                //Rt = R0 + Rslope1 + (Ut - Ub) / (1 - Ut) * Rslope2
-                reserve.interestRate = config.baseRate.add(config.slope1).add(currentRatio.sub(config.bestRatio).mul(config.slope2).div(one.sub(currentRatio)));
+                //Rt = R0 + Rslope1 + (Ut - Ub) / (1 - Ub) * Rslope2
+                reserve.interestRate = config.baseRate.add(config.slope1).add(currentRatio.sub(config.bestRatio).mul(config.slope2).div(one.sub(config.bestRatio)));
             }
             reserve.currentRatio = currentRatio;
         } else {
@@ -207,7 +210,7 @@ contract Pool is Ownable, ReentrancyGuard, LzApp {
         }
         
     }
-
+// 0.39 * 0.5 / 0.5
     function addToken(address user, bytes32 id) internal {
         for(uint i = 0;i < users[user].length;i++) {
             if(users[user][i] == id) {

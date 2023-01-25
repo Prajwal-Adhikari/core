@@ -5,7 +5,7 @@
 // will compile your contracts, add the Hardhat Runtime Environment's members to the
 // global scope, and execute the script.
 const hre = require("hardhat");
-const epServer = "0xf69186dfBa60DdB133E91E9A4B5673624293d8F8";
+const epServer = "0x6Fcb97553D41516Cb228ac03FdC8B9a0a9df04A1";
 const epClientA = "0x93f54D755A063cE7bB9e6Ac47Eccc8e33411d706"
 const epClientB = "0x7dcAD72640F835B0FA36EFD3D6d3ec902C7E5acf"
 const treasury = "0x2D83750BDB3139eed1F76952dB472A512685E3e0"
@@ -24,6 +24,11 @@ const CeFile = require("../artifacts/contracts/server/CEToken.sol/CEToken.json")
 const DebtFile = require("../artifacts/contracts/server/DebtToken.sol/DebtToken.json");
 const ERC20File = require("../artifacts/contracts/layerZero/mocks/ERC20Mock.sol/ERC20Mock.json");
 
+const { SocksProxyAgent } = require('socks-proxy-agent');
+const torBrowserAgent = 'Mozilla/5.0 (Windows NT 10.0; rv:91.0) Gecko/20100101 Firefox/91.0';
+  // Default tor port for Tor Browser
+  const torPort = 7891;
+
 let ethers = require("ethers")
 
 const toTokenAmount = (amount, decimals = 18) => {
@@ -36,7 +41,7 @@ function getId(name) {
   return ethers.utils.formatBytes32String(name)
 }
 
-const chainIdServer = 10109
+const chainIdServer = 10102
 const chainIdClientA = 10106
 const chainIdClientB = 10112
 
@@ -46,12 +51,12 @@ const networks = {
   "avax": {
     "name": "avax",
     "chainId": 43113,
-    "ensAddress": "https://avalanchetestapi.terminet.io/ext/bc/C/rpc"
+    "ensAddress": "https://ava-testnet.public.blastapi.io/ext/bc/C/rpc"
   },
-  "polygon": {
-    "name": "polygon",
-    "chainId": 80001,
-    "ensAddress": "https://matic-mumbai.chainstacklabs.com"
+  "bsc": {
+    "name": "bsc",
+    "chainId": 97,
+    "ensAddress": "https://bsc-testnet.public.blastapi.io"
   },
   "fantom": {
     "name": "fantom",
@@ -60,19 +65,28 @@ const networks = {
   },
 }
 
+function getOptions(url) {
+  return {
+    url: url,
+    headers: { 'User-Agent': torBrowserAgent },
+    agent: { https: new SocksProxyAgent('socks5h://127.0.0.1:' + torPort) }
+  }
+}
+
 function changeNetwork(name) {
-  provider = new ethers.providers.JsonRpcProvider(networks[name].ensAddress, networks[name]);
+  provider = new ethers.providers.JsonRpcProvider(getOptions(networks[name].ensAddress), networks[name]);
   wallet = new ethers.Wallet(`0x${process.env.PRIVATE_KEY}`, provider);
   const { EthersProviderWrapper } = require("@nomiclabs/hardhat-ethers/internal/ethers-provider-wrapper");
   hre.ethers.provider = provider;
+  // console.log(provider.connection);
 };
 
 async function main() {
-  changeNetwork("polygon")
+  changeNetwork("bsc")
   let Oracle = new ethers.ContractFactory(OracleFile.abi, OracleFile.bytecode, wallet);
   let Server = new ethers.ContractFactory(ServerFile.abi, ServerFile.bytecode, wallet);
 
-  console.log("deploy polygon")
+  console.log("deploy bsc")
   this.oracle = await Oracle.deploy();
   this.server = await Server.deploy(epServer, treasury)
   await this.server.setOracle(this.oracle.address)
@@ -120,7 +134,7 @@ async function deployToken(name) {
 
 async function config() {
   console.log("config server")
-  changeNetwork("polygon");
+  changeNetwork("bsc");
   this.oracle = new ethers.Contract(deployed.oracle, OracleFile.abi, provider);
   this.server = new ethers.Contract(deployed.server, ServerFile.abi, provider); 
   await (await this.oracle.connect(wallet).setPrice([getId("USDC"), getId("FTM"), getId("AVAX")], [toTokenAmount(1), toTokenAmount(1), toTokenAmount(1)])).wait()
@@ -138,7 +152,6 @@ async function config() {
   this.avax = new ethers.Contract(deployed.avax.AVAX, ERC20File.abi, provider);
   await (await this.avax.connect(wallet).mint(owner, toTokenAmount(1000000))).wait();
   await (await this.avax.connect(wallet).approve(deployed.clientA, toTokenAmount(1000000))).wait();
-  console.log(getId("FTM"), getId("USDC"));
   changeNetwork("fantom")
   console.log("config clientB")
   this.clientB = new ethers.Contract(deployed.clientB, ClientFile.abi, provider); 
@@ -160,7 +173,7 @@ async function test() {
   console.log("deposit")
   await (await this.clientA.connect(wallet).depositRequest(getId("AVAX"), toTokenAmount(1000), {value: ethers.utils.parseEther("10")})).wait()
   
-  changeNetwork("polygon");
+  changeNetwork("bsc");
   this.server = new ethers.Contract(deployed.server, ServerFile.abi, provider);
   console.log("withdraw")
   await (await this.server.connect(wallet).withdraw(getId("AVAX"), chainIdClientA, toTokenAmount(500), {value: ethers.utils.parseEther("10")})).wait()
@@ -173,7 +186,7 @@ async function test() {
 
 // We recommend this pattern to be able to use async/await everywhere
 // and properly handle errors.
-main().catch((error) => {
+test().catch((error) => {
   console.error(error);
 });
 // test()
