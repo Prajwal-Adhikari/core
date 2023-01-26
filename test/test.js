@@ -50,7 +50,7 @@ describe("Ready", function () {
         const Oracle = await ethers.getContractFactory("Oracle");
         this.oracle = await Oracle.deploy();
 
-        const Client = await ethers.getContractFactory("Client")
+        const Client = await ethers.getContractFactory("Branch")
         this.clientA = await Client.deploy(this.lzEndpointMockClientA.address, this.chainIdServer)
         this.clientB = await Client.deploy(this.lzEndpointMockClientB.address, this.chainIdServer)
 
@@ -137,20 +137,20 @@ describe("Ready", function () {
         await printInfo();
 
         console.log("alice borrow ftm and after one month");
-        await server.connect(alice).borrow(FTM, this.chainIdClientB, toTokenAmount(1e5), {value: fees});
+        await server.connect(alice).borrow(FTM, this.chainIdClientB, toTokenAmount(1e5), alice.address, {value: fees});
         await network.provider.send("evm_increaseTime", [365 * 86400 - 1])
         await printInfo();
 
         console.log("alice withdraw matic");
-        await server.connect(alice).withdraw(MATIC, this.chainIdClientA, toTokenAmount(1e5), {value: fees})
+        await server.connect(alice).withdraw(MATIC, this.chainIdClientA, toTokenAmount(1e5), alice.address, {value: fees})
         await printInfo();
 
         console.log("bob withdraw ftm");
-        await server.connect(bob).withdraw(FTM, this.chainIdClientB, toTokenAmount(1e5), {value: fees})
+        await server.connect(bob).withdraw(FTM, this.chainIdClientB, toTokenAmount(1e5), bob.address, {value: fees})
         await printInfo();
 
         console.log("alice withdraw matic")
-        await server.connect(alice).withdraw(MATIC, this.chainIdClientA, toTokenAmount(180000), {value: fees})
+        await server.connect(alice).withdraw(MATIC, this.chainIdClientA, toTokenAmount(180000), alice.address, {value: fees})
         await printInfo();
         // expect(await matic.balanceOf(alice.address)).to.be.equal(toTokenAmount(6e5))
 
@@ -169,7 +169,7 @@ describe("Ready", function () {
         await printInfo();
 
         console.log("bob borrow matic");
-        await server.connect(bob).borrow(MATIC, this.chainIdClientA, toTokenAmount(2e5), {value: fees});
+        await server.connect(bob).borrow(MATIC, this.chainIdClientA, toTokenAmount(2e5), bob.address, {value: fees});
         await network.provider.send("evm_increaseTime", [365 * 86400 - 1])
         await printInfo();
         // let borrowB = (await this.server.userInfos(alice.address, 1))["borrowedB"]; 

@@ -1,104 +1,13 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.9;
-import "hardhat/console.sol";
-// Uncomment this line to use console.log
-import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "../layerZero/lzApp/NonblockingLzApp.sol";
+import "../layerZero/lzApp/LzApp.sol";
 
 import './interfaces/ICEToken.sol';
 import './interfaces/IDebtToken.sol';
 import './interfaces/IOracle.sol';
-
-library Data {
-    using SafeMath for uint256;
-    struct ReserveData {
-        //current interest rate
-        uint interestRate;
-        //current borrowRatio
-        uint currentRatio;
-        //cetoken address
-        address ceToken;
-        //debt token address
-        address debtToken;
-        //express 1 ceToken equal to x underlying token
-        uint ceScaled;
-        //express 1 debtToken equal to x underlying token
-        uint dtScaled;
-        //last update timestamp
-        uint lastUpdateTime;
-        // cetoken total supply cache
-        uint ceSupply;
-        // debt token total supply cache
-        uint debtSupply;
-        //is enable now
-        bool enable;
-    }
-
-    struct ConfigData {
-        // using to calculate interest rate
-        uint bestRatio;
-        uint slope1;
-        uint slope2;
-        uint baseRate;
-        //loan to value
-        uint ltv;
-        //liquidition threshold 
-        uint lts;
-        //percent to treasury
-        uint tsuPercent;
-        //liquidity bonus
-        uint ltBonus;
-    }
-
-    struct HealthData {
-        uint collateralValue;
-        uint debtValue;
-        uint factor;
-        uint ltsValue;
-    }
-
-    //using to avoid stack too deep
-    struct BorrowParams {
-        uint liquidity;
-        uint tokenAmount;
-        uint price;
-        uint ltv;
-        uint debtAmount;
-        address debtToken;
-    }
-
-    //using to avoid stack too deep
-    struct RepayParams {
-        uint debtAmount;
-        uint tokenAmount;
-        uint repayAmount;
-        address ceToken;
-        address debtToken;
-        uint dtScaled;
-        uint ceScaled;
-        address user;
-    }
-
-
-    //using to avoid stack too dept 
-    struct LiquidateParams {
-        uint debtValue;
-        uint ceDebtAmount;
-        uint collateralValue;
-        uint ceCollateralAmount;
-    }
-
-    event MintToTreasury(bytes32 id, uint tokenAmount, uint ceAmount);
-    event Deposit(address user, bytes32 id, uint16 chainId, uint tokenAmount, uint ceAmount);
-    event Withdraw(address user, bytes32 id, uint16 chainId, uint tokenAmount, uint ceAmount);
-    event Borrow(address user, bytes32 id, uint16 chainId, uint tokenAmount, uint debtAmount);
-    event Repay(address user, bytes32 id, uint16 chainId, uint tokenAmount, uint debtAmount, uint ceAmount);
-    event Liquidate(address user, address liquidator, bytes32 debtId, bytes32 collateralId, 
-        uint debtAmount, uint ceDebtAmount, uint ceCollateralAmount);
-    event ChangePoolStatus(bytes32 id, bool enable);
-}
+import './libraries/Data.sol';
 
 contract Pool is Ownable, ReentrancyGuard, LzApp {
     using SafeMath for uint256;
@@ -175,7 +84,6 @@ contract Pool is Ownable, ReentrancyGuard, LzApp {
             ICEToken(reserve.ceToken).mint(treasury, ceAmountTreasury);
             reserve.ceSupply = reserve.ceSupply.add(ceAmountTreasury);
             emit Data.MintToTreasury(id, tokenAmountTreasury, ceAmountTreasury);
-            console.log(increasedAPY, tokenAmountTreasury, ceAmountTreasury, reserve.ceScaled);
         }
         reserve.lastUpdateTime = block.timestamp;
          
@@ -254,7 +162,7 @@ contract Pool is Ownable, ReentrancyGuard, LzApp {
         require(healthFactor(user).factor < MAX_HEALTH_FACTOR, "Health failed");
     }
 
-    function withdraw(bytes32 id, uint16 chainId, uint ceAmount) payable nonReentrant external {
+    function withdraw(bytes32 id, uint16 chainId, uint ceAmount, address to) payable nonReentrant external {
         refresh(id);
         Data.ReserveData storage reserve = reserves[id];
         require(reserve.enable, "Not enable now");
@@ -267,8 +175,8 @@ contract Pool is Ownable, ReentrancyGuard, LzApp {
         updateInterestRate(id);
 
         checkHealth(msg.sender);
-        _sendToken(id, chainId, msg.sender, tokenAmount);
-        emit Data.Withdraw(msg.sender, id, chainId, tokenAmount, ceAmount);
+        _sendToken(id, chainId, to, tokenAmount);
+        emit Data.Withdraw(msg.sender, to, id, chainId, tokenAmount, ceAmount);
     }
 
     // avoid stack too deep error
@@ -283,7 +191,7 @@ contract Pool is Ownable, ReentrancyGuard, LzApp {
     }
 
 
-    function borrow(bytes32 id, uint16 chainId, uint tokenAmount) payable nonReentrant external {
+    function borrow(bytes32 id, uint16 chainId, uint tokenAmount, address to) payable nonReentrant external {
         refresh(id);
         Data.BorrowParams memory params = _buildBorrowParams(id, chainId, tokenAmount);    
 
@@ -297,8 +205,8 @@ contract Pool is Ownable, ReentrancyGuard, LzApp {
         Data.HealthData memory healthData = healthFactor(msg.sender);
         require(healthData.collateralValue.mul(params.ltv).div(1e18) >= healthData.debtValue.add(tokenAmount.mul(params.price).div(1e18)), "LTV check failed");
 
-        _sendToken(id, chainId, msg.sender, tokenAmount);
-        emit Data.Borrow(msg.sender, id, chainId, tokenAmount, params.debtAmount);
+        _sendToken(id, chainId, to, tokenAmount);
+        emit Data.Borrow(msg.sender, to, id, chainId, tokenAmount, params.debtAmount);
     }
 
     // avoid stack too deep error

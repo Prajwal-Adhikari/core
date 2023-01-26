@@ -9,7 +9,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 // 1.decimal
 // 2.emergency withdraw
 
-contract Client is LzApp {
+contract Branch is LzApp {
     uint8 internal constant TYPE_DEPOSIT = 1;
     uint8 internal constant TYPE_REPAY = 2;
 
@@ -30,9 +30,6 @@ contract Client is LzApp {
 
     function setPool(bytes32 id, address token, bool enable) external onlyOwner {
         PoolInfo storage pool = pools[id];
-        if(pool.token == address(0)) {
-            pool.token = token;
-        }
         pool.enable = enable;
     }
 
@@ -56,16 +53,33 @@ contract Client is LzApp {
 
     function depositRequest(bytes32 id, uint amount) external payable {
         require(pools[id].enable, "Pool not enable");
-        IERC20(pools[id].token).safeTransferFrom(msg.sender, address(this), amount);
+        _pay(pools[id].token, amount);
         bytes memory payload = abi.encode(TYPE_DEPOSIT, id, msg.sender, amount);
         _send(serverChainId, payload);
     }
 
     function repayRequest(bytes32 id, uint amount) external payable {
         require(pools[id].enable, "Pool not enable");
-        IERC20(pools[id].token).safeTransferFrom(msg.sender, address(this), amount);
+        _pay(pools[id].token, amount);
         bytes memory payload = abi.encode(TYPE_REPAY, id, msg.sender, amount);
         _send(serverChainId, payload);
+    }
+
+    function _pay(address token, uint amount) internal {
+        if(token == address(0)) {
+            require(msg.value == amount, "Invalid amount");
+        } else {
+            IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
+        }
+    }
+
+    function _receive(address token, uint amount, address to) internal {
+        if(token == address(0)) {
+            payable(to).transfer(amount);
+        } else {
+            IERC20(token).safeTransfer(to, amount);
+        }
+        
     }
 
     function _send(uint16 chainId, bytes memory payload) internal {
@@ -74,6 +88,6 @@ contract Client is LzApp {
 
     function _blockingLzReceive(uint16, bytes memory, uint64, bytes memory _payload) internal override {
         (bytes32 id, address user, uint amount) = abi.decode(_payload, (bytes32, address, uint256));
-        IERC20(pools[id].token).safeTransfer(user, amount);
+        _receive(pools[id].token, amount, user);
     }
 }
