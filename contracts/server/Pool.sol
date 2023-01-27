@@ -8,7 +8,14 @@ import './interfaces/ICEToken.sol';
 import './interfaces/IDebtToken.sol';
 import './interfaces/IOracle.sol';
 import './libraries/Data.sol';
-
+/** 
+* Title Root
+* Root is deployed on a single chain where all the global data is stored. 
+* All the Branches are connected to Root, all of which sends deposit and repay information
+* to Root.
+* Most of the lending and borrowing logic like interest rate calculation, checks, etc. is in Root.
+* Users interact with Root for Borrow, Withdraw, and Liquidate actions.
+**/
 contract Pool is Ownable, ReentrancyGuard, LzApp {
     using SafeMath for uint256;
 
@@ -31,12 +38,25 @@ contract Pool is Ownable, ReentrancyGuard, LzApp {
         treasury = _treasury;
     }
 
+    /** 
+    * @dev Returns the estimated transaction fees to send a cross chain message to
+    * the destination chain with chain id `chainId`.
+    * @param chainId chain id of the destionation chain as specified by LayerZero
+    **/
     function estimateFees(uint16 chainId) public view returns (uint) {
         bytes memory payload = abi.encode("", chainId, msg.sender, 0);
         (uint fees, ) = lzEndpoint.estimateFees(chainId, address(this), payload, false, abi.encodePacked(uint16(1), GAS_USAGE));
         return fees;
     }
 
+    /**
+    * @dev Registers a new pool in the protocol. 
+    * This function can only be accessed by the contract owner.
+    * @param id id of the pool to be created
+    * @param config a ConfigData struct containing the interest rate and liqudation variables.
+    * @param _ceToken address to the ceToken smart contract for this pool.
+    * @param _debtToken address to the debtToken smart contract for this pool.
+    **/
     function initPool(bytes32 id, Data.ConfigData memory config, address _ceToken, address _debtToken) external onlyOwner {
         updateInterestRate(id);
         configs[id] = config;
@@ -47,22 +67,31 @@ contract Pool is Ownable, ReentrancyGuard, LzApp {
         reserve.dtScaled = 1e18;
     }
 
+    /**
+    * @dev Freezes/Unfreezes a pool with pool id `id`.
+    * This function is only accessible by the contract owner and can be used in extreme cases.
+    * @param id id of the pool to freeze/unfreeze
+    * @param enable bool to freeze/unfreeze
+    **/
     function changePoolStatus(bytes32 id, bool enable) external onlyOwner {
         reserves[id].enable = enable;
         emit Data.ChangePoolStatus(id, enable);
     }
 
-
+    /** 
+    * @dev Receive a cross chain message sent from the branch of chain with chain id `_srcChainId`.
+    * 
+    **/
     function _blockingLzReceive(uint16 _srcChainId, bytes memory , uint64 , bytes memory _payload) internal override {
         uint8 functionType;
         assembly {
-            functionType := mload(add(_payload, 32))
+            functionType := mload(add(_payload, 32))  // get the request type; either deposit or repay.
         }
 
-        if(functionType == TYPE_DEPOSIT) {
+        if(functionType == TYPE_DEPOSIT) {  
             (, bytes32 tokenId, address user, uint amount) = abi.decode(_payload, (uint8, bytes32, address, uint256));
             _deposit(tokenId, _srcChainId, user, amount);
-        } else if(functionType == TYPE_REPAY) {
+        } else if(functionType == TYPE_REPAY) { 
             (, bytes32 tokenId, address user, uint amount) = abi.decode(_payload, (uint8, bytes32, address, uint256));
             _repay(tokenId, _srcChainId, user, amount);
         } 
@@ -128,6 +157,10 @@ contract Pool is Ownable, ReentrancyGuard, LzApp {
         users[user].push(id);
     }
 
+    /** 
+    * @dev returns the health factor of the address `user`. 
+    * @param user wallet address for which the health factor is calculated.
+    **/
     function healthFactor(address user) public view returns(Data.HealthData memory health) {
         bytes32[] memory ids = users[user];
         if(ids.length > 0) {
@@ -162,6 +195,15 @@ contract Pool is Ownable, ReentrancyGuard, LzApp {
         require(healthFactor(user).factor < MAX_HEALTH_FACTOR, "Health failed");
     }
 
+    
+    /** 
+    * @dev sends a withdraw request of amount `ceAmount` to address `to` from pool with pool id `id`
+    * in chain with chain id `chainId`.
+    * @param id pool id of pool to withdraw from
+    * @param chainId chain id of chain to withdraw from
+    * @param ceAmount amount to withdraw
+    * @param to withdraw address
+    **/
     function withdraw(bytes32 id, uint16 chainId, uint ceAmount, address to) payable nonReentrant external {
         refresh(id);
         Data.ReserveData storage reserve = reserves[id];
@@ -190,7 +232,14 @@ contract Pool is Ownable, ReentrancyGuard, LzApp {
         params.debtToken = reserve.debtToken;
     }
 
-
+    /** 
+    * sends a borrow request of amount `tokenAmount` to address `to` from pool with pool id `id`
+    * in chain with chain id `chainId`.
+    * @param id pool id of pool to borrow from
+    * @param chainId chain id of chain to borrow from
+    * @param tokenAmount amount to borrow
+    * @param to borrow address
+    **/
     function borrow(bytes32 id, uint16 chainId, uint tokenAmount, address to) payable nonReentrant external {
         refresh(id);
         Data.BorrowParams memory params = _buildBorrowParams(id, chainId, tokenAmount);    
@@ -218,7 +267,13 @@ contract Pool is Ownable, ReentrancyGuard, LzApp {
         uint collateralValue = params.debtValue.mul(1e18).div(oracle.getSinglePrice(collateralId));
         params.ceCollateralAmount = collateralValue.add(collateralValue.mul(configs[collateralId].ltBonus).div(1e18));
     }
-
+    /**
+    * @dev liquidates the position of address `user`.
+    * @param user the address whose position is to be liquidated
+    * @param collateralId the pool id of the collateral asset
+    * @param debtId the pool id of the debt asset
+    * @param debtAmount total debt amount of user
+    **/
     function liquidate(address user, bytes32 collateralId, bytes32 debtId, uint debtAmount) external nonReentrant {
         require(user != msg.sender, "Same address");
         refresh(collateralId);
@@ -253,7 +308,15 @@ contract Pool is Ownable, ReentrancyGuard, LzApp {
         params.user = user;
     }
 
-
+    /** 
+    * @dev updates the global protocol states after receiving repay information
+    * of amount `tokenAmount` from address `user` for pool with pool id 'id' from
+    * chain with chain id `chainId`.
+    * @param id pool id of pool where amount was repaid to
+    * @param chainId chain id of chain repaid from
+    * @param tokenAmount amount repaid
+    * @param user repay address
+    **/
     function _repay(bytes32 id, uint16 chainId, address user, uint tokenAmount) internal {
         refresh(id);
         Data.RepayParams memory params = _buildRepayParams(reserves[id], user, tokenAmount);
@@ -276,6 +339,15 @@ contract Pool is Ownable, ReentrancyGuard, LzApp {
         emit Data.Repay(user, id, chainId, params.repayAmount, params.debtAmount, ceAmount);
     }
 
+    /** 
+    * @dev updates the global protocol states after receiving deposit information
+    * of amount `tokenAmount` from address `user` for pool with pool id 'id' from
+    * chain with chain id `chainId`.
+    * @param id pool id of pool where amount was deposited to
+    * @param chainId chain id of chain deposited to
+    * @param tokenAmount amount deposited
+    * @param user deposit address
+    **/
     function _deposit(bytes32 id, uint16 chainId, address user, uint tokenAmount) internal {
         refresh(id);
         Data.ReserveData storage reserve = reserves[id];
@@ -291,6 +363,13 @@ contract Pool is Ownable, ReentrancyGuard, LzApp {
         emit Data.Deposit(user, id, chainId, tokenAmount, ceAmount);
     }
 
+    /** 
+    * @dev sends a cross chain message to chain with chain id `chainId` to send
+    * `amount` to `user` from the pool with pool id `id`
+    * @param id pool id of pool to release amount from
+    * @param chainId chain id of chain to release the amount from
+    * @param amount amount to be released
+    * @param user deposit address    **/
     function _sendToken(bytes32 id, uint16 chainId, address user, uint amount) internal {
         bytes memory payload = abi.encode(id, user, amount);
         _lzSend(chainId, payload, payable(msg.sender), address(0x0), "");
