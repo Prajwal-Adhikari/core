@@ -209,7 +209,7 @@ contract Pool is Ownable, ReentrancyGuard, LzApp {
         emit Data.Borrow(msg.sender, to, id, chainId, tokenAmount, params.debtAmount);
     }
 
-    // avoid stack too deep error
+    // caluculate liquidate info and avoid stack too deep error
     function _buildLiquidateParams(bytes32 collateralId, bytes32 debtId, uint debtAmount) view internal returns(Data.LiquidateParams memory params) {
         Data.ReserveData memory debtReserve = reserves[debtId];
         params.debtValue = debtAmount.mul(debtReserve.dtScaled).div(1e18);
@@ -243,7 +243,7 @@ contract Pool is Ownable, ReentrancyGuard, LzApp {
         emit Data.Liquidate(user, msg.sender, debtId, collateralId, debtAmount, params.ceDebtAmount, params.ceCollateralAmount);
     }
 
-    // avoid stack too deep error
+    // calculate repay info and avoid stack too deep error
     function _buildRepayParams(Data.ReserveData memory reserve, address user, uint tokenAmount) view internal returns(Data.RepayParams memory params) {
         params.ceToken = reserve.ceToken;
         params.debtToken = reserve.debtToken;
