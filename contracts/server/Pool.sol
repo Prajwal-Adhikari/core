@@ -238,6 +238,8 @@ contract Pool is Ownable, ReentrancyGuard, LzApp {
         IDebtToken(collateralReserve.ceToken).burn(user, params.ceCollateralAmount);
         IDebtToken(collateralReserve.ceToken).mint(msg.sender, params.ceCollateralAmount);
         
+        updateInterestRate(collateralId);
+        updateInterestRate(debtId);
         emit Data.Liquidate(user, msg.sender, debtId, collateralId, debtAmount, params.ceDebtAmount, params.ceCollateralAmount);
     }
 
@@ -273,6 +275,8 @@ contract Pool is Ownable, ReentrancyGuard, LzApp {
         chains[chainId][id] += tokenAmount;
         IDebtToken(params.debtToken).burn(params.user, params.debtAmount);
         reserve.debtSupply -= params.debtAmount;
+        updateInterestRate(id);
+
         emit Data.Repay(user, id, chainId, params.repayAmount, params.debtAmount, ceAmount);
     }
 
