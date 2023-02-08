@@ -3,6 +3,30 @@
     "clientA": "0x55881caB0bEa6921C5557045e4476A2c3045094a",
     "oracle": "0xf58e99aDf44E2C00638a7ff6afE43149608cE3d2",
     "clientB": "0x597e6E157a21a961Af09aC9b4CD5796a0885616D",
+    "serverId": 10102,
+    "branches": {
+        "goerli": {
+            "ETH": "0xccb53d8A41CF4001763F971FBB24e472603E9809",
+            "USDC": "0x355bB937dA034797d7c38fA86632c801232D123d",
+            "branch": "0x7b2d99E1D1656a820Caa5DC145c0f9E5D5976DC4",
+            "endpoint": "0xbfD2135BFfbb0B5378b56643c2Df8a87552Bfa23",
+            "chainId": 10121
+        },
+        "polygon": {
+            "MATIC": "0x6c3bA5eC7EB433FaC8AA0a159b2c5eacFD34175A",
+            "USDC": "0x5fdCD64c86F96f8c8B8b75563f8cd7cAB64d6e78",
+            "branch": "0x3776dFa4E83e0AC7b989679C4210319CEaCCbbAA",
+            "endpoint": "0xf69186dfBa60DdB133E91E9A4B5673624293d8F8",
+            "chainId": 10109
+        },
+        "arbitrum": {
+            "ETH": "0xF143f587A65ABbf8a0266C6c1F3695504E06BF4C",
+            "USDC": "0x03860F63208227448896655331B53591293672c7",
+            "branch": "0xfcc32B35BC7D7DbAb73Af5a54820818ae7bff11B",
+            "endpoint": "0x6aB5Ae6822647046626e83ee6dB8187151E1d5ab",
+            "chainId": 10143
+        }
+    },
     "avax": {
         "AVAX": "0x7b2d99E1D1656a820Caa5DC145c0f9E5D5976DC4",
         "USDC": "0x69E28E205913D6E4Fd7913269EE545Bdf55fD0Ff"

@@ -8,6 +8,8 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 // todo
 // 1.decimal
 // 2.emergency withdraw
+// 3.gas value into params
+
 
 /** 
 * Title Branch
@@ -40,13 +42,14 @@ contract Branch is LzApp {
     function setPool(bytes32 id, address token, bool enable) external onlyOwner {
         PoolInfo storage pool = pools[id];
         pool.enable = enable;
+        pool.token = token;
     }
 
     function setGasUsage(uint _usage) external {
         GAS_USAGE = _usage;
     }
 
-    /** 
+    /*
     * @dev encodes the message type and returns the cross chain messaging fee for LayerZero.
     * @param funtionType message type, either deposit or repay information
     **/
@@ -96,7 +99,7 @@ contract Branch is LzApp {
     **/
     function _pay(address token, uint amount) internal {
         if(token == address(0)) {
-            require(msg.value == amount, "Invalid amount");
+            require(msg.value > amount, "Invalid amount");
         } else {
             IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
         }

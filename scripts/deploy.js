@@ -18,7 +18,7 @@ let fs = require("fs")
 
 
 const OracleFile = require("../artifacts/contracts/server/Oracle.sol/Oracle.json");
-const ClientFile = require("../artifacts/contracts/client/Client.sol/Client.json");
+const ClientFile = require("../artifacts/contracts/client/Branch.sol/Branch.json");
 const ServerFile = require("../artifacts/contracts/server/Pool.sol/Pool.json");
 const CeFile = require("../artifacts/contracts/server/CEToken.sol/CEToken.json");
 const DebtFile = require("../artifacts/contracts/server/DebtToken.sol/DebtToken.json");
