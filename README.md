@@ -1,5 +1,5 @@
 
-**Cedro: A chain Agnostic Liquidity platform**
+## **Cedro: A chain Agnostic Liquidity platform**
 
 Cedro is a cross chain liquidity platform where users can lend and borrow across multiple chains within a few clicks. Cedro’s architecture consists of three main components. 
 
