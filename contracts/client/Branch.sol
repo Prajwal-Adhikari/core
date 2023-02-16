@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.9;
 
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "../layerZero/lzApp/NonblockingLzApp.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 // todo
 // 1.decimal
-// 2.emergency withdraw
-// 3.gas value into params
+// 2.emergency withdraw\
 
 
 /** 
@@ -27,6 +27,8 @@ contract Branch is LzApp {
     uint public GAS_USAGE = 300000;
     uint16 public serverChainId;
     using SafeERC20 for IERC20;
+    using SafeMath for uint256;
+    address public localServer;
 
     struct PoolInfo {
         bool enable;
@@ -35,7 +37,7 @@ contract Branch is LzApp {
 
     mapping(bytes32 => PoolInfo) public pools;
 
-    constructor(address _lzEndpoint, uint16 _serverChainId) LzApp(_lzEndpoint) {
+    constructor(address _lzEndpoint, uint16 _localChainId, uint16 _serverChainId) LzApp(_lzEndpoint, _localChainId) {
         serverChainId = _serverChainId;
     }
 
@@ -74,9 +76,7 @@ contract Branch is LzApp {
     **/
     function depositRequest(bytes32 id, uint amount) external payable {
         require(pools[id].enable, "Pool not enable");
-        _pay(pools[id].token, amount);
-        bytes memory payload = abi.encode(TYPE_DEPOSIT, id, msg.sender, amount);
-        _send(serverChainId, payload);
+        _pay(pools[id].token, amount, id, TYPE_DEPOSIT);
     }
 
     /** 
@@ -86,9 +86,7 @@ contract Branch is LzApp {
     **/
     function repayRequest(bytes32 id, uint amount) external payable {
         require(pools[id].enable, "Pool not enable");
-        _pay(pools[id].token, amount);
-        bytes memory payload = abi.encode(TYPE_REPAY, id, msg.sender, amount);
-        _send(serverChainId, payload);
+        _pay(pools[id].token, amount, id, TYPE_REPAY);
     }
 
     /**
@@ -96,12 +94,17 @@ contract Branch is LzApp {
     * Called when contract receives deposit / repay request from an address.
     * @param token token address of the deposited / repaid token
     * @param amount amount of token deposited / repaid
+    * @param id pool id of the pool 
+    * @param functionType type of function
     **/
-    function _pay(address token, uint amount) internal {
+    function _pay(address token, uint amount, bytes32 id, uint8 functionType) internal {
+        bytes memory payload = abi.encode(functionType, id, msg.sender, amount);
         if(token == address(0)) {
-            require(msg.value > amount, "Invalid amount");
+            require(msg.value >= amount, "Invalid amount");
+            _send(serverChainId, payload, msg.value.sub(amount));
         } else {
             IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
+            _send(serverChainId, payload, msg.value);
         }
     }
     /**
@@ -121,11 +124,12 @@ contract Branch is LzApp {
     }
 
     // LayerZero functions
-    function _send(uint16 chainId, bytes memory payload) internal {
-        _lzSend(chainId, payload, payable(msg.sender), address(this), abi.encodePacked(uint16(1), GAS_USAGE));
+    function _send(uint16 chainId, bytes memory payload, uint gasValue) internal {
+        _lzSend(chainId, payload, payable(msg.sender), address(this), abi.encodePacked(uint16(1), GAS_USAGE), gasValue);
     }
 
-    function _blockingLzReceive(uint16, bytes memory, uint64, bytes memory _payload) internal override {
+    function _blockingLzReceive(uint16 _srcId, bytes memory, uint64, bytes memory _payload) internal override {
+        require(serverChainId == _srcId, "Invalid chainId");
         (bytes32 id, address user, uint amount) = abi.decode(_payload, (bytes32, address, uint256));
         _receive(pools[id].token, amount, user);
     }

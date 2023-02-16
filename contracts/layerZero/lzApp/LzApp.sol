@@ -11,13 +11,23 @@ import "../interfaces/ILayerZeroEndpoint.sol";
  */
 contract LzApp is Ownable, ILayerZeroReceiver, ILayerZeroUserApplicationConfig {
     ILayerZeroEndpoint public immutable lzEndpoint;
+    uint public localId;
 
     mapping(uint16 => bytes) public trustedRemoteLookup;
 
     event SetTrustedRemote(uint16 _srcChainId, bytes _srcAddress);
 
-    constructor(address _endpoint) {
+    constructor(address _endpoint, uint16 _localId) {
         lzEndpoint = ILayerZeroEndpoint(_endpoint);
+        localId = _localId;
+    }
+
+    function localReceive(uint16 _srcChainId, bytes memory _payload) public virtual override {
+        bytes memory trustedRemote = trustedRemoteLookup[_srcChainId];
+        bytes memory sender = abi.encodePacked(msg.sender);
+        require(sender.length == trustedRemote.length && keccak256(sender) == keccak256(trustedRemote), "LzApp: invalid source sending contract");
+
+        _blockingLzReceive(_srcChainId, sender, 0, _payload);
     }
 
     function lzReceive(uint16 _srcChainId, bytes memory _srcAddress, uint64 _nonce, bytes memory _payload) public virtual override {
@@ -37,10 +47,14 @@ contract LzApp is Ownable, ILayerZeroReceiver, ILayerZeroUserApplicationConfig {
 
     
 
-    function _lzSend(uint16 _dstChainId, bytes memory _payload, address payable _refundAddress, address _zroPaymentAddress, bytes memory _adapterParams) internal virtual {
+    function _lzSend(uint16 _dstChainId, bytes memory _payload, address payable _refundAddress, address _zroPaymentAddress, bytes memory _adapterParams, uint gasValue) internal virtual {
         bytes memory trustedRemote = trustedRemoteLookup[_dstChainId];
         require(trustedRemote.length != 0, "LzApp: destination chain is not a trusted source");
-        lzEndpoint.send{value: msg.value}(_dstChainId, trustedRemote, _payload, _refundAddress, _zroPaymentAddress, _adapterParams);
+        if(_dstChainId == localId) {
+            ILayerZeroReceiver(address(bytes20(trustedRemote))).localReceive(_dstChainId, _payload);
+        } else {
+            lzEndpoint.send{value: gasValue}(_dstChainId, trustedRemote, _payload, _refundAddress, _zroPaymentAddress, _adapterParams);
+        }
     }
 
     //---------------------------UserApplication config----------------------------------------

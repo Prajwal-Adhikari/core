@@ -34,7 +34,7 @@ contract Pool is Ownable, ReentrancyGuard, LzApp {
 
     uint public GAS_USAGE = 200000;
 
-    constructor(address _lzEndpoint, address _treasury) LzApp(_lzEndpoint) {
+    constructor(address _lzEndpoint, address _treasury, uint16 _localChainId) LzApp(_lzEndpoint, _localChainId) {
         treasury = _treasury;
     }
 
@@ -100,8 +100,7 @@ contract Pool is Ownable, ReentrancyGuard, LzApp {
     function refresh(bytes32 id) internal {
         Data.ReserveData storage reserve = reserves[id];
         if(reserve.ceSupply > 0) {
-            uint second = block.timestamp.sub(reserve.lastUpdateTime);
-            uint increasedDebt = second.mul(reserve.interestRate).div(YEAR);
+            uint increasedDebt = block.timestamp.sub(reserve.lastUpdateTime).mul(reserve.interestRate).div(YEAR);
             reserve.dtScaled = reserve.dtScaled.add(increasedDebt);
 
             uint increasedAPY = increasedDebt.mul(reserve.debtSupply).div(1e18);
@@ -147,7 +146,7 @@ contract Pool is Ownable, ReentrancyGuard, LzApp {
         }
         
     }
-// 0.39 * 0.5 / 0.5
+
     function addToken(address user, bytes32 id) internal {
         for(uint i = 0;i < users[user].length;i++) {
             if(users[user][i] == id) {
@@ -181,9 +180,8 @@ contract Pool is Ownable, ReentrancyGuard, LzApp {
     function _getValues(address user, uint price, bytes32 id) internal view returns(uint collateralValue, uint debtValue) {
         Data.ReserveData memory reserve = reserves[id];
         address _user = user;
-        uint second = block.timestamp.sub(reserve.lastUpdateTime);
 
-        uint increasedDebt = second.mul(reserve.interestRate).div(YEAR);
+        uint increasedDebt = block.timestamp.sub(reserve.lastUpdateTime).mul(reserve.interestRate).div(YEAR);
         uint dtScaled = reserve.dtScaled.add(increasedDebt);
         uint ceScaled = reserve.ceScaled.add(increasedDebt.mul(reserve.currentRatio).div(1e18).mul(1e18 - configs[id].tsuPercent).div(1e18));
         collateralValue = IERC20(reserve.ceToken).balanceOf(_user).mul(ceScaled).div(1e18).mul(price).div(1e18);
@@ -376,6 +374,6 @@ contract Pool is Ownable, ReentrancyGuard, LzApp {
     * @param user deposit address    **/
     function _sendToken(bytes32 id, uint16 chainId, address user, uint amount) internal {
         bytes memory payload = abi.encode(id, user, amount);
-        _lzSend(chainId, payload, payable(msg.sender), address(0x0), "");
+        _lzSend(chainId, payload, payable(msg.sender), address(0x0), "", msg.value);
     }
 }
