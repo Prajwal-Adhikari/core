@@ -82,21 +82,6 @@ library Data {
         uint ceCollateralAmount;
     }
 
-    function buildPoolData(address _ceToken, address _debtToken) external returns (ReserveData memory reserve) {
-        return Data.ReserveData({
-            interestRate: 0,
-            currentRatio: 0,
-            lastUpdateTime: block.timestamp,
-            ceSupply: 0,
-            debtSupply: 0,
-            enable: true,
-            ceToken: _ceToken,
-            debtToken: _debtToken,
-            ceScaled: 1e18,
-            dtScaled: 1e18
-            });
-    }
-
     event MintToTreasury(bytes32 id, uint tokenAmount, uint ceAmount);
     event Deposit(address user, bytes32 id, uint16 chainId, uint tokenAmount, uint ceAmount);
     event Withdraw(address user, address to, bytes32 id, uint16 chainId, uint tokenAmount, uint ceAmount);

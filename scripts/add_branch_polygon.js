@@ -44,7 +44,7 @@ async function main() {
   console.log("deploy branch")
 
   let Branch = await hre.ethers.getContractFactory("Branch");
-  this.branch = await Branch.deploy(deployed.endpoint, data.serverId);
+  this.branch = await Branch.deploy(deployed.endpoint, data.serverId, deployed.chainId);
   deployed["branch"] = this.branch.address;
 
   await (await this.matic.mint(owner, toTokenAmount(1000000))).wait();

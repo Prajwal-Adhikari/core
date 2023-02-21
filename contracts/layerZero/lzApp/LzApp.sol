@@ -9,7 +9,7 @@ import "../interfaces/ILayerZeroEndpoint.sol";
 /*
  * a generic LzReceiver implementation
  */
-contract LzApp is Ownable, ILayerZeroReceiver, ILayerZeroUserApplicationConfig {
+contract LzApp is Ownable, ILayerZeroReceiver {
     ILayerZeroEndpoint public immutable lzEndpoint;
     uint public localId;
 
@@ -57,25 +57,15 @@ contract LzApp is Ownable, ILayerZeroReceiver, ILayerZeroUserApplicationConfig {
         }
     }
 
-    //---------------------------UserApplication config----------------------------------------
-    function getConfig(uint16 _version, uint16 _chainId, address, uint _configType) external view returns (bytes memory) {
-        return lzEndpoint.getConfig(_version, _chainId, address(this), _configType);
-    }
-
-    // generic config for LayerZero user Application
-    function setConfig(uint16 _version, uint16 _chainId, uint _configType, bytes calldata _config) external override onlyOwner {
-        lzEndpoint.setConfig(_version, _chainId, _configType, _config);
-    }
-
-    function setSendVersion(uint16 _version) external override onlyOwner {
+    function setSendVersion(uint16 _version) external onlyOwner {
         lzEndpoint.setSendVersion(_version);
     }
 
-    function setReceiveVersion(uint16 _version) external override onlyOwner {
+    function setReceiveVersion(uint16 _version) external onlyOwner {
         lzEndpoint.setReceiveVersion(_version);
     }
 
-    function forceResumeReceive(uint16 _srcChainId, bytes calldata _srcAddress) external override onlyOwner {
+    function forceResumeReceive(uint16 _srcChainId, bytes calldata _srcAddress) external onlyOwner {
         lzEndpoint.forceResumeReceive(_srcChainId, _srcAddress);
     }
 
@@ -83,12 +73,5 @@ contract LzApp is Ownable, ILayerZeroReceiver, ILayerZeroUserApplicationConfig {
     function setTrustedRemote(uint16 _srcChainId, bytes calldata _srcAddress) external onlyOwner {
         trustedRemoteLookup[_srcChainId] = _srcAddress;
         emit SetTrustedRemote(_srcChainId, _srcAddress);
-    }
-
-    //--------------------------- VIEW FUNCTION ----------------------------------------
-
-    function isTrustedRemote(uint16 _srcChainId, bytes calldata _srcAddress) external view returns (bool) {
-        bytes memory trustedSource = trustedRemoteLookup[_srcChainId];
-        return keccak256(trustedSource) == keccak256(_srcAddress);
     }
 }

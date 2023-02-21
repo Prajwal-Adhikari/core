@@ -10,15 +10,27 @@ task("accounts", "Prints the list of accounts", async (taskArgs, hre) => {
 });
 module.exports = {
   solidity: "0.8.17",
-  settings: { optimizer: { enabled: true, runs: 1000, details: { yul: false }, }, },
+
+  settings: { optimizer: { enabled: true, runs: 200, details: { yul: false }, }, },
 
   networks: {
+    hardhat: {
+      allowUnlimitedContractSize: true,
+    },
     goerli: {
-      url: `https://goerli.blockpi.network/v1/rpc/public`,
+      url: `https://blue-clean-bird.ethereum-goerli.quiknode.pro/067369ceaa12334c72be132ef715f54682f05a1d/`,
+      accounts: [`0x${PRIVATE_KEY}`],
+    },
+    ftm: {
+      url: `https://fantom-testnet.public.blastapi.io`,
       accounts: [`0x${PRIVATE_KEY}`],
     },
     arbitrum: {
       url: `https://goerli-rollup.arbitrum.io/rpc`,
+      accounts: [`0x${PRIVATE_KEY}`],
+    },
+    avax: {
+      url: `https://api.avax-test.network/ext/bc/C/rpc`,
       accounts: [`0x${PRIVATE_KEY}`],
     },
     mainnet: {
@@ -37,9 +49,10 @@ module.exports = {
       url: `https://matic-mumbai.chainstacklabs.com`,
       accounts: [`0x${PRIVATE_KEY}`],
     },
-    bsctest: {
-      url: `https://bsc-testnet.public.blastapi.io`,
+    bsc: {
+      url: `https://bsc-testnet-rpc.allthatnode.com`,
       accounts: [`0x${PRIVATE_KEY}`],
+      gas: 4000000
     }
   }
 };

@@ -140,9 +140,6 @@ contract Pool is Ownable, ReentrancyGuard, LzApp {
                 reserve.interestRate = config.baseRate.add(config.slope1).add(currentRatio.sub(config.bestRatio).mul(config.slope2).div(one.sub(config.bestRatio)));
             }
             reserve.currentRatio = currentRatio;
-        } else {
-            reserve.interestRate = 0;
-            reserve.currentRatio = 0;
         }
         
     }
