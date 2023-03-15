@@ -130,7 +130,7 @@ contract Branch is LzApp {
 
     function _blockingLzReceive(uint16 _srcId, bytes memory, uint64, bytes memory _payload) internal override {
         require(serverChainId == _srcId, "Invalid chainId");
-        (bytes32 id, address user, uint amount) = abi.decode(_payload, (bytes32, address, uint256));
-        _receive(pools[id].token, amount, user);
+        (bytes32 id, bytes32 to, uint amount) = abi.decode(_payload, (bytes32, bytes32, uint256));
+        _receive(pools[id].token, amount, address(uint160(uint256(to))));
     }
 }

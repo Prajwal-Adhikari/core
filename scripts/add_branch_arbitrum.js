@@ -44,7 +44,7 @@ async function main() {
   console.log("deploy branch")
 
   let Branch = await hre.ethers.getContractFactory("Branch");
-  this.branch = await Branch.deploy(deployed.endpoint, data.serverId, deployed.chainId);
+  this.branch = await Branch.deploy(deployed.endpoint, deployed.chainId, data.serverId);
   deployed["branch"] = this.branch.address;
 
   await (await this.eth.mint(owner, toTokenAmount(1000000))).wait();

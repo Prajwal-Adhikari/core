@@ -18,7 +18,7 @@ module.exports = {
       allowUnlimitedContractSize: true,
     },
     goerli: {
-      url: `https://blue-clean-bird.ethereum-goerli.quiknode.pro/067369ceaa12334c72be132ef715f54682f05a1d/`,
+      url: `https://endpoints.omniatech.io/v1/eth/goerli/public`,
       accounts: [`0x${PRIVATE_KEY}`],
     },
     ftm: {

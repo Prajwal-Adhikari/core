@@ -18,7 +18,6 @@ const toTokenAmount = (amount, decimals = 18) => {
 }
 
 let data = require("../deployed.json");
-let deployed = data.polygon;
 let server = data.server;
 
 function getId(name) {
@@ -54,12 +53,17 @@ async function main() {
   // console.log("deploy token");
   // await deployToken("ETH");
   // await deployToken("MATIC");
+  // console.log("deploy token");
+  // for(let token of data.tokens) {
+  //   console.log(token);
+  //   await deployToken(token);
+  // }
 
+  console.log("set remote")
   for(let info of Object.values(data.branches)) {
     await (await this.server.setTrustedRemote(info.chainId, getAddress(server, info.branch))).wait()
   }
 
-  // await (await this.oracle.setPrice([getId("ETH"), getId("MATIC")], [toTokenAmount(1600), toTokenAmount(0.6)])).wait()
   console.log("complete");
 }
 

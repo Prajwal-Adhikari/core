@@ -13,7 +13,10 @@ const MATIC = ethers.utils.formatBytes32String("MATIC");
 const FTM = ethers.utils.formatBytes32String("FTM");
 const BNB = ethers.utils.formatBytes32String("BNB");
 let server, treasury, matic, ftm, bnb
-
+function getAddress(b, a) {
+  return ethers.utils.solidityPack(['address','address'],
+                    [a, b]);
+}
 describe("Ready", function () {
 
     beforeEach(async function () {
@@ -33,9 +36,9 @@ describe("Ready", function () {
         this.lzEndpointMockClientB = await LayerZeroEndpointMock.deploy(this.chainIdClientB)
         this.lzEndpointMockClientC = this.lzEndpointMockServer;
 
-        this.lzEndpointMockServer.setEstimatedFees(toTokenAmount(0.001), 0);
-        this.lzEndpointMockClientA.setEstimatedFees(toTokenAmount(0.001), 0);
-        this.lzEndpointMockClientB.setEstimatedFees(toTokenAmount(0.001), 0);
+        // this.lzEndpointMockServer.setEstimatedFees(toTokenAmount(0.001), 0);
+        // this.lzEndpointMockClientA.setEstimatedFees(toTokenAmount(0.001), 0);
+        // this.lzEndpointMockClientB.setEstimatedFees(toTokenAmount(0.001), 0);
 
         const CEToken = await ethers.getContractFactory("CEToken");
         this.ceMATIC = await CEToken.deploy("CEMATIC", "CEMATIC");
@@ -87,13 +90,13 @@ describe("Ready", function () {
         await this.lzEndpointMockClientB.setDestLzEndpoint(server.address, this.lzEndpointMockServer.address)
 
         // set each contracts source address so it can send to each other
-        await this.clientA.setTrustedRemote(this.chainIdServer, server.address)
-        await this.clientB.setTrustedRemote(this.chainIdServer, server.address)
-        await this.clientC.setTrustedRemote(this.chainIdServer, server.address)
+        await this.clientA.setTrustedRemote(this.chainIdServer, getAddress(this.clientA.address, server.address))
+        await this.clientB.setTrustedRemote(this.chainIdServer, getAddress(this.clientB.address, server.address))
+        await this.clientC.setTrustedRemote(this.chainIdServer, getAddress(this.clientC.address, server.address))
 
-        await server.setTrustedRemote(this.chainIdClientA, this.clientA.address)
-        await server.setTrustedRemote(this.chainIdClientB, this.clientB.address)
-        await server.setTrustedRemote(this.chainIdClientC, this.clientC.address)
+        await server.setTrustedRemote(this.chainIdClientA, getAddress(server.address, this.clientA.address))
+        await server.setTrustedRemote(this.chainIdClientB, getAddress(server.address, this.clientB.address))
+        await server.setTrustedRemote(this.chainIdClientC, getAddress(server.address, this.clientC.address))
 
         await matic.mint(alice.address, toTokenAmount(1e6))
         await ftm.mint(alice.address, toTokenAmount(1e6))

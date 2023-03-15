@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "../interfaces/ILayerZeroReceiver.sol";
 import "../interfaces/ILayerZeroUserApplicationConfig.sol";
 import "../interfaces/ILayerZeroEndpoint.sol";
+
 /*
  * a generic LzReceiver implementation
  */
@@ -24,7 +25,8 @@ contract LzApp is Ownable, ILayerZeroReceiver {
 
     function localReceive(uint16 _srcChainId, bytes memory _payload) public virtual override {
         bytes memory trustedRemote = trustedRemoteLookup[_srcChainId];
-        bytes memory sender = abi.encodePacked(msg.sender);
+        bytes memory sender = abi.encodePacked(msg.sender, address(this));
+
         require(sender.length == trustedRemote.length && keccak256(sender) == keccak256(trustedRemote), "LzApp: invalid source sending contract");
 
         _blockingLzReceive(_srcChainId, sender, 0, _payload);
