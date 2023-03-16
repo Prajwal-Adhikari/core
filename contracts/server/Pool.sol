@@ -8,6 +8,8 @@ import './interfaces/ICEToken.sol';
 import './interfaces/IDebtToken.sol';
 import './interfaces/IOracle.sol';
 import './libraries/Data.sol';
+import './FeeProvider.sol';
+
 /** 
 * Title Root
 * Root is deployed on a single chain where all the global data is stored. 
@@ -21,6 +23,11 @@ contract Pool is Ownable, ReentrancyGuard, LzApp {
 
     IOracle public oracle;
     address public treasury;
+    address public cedroToken;
+    address public feeProvider;
+
+    bool public feeEnable;
+    bool public rewardEnable;
 
     uint8 internal constant TYPE_DEPOSIT = 1;
     uint8 internal constant TYPE_REPAY = 2;
@@ -36,6 +43,38 @@ contract Pool is Ownable, ReentrancyGuard, LzApp {
 
     constructor(address _lzEndpoint, address _treasury, uint16 _localChainId) LzApp(_lzEndpoint, _localChainId) {
         treasury = _treasury;
+    }
+
+    /**
+    * @dev Sets Cedro contract. 
+    * This function can only be accessed by the contract owner.
+    * @param _cedroTokenAddress address of the Cedro Token contract.
+    **/
+    function setCedroToken(address _cedroTokenAddress) external onlyOwner {
+        cedroToken = _cedroTokenAddress;
+
+    }
+
+    /**
+    * @dev Configures fee provider contract. 
+    * This function can only be accessed by the contract owner.
+    * @param _feeProviderAddress address of the fee provider contract.
+    **/
+    function setFeeProvider(address _feeProviderAddress) external onlyOwner {
+        feeProvider = _feeProviderAddress;
+
+    }
+
+    /**
+    * @dev Configures fee and reward status. 
+    * This function can only be accessed by the contract owner.
+    * @param _feeEnable status of the fee.
+    * @param _rewardEnable status of the reward.
+    **/
+    function setFeeRewardStatus(bool _feeEnable, bool _rewardEnable) external onlyOwner {
+        feeEnable = _feeEnable;
+        rewardEnable = _rewardEnable;
+
     }
 
     /** 
@@ -185,10 +224,6 @@ contract Pool is Ownable, ReentrancyGuard, LzApp {
         debtValue = IERC20(reserve.debtToken).balanceOf(_user).mul(dtScaled).div(1e18).mul(price).div(1e18);
     }
 
-    function _bytes32ToAddress(bytes32 _bytes) pure internal returns (address addr){
-        addr = address(uint160(uint256(_bytes)));
-    }
-
 
     function checkHealth(address user) view public {
         require(healthFactor(user).factor < MAX_HEALTH_FACTOR, "Health failed");
@@ -203,7 +238,7 @@ contract Pool is Ownable, ReentrancyGuard, LzApp {
     * @param ceAmount amount to withdraw
     * @param to withdraw address
     **/
-    function withdraw(bytes32 id, uint16 chainId, uint ceAmount, bytes32 to) payable nonReentrant external {
+    function withdraw(bytes32 id, uint16 chainId, uint ceAmount, address to) payable nonReentrant external {
         refresh(id);
         Data.ReserveData storage reserve = reserves[id];
         require(reserve.enable, "Not enable now");
@@ -211,13 +246,18 @@ contract Pool is Ownable, ReentrancyGuard, LzApp {
         uint tokenAmount = reserve.ceScaled.mul(ceAmount).div(1e18);
         require(chains[chainId][id] >= tokenAmount, "No enough liquidity");
         ICEToken(reserve.ceToken).burn(msg.sender, ceAmount);
-        reserve.ceSupply = reserve.ceSupply.sub(ceAmount);
+        reserve.ceSupply = reserve.ceSupply.sub(ceAmount);  
         chains[chainId][id] -= tokenAmount;
         updateInterestRate(id);
 
+        if(feeEnable){
+        uint fee = FeeProvider(feeProvider).getFeeAmount(chainId, id);
+        tokenAmount -= fee;
+        }
+
         checkHealth(msg.sender);
         _sendToken(id, chainId, to, tokenAmount);
-        emit Data.Withdraw(msg.sender, _bytes32ToAddress(to), id, chainId, tokenAmount, ceAmount);
+        emit Data.Withdraw(msg.sender, to, id, chainId, tokenAmount, ceAmount);
     }
 
     // avoid stack too deep error
@@ -239,7 +279,7 @@ contract Pool is Ownable, ReentrancyGuard, LzApp {
     * @param tokenAmount amount to borrow
     * @param to borrow address
     **/
-    function borrow(bytes32 id, uint16 chainId, uint tokenAmount, bytes32 to) payable nonReentrant external {
+    function borrow(bytes32 id, uint16 chainId, uint tokenAmount, address to) payable nonReentrant external {
         refresh(id);
         Data.BorrowParams memory params = _buildBorrowParams(id, chainId, tokenAmount);    
 
@@ -253,8 +293,13 @@ contract Pool is Ownable, ReentrancyGuard, LzApp {
         Data.HealthData memory healthData = healthFactor(msg.sender);
         require(healthData.collateralValue.mul(params.ltv).div(1e18) >= healthData.debtValue.add(tokenAmount.mul(params.price).div(1e18)), "LTV check failed");
 
+        if(feeEnable){
+        uint fee = FeeProvider(feeProvider).getFeeAmount(chainId, id);
+        tokenAmount -= fee;
+        }
+
         _sendToken(id, chainId, to, tokenAmount);
-        emit Data.Borrow(msg.sender, _bytes32ToAddress(to), id, chainId, tokenAmount, params.debtAmount);
+        emit Data.Borrow(msg.sender, to, id, chainId, tokenAmount, params.debtAmount);
     }
 
     // caluculate liquidate info and avoid stack too deep error
@@ -333,6 +378,11 @@ contract Pool is Ownable, ReentrancyGuard, LzApp {
             params.repayAmount = params.tokenAmount;
             params.debtAmount = params.repayAmount.mul(1e18).div(params.dtScaled);
         }
+        
+        if(rewardEnable){
+        uint reward = FeeProvider(feeProvider).getFeeAmount(chainId, id);
+        IERC20(cedroToken).transfer(user, reward);
+        }
 
         chains[chainId][id] += tokenAmount;
         IDebtToken(params.debtToken).burn(params.user, params.debtAmount);
@@ -359,6 +409,11 @@ contract Pool is Ownable, ReentrancyGuard, LzApp {
         uint ceAmount = tokenAmount.mul(1e18).div(reserve.ceScaled);
         ICEToken(reserve.ceToken).mint(user, ceAmount);
         reserve.ceSupply = reserve.ceSupply.add(ceAmount);
+
+        if(rewardEnable){
+        uint reward = FeeProvider(feeProvider).getFeeAmount(chainId, id);
+        IERC20(cedroToken).transfer(user, reward);
+        }
         chains[chainId][id] += tokenAmount;
         updateInterestRate(id);
 
@@ -373,8 +428,17 @@ contract Pool is Ownable, ReentrancyGuard, LzApp {
     * @param chainId chain id of chain to release the amount from
     * @param amount amount to be released
     * @param user deposit address    **/
-    function _sendToken(bytes32 id, uint16 chainId, bytes32 user, uint amount) internal {
+    function _sendToken(bytes32 id, uint16 chainId, address user, uint amount) internal {
         bytes memory payload = abi.encode(id, user, amount);
         _lzSend(chainId, payload, payable(msg.sender), address(0x0), "", msg.value);
+    }
+
+    /**
+    * @dev Returns liquidity of an asset for a chain
+    * @param _chainId id of the chain.
+    * @param _poolId id of the pool.
+    **/
+    function getLiquidity( uint16 _chainId, bytes32 _poolId) public view returns (uint){
+       return chains[_chainId][_poolId];
     }
 }
