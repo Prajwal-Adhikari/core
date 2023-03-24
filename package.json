@@ -2,11 +2,12 @@
   "name": "hardhat-project",
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^2.0.0",
-    "hardhat": "^2.11.2"
+    "hardhat": "^2.13.0",
+    "hardhat-contract-sizer": "^2.8.0"
   },
   "dependencies": {
     "@openzeppelin/contracts": "^4.7.3",
-    "socks-proxy-agent": "^7.0.0",
-    "chain": "^0.4.0"
+    "chain": "^0.4.0",
+    "socks-proxy-agent": "^7.0.0"
   }
 }

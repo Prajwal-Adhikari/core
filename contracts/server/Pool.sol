@@ -8,6 +8,7 @@ import './interfaces/ICEToken.sol';
 import './interfaces/IDebtToken.sol';
 import './interfaces/IOracle.sol';
 import './libraries/Data.sol';
+
 /** 
 * Title Root
 * Root is deployed on a single chain where all the global data is stored. 
@@ -24,7 +25,7 @@ contract Pool is Ownable, ReentrancyGuard, LzApp {
 
     uint8 internal constant TYPE_DEPOSIT = 1;
     uint8 internal constant TYPE_REPAY = 2;
-
+    uint constant public BASE = 10 ** 18;
     uint constant public MAX_HEALTH_FACTOR = 1e18;
     uint constant public YEAR = 365 * 86400;
     mapping(bytes32 => Data.ReserveData) public reserves;
@@ -44,7 +45,7 @@ contract Pool is Ownable, ReentrancyGuard, LzApp {
     * @param chainId chain id of the destionation chain as specified by LayerZero
     **/
     function estimateFees(uint16 chainId) public view returns (uint) {
-        bytes memory payload = abi.encode("", chainId, msg.sender, 0);
+        bytes memory payload = abi.encode("", chainId, msg.sender, 0, 0);
         (uint fees, ) = lzEndpoint.estimateFees(chainId, address(this), payload, false, abi.encodePacked(uint16(1), GAS_USAGE));
         return fees;
     }
@@ -83,17 +84,24 @@ contract Pool is Ownable, ReentrancyGuard, LzApp {
     * 
     **/
     function _blockingLzReceive(uint16 _srcChainId, bytes memory , uint64 , bytes memory _payload) internal override {
-        uint8 functionType;
+        
+        bytes32 tokenId;
+        bytes32 user;
+        uint64 amountpx;
+        uint64 amountsx;
+        uint8 functionType = uint8(_payload[0]);
         assembly {
-            functionType := mload(add(_payload, 32))  // get the request type; either deposit or repay.
+            tokenId := mload(add(_payload, 33))
+            user := mload(add(_payload, 65))
+            amountpx := mload(add(_payload, 73))
+            amountsx := mload(add(_payload, 81))
         }
-
+        // (, bytes32 tokenId, bytes memory user, uint64 amountpx, uint64 amountsx) = abi.decode(_payload, (uint8, bytes32, bytes, uint64, uint64));
+        uint amount = uint(amountpx) * BASE +  uint(amountsx);
         if(functionType == TYPE_DEPOSIT) {  
-            (, bytes32 tokenId, address user, uint amount) = abi.decode(_payload, (uint8, bytes32, address, uint256));
-            _deposit(tokenId, _srcChainId, user, amount);
+            _deposit(tokenId, _srcChainId, _bytesToAddress(user), amount);
         } else if(functionType == TYPE_REPAY) { 
-            (, bytes32 tokenId, address user, uint amount) = abi.decode(_payload, (uint8, bytes32, address, uint256));
-            _repay(tokenId, _srcChainId, user, amount);
+            _repay(tokenId, _srcChainId, _bytesToAddress(user), amount);
         } 
     }
 
@@ -185,8 +193,8 @@ contract Pool is Ownable, ReentrancyGuard, LzApp {
         debtValue = IERC20(reserve.debtToken).balanceOf(_user).mul(dtScaled).div(1e18).mul(price).div(1e18);
     }
 
-    function _bytes32ToAddress(bytes32 _bytes) pure internal returns (address addr){
-        addr = address(uint160(uint256(_bytes)));
+    function _bytesToAddress(bytes32 bys) private pure returns (address addr) {
+        return address(uint160(uint256(bys)));
     }
 
 
@@ -217,7 +225,7 @@ contract Pool is Ownable, ReentrancyGuard, LzApp {
 
         checkHealth(msg.sender);
         _sendToken(id, chainId, to, tokenAmount);
-        emit Data.Withdraw(msg.sender, _bytes32ToAddress(to), id, chainId, tokenAmount, ceAmount);
+        emit Data.Withdraw(msg.sender, _bytesToAddress(to), id, chainId, tokenAmount, ceAmount);
     }
 
     // avoid stack too deep error
@@ -254,7 +262,7 @@ contract Pool is Ownable, ReentrancyGuard, LzApp {
         require(healthData.collateralValue.mul(params.ltv).div(1e18) >= healthData.debtValue.add(tokenAmount.mul(params.price).div(1e18)), "LTV check failed");
 
         _sendToken(id, chainId, to, tokenAmount);
-        emit Data.Borrow(msg.sender, _bytes32ToAddress(to), id, chainId, tokenAmount, params.debtAmount);
+        emit Data.Borrow(msg.sender, _bytesToAddress(to), id, chainId, tokenAmount, params.debtAmount);
     }
 
     // caluculate liquidate info and avoid stack too deep error
@@ -374,7 +382,7 @@ contract Pool is Ownable, ReentrancyGuard, LzApp {
     * @param amount amount to be released
     * @param user deposit address    **/
     function _sendToken(bytes32 id, uint16 chainId, bytes32 user, uint amount) internal {
-        bytes memory payload = abi.encode(id, user, amount);
+        bytes memory payload = abi.encode(id, user, uint64(amount / BASE), uint64(amount % BASE));
         _lzSend(chainId, payload, payable(msg.sender), address(0x0), "", msg.value);
     }
 }

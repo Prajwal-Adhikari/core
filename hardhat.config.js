@@ -1,4 +1,5 @@
 require("@nomicfoundation/hardhat-toolbox");
+require('hardhat-contract-sizer');
 const PRIVATE_KEY = process.env.PRIVATE_KEY;
 /** @type import('hardhat/config').HardhatUserConfig */
 task("accounts", "Prints the list of accounts", async (taskArgs, hre) => {
@@ -9,17 +10,34 @@ task("accounts", "Prints the list of accounts", async (taskArgs, hre) => {
   }
 });
 module.exports = {
-  solidity: "0.8.17",
+  solidity: {
+    version: "0.8.17",
+    settings: {
+      optimizer: {
+        enabled: true,
+        runs: 200
+      }
+    }
+  },
 
-  settings: { optimizer: { enabled: true, runs: 200, details: { yul: false }, }, },
+  contractSizer: {
+    runOnCompile: true,
+    alphaSort: false,
+    disambiguatePaths: false,
+    strictMode: true,
+    ignoreFiles: [],
+    reportGas: true,
+    maxMethodDiff: 10,
+    targets: [
+      { path: "contracts/server/Pool.sol", name: "Pool" }
+    ]
+  },
 
   networks: {
-    hardhat: {
-      allowUnlimitedContractSize: true,
-    },
     goerli: {
-      url: `https://endpoints.omniatech.io/v1/eth/goerli/public`,
+      url: `https://eth-goerli.public.blastapi.io`,
       accounts: [`0x${PRIVATE_KEY}`],
+      gas: 4000000
     },
     ftm: {
       url: `https://fantom-testnet.public.blastapi.io`,

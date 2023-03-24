@@ -31,7 +31,8 @@ contract DebtToken is ERC20, Ownable {
         address from,
         address to,
         uint256 amount
-    ) internal override {
+    ) internal pure override {
+        (from, to, amount);
         require(false, "Cannot transfer debt token");
     }
 

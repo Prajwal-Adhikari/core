@@ -50,17 +50,15 @@ async function main() {
   this.server = await hre.ethers.getContractAt("Pool", server);
   this.oracle = await hre.ethers.getContractAt("Oracle", data.oracle);
 
-  // console.log("deploy token");
-  // await deployToken("ETH");
-  // await deployToken("MATIC");
-  // console.log("deploy token");
-  // for(let token of data.tokens) {
-  //   console.log(token);
-  //   await deployToken(token);
-  // }
+  console.log("deploy token");
+  for(let token of data.tokens) {
+    console.log(token);
+    await deployToken(token);
+  }
 
-  console.log("set remote")
+  
   for(let info of Object.values(data.branches)) {
+    console.log(`set remote ${info.chainId}`)
     await (await this.server.setTrustedRemote(info.chainId, getAddress(server, info.branch))).wait()
   }
 
