@@ -5,8 +5,11 @@
     "hardhat": "^2.11.2"
   },
   "dependencies": {
+    "@nomicfoundation/solidity-analyzer-linux-x64-gnu": "^0.1.1",
     "@openzeppelin/contracts": "^4.7.3",
-    "socks-proxy-agent": "^7.0.0",
-    "chain": "^0.4.0"
+    "@openzeppelin/contracts-upgradeable": "^4.8.2",
+    "@openzeppelin/hardhat-upgrades": "^1.22.1",
+    "chain": "^0.4.0",
+    "socks-proxy-agent": "^7.0.0"
   }
 }
