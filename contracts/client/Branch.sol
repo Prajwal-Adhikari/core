@@ -2,7 +2,7 @@
 pragma solidity ^0.8.9;
 
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
-import "../layerZero/lzApp/NonblockingLzApp.sol";
+import "../layerZero/lzApp/LzApp.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
@@ -20,11 +20,11 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 * Users interact with Branch for Deposit and Repay actions.
 **/
 
-contract Branch is LzApp {
+contract Branch is Initializable, LzApp {
     uint8 internal constant TYPE_DEPOSIT = 1;
     uint8 internal constant TYPE_REPAY = 2;
 
-    uint public GAS_USAGE = 300000;
+    uint public GAS_USAGE;
     uint16 public serverChainId;
     using SafeERC20 for IERC20;
     using SafeMath for uint256;
@@ -37,8 +37,10 @@ contract Branch is LzApp {
 
     mapping(bytes32 => PoolInfo) public pools;
 
-    constructor(address _lzEndpoint, uint16 _localChainId, uint16 _serverChainId) LzApp(_lzEndpoint, _localChainId) {
+    function initialize(address _lzEndpoint, uint16 _localChainId, uint16 _serverChainId, uint _gas) public initializer {
+        __LzApp_init(_lzEndpoint, _localChainId);
         serverChainId = _serverChainId;
+        GAS_USAGE = _gas;
     }
 
     function setPool(bytes32 id, address token, bool enable) external onlyOwner {
