@@ -3,8 +3,7 @@ pragma solidity ^0.8.9;
 
 import './Pool.sol';
 
-contract FeeProvider is Ownable{
-
+contract FeeProvider is OwnableUpgradeable{
     using SafeMath for uint256;
 
     uint16[] public chainList;
@@ -13,15 +12,15 @@ contract FeeProvider is Ownable{
     mapping(uint16 => mapping(bytes32 => uint)) public BASE_FEE;
     mapping(uint16 => mapping(bytes32 => uint)) public MAX_FEE;
     
-    Pool public pool;
+    address public core;
 
     /**
-    * @dev Configures pool contract. 
+    * @dev Sets core contract. 
     * This function can only be accessed by the contract owner.
-    * @param _poolAddress address of the pool.
+    * @param _coreAddress address of the pool.
     **/
-    function configurePool(address _poolAddress) external onlyOwner {
-        pool = Pool(_poolAddress);
+    function setCore(address _coreAddress) external onlyOwner {
+        core = _coreAddress;
 
     }
 
@@ -121,11 +120,8 @@ contract FeeProvider is Ownable{
     * @param _poolId id of the pool.
     **/
     function _getGlobalLiquidityFactor(uint16 _chainId, bytes32 _poolId) internal view returns (uint){
-        uint totalLiquidity = 0; 
-        for (uint256 i = 0; i < chainList.length; i++){
-            totalLiquidity += pool.getLiquidity(chainList[i], _poolId);
-        }
-        return totalLiquidity > 0 ? pool.getLiquidity(_chainId, _poolId).div(totalLiquidity): 0;
+        uint totalLiquidity = Core(core).getTotalLiquidity(_poolId);
+        return totalLiquidity > 0 ? Core(core).getLiquidity(_chainId, _poolId).div(totalLiquidity): 0;
     }
 
 }
