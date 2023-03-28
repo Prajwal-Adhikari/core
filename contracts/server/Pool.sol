@@ -272,8 +272,9 @@ contract Pool is Ownable, ReentrancyGuard, LzApp {
         params.ceDebtAmount = params.debtValue.mul(1e18).div(debtReserve.ceScaled);
  
         uint collateralValue = params.debtValue.mul(1e18).div(oracle.getSinglePrice(collateralId));
-        params.ceCollateralAmount = collateralValue.add(collateralValue.mul(configs[collateralId].ltBonus).div(1e18));
+        params.ceCollateralAmount = collateralValue.add(collateralValue.mul(configs[collateralId].ltMaxDiscount).div(1e18));
     }
+
     /**
     * @dev liquidates the position of address `user`.
     * @param user the address whose position is to be liquidated
@@ -286,7 +287,26 @@ contract Pool is Ownable, ReentrancyGuard, LzApp {
         refresh(collateralId);
         refresh(debtId);
         Data.HealthData memory healthData = healthFactor(user);
+        Data.ConfigData memory config = configs[collateralId];
         require(healthData.factor >= MAX_HEALTH_FACTOR, "Cannot liquidate now");
+
+        uint currentLTV = healthData.debtValue.mul(1e18).div(healthData.collateralValue);
+        uint discount;
+        uint liqPercent = 1e18;
+        if(currentLTV < 1e18) {
+           discount = 1e36 / currentLTV - 999000000000000000;
+           if(discount > config.ltMaxDiscount) {
+             discount = config.ltMaxDiscount;
+           }
+
+           uint p1 = config.liqClosingFac.mul(1e18 - currentLTV).div(1e18 - config.liqThreshold);
+           if(currentLTV > config.liqThreshold) {
+                liqPercent = p1.add(currentLTV.sub(config.liqThreshold).mul(1e18).div(1e18 - config.liqThreshold));
+           } else {
+                liqPercent = p1.add(config.liqThreshold.sub(currentLTV).mul(1e18).div(1e18 - config.liqThreshold));
+           }
+        }       
+
         Data.ReserveData storage debtReserve = reserves[debtId];
         Data.ReserveData memory collateralReserve = reserves[collateralId];
         Data.LiquidateParams memory params = _buildLiquidateParams(collateralId, debtId, debtAmount);

@@ -13,7 +13,7 @@ async function main() {
   let Oracle = await hre.ethers.getContractFactory("Oracle");
   let Server = await hre.ethers.getContractFactory("Pool");
 
-  this.oracle = await Oracle.deploy();
+  this.oracle = await hre.ethers.getContractAt("Oracle", deployed.oracle);
   this.server = await Server.deploy(deployed.endpoint, deployed.treasury, deployed.serverId);
   await this.server.setOracle(this.oracle.address)
 
