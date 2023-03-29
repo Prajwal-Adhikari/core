@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.9;
+import "hardhat/console.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -7,9 +8,10 @@ import "../layerZero/lzApp/LzApp.sol";
 import './interfaces/ICEToken.sol';
 import './interfaces/IDebtToken.sol';
 import './interfaces/IOracle.sol';
+import './interfaces/ICore.sol';
+import './interfaces/IFeeProvider.sol';
 import './libraries/Data.sol';
-import './FeeProvider.sol';
-import './Core.sol';
+
 
 /** 
 * Title Root
@@ -31,8 +33,6 @@ contract Pool is Initializable, ReentrancyGuardUpgradeable, LzApp {
 
     uint8 internal constant TYPE_DEPOSIT = 1;
     uint8 internal constant TYPE_REPAY = 2;
-
-    uint constant public MAX_HEALTH_FACTOR = 1e18;
 
     uint public GAS_USAGE;
 
@@ -119,11 +119,6 @@ contract Pool is Initializable, ReentrancyGuardUpgradeable, LzApp {
         addr = address(uint160(uint256(_bytes)));
     }
 
-
-    function checkHealth(address user) view public {
-        require(Core(core).healthFactor(user).factor < MAX_HEALTH_FACTOR, "Health failed");
-    }
-
     
     /** 
     * @dev sends a withdraw request of amount `ceAmount` to address `to` from pool with pool id `id`
@@ -134,13 +129,11 @@ contract Pool is Initializable, ReentrancyGuardUpgradeable, LzApp {
     * @param to withdraw address
     **/
     function withdraw(bytes32 id, uint16 chainId, uint ceAmount, bytes32 to) payable nonReentrant external {
-        uint tokenAmount = Core(core).withdraw(id, chainId, ceAmount, msg.sender);
+        uint tokenAmount = ICore(core).withdraw(id, chainId, ceAmount, msg.sender);
         // if(feeEnable){
-        // uint fee = FeeProvider(feeProvider).getFeeAmount(chainId, id);
+        // uint fee = IFeeProvider(feeProvider).getFeeAmount(chainId, id);
         // tokenAmount -= fee;
         // }
-
-        checkHealth(msg.sender);
         _sendToken(id, chainId, to, tokenAmount);
         emit Data.Withdraw(msg.sender, _bytes32ToAddress(to), id, chainId, tokenAmount, ceAmount);
     }
@@ -154,9 +147,9 @@ contract Pool is Initializable, ReentrancyGuardUpgradeable, LzApp {
     * @param to borrow address
     **/
     function borrow(bytes32 id, uint16 chainId, uint tokenAmount, bytes32 to) payable nonReentrant external {
-        uint debtAmount = Core(core).borrow(id, chainId, tokenAmount, msg.sender);
+        uint debtAmount = ICore(core).borrow(id, chainId, tokenAmount, msg.sender);
         // if(feeEnable){  
-        // uint fee = FeeProvider(feeProvider).getFeeAmount(chainId, id);
+        // uint fee = IFeeProvider(feeProvider).getFeeAmount(chainId, id);
         // tokenAmount -= fee;
         // }
         _sendToken(id, chainId, to, tokenAmount);
@@ -214,9 +207,9 @@ contract Pool is Initializable, ReentrancyGuardUpgradeable, LzApp {
     **/
     function _repay(bytes32 id, uint16 chainId, address user, uint tokenAmount) internal {
        
-        (uint repayAmount, uint debtAmount, uint ceAmount) = Core(core).repay(id, chainId, user, tokenAmount);
+        (uint repayAmount, uint debtAmount, uint ceAmount) = ICore(core).repay(id, chainId, user, tokenAmount);
         // if(rewardEnable){
-        // uint reward = FeeProvider(feeProvider).getFeeAmount(chainId, id);
+        // uint reward = IFeeProvider(feeProvider).getFeeAmount(chainId, id);
         // IERC20(cedroToken).transfer(user, reward);
         // }
         emit Data.Repay(user, id, chainId, repayAmount, debtAmount, ceAmount);
@@ -232,12 +225,15 @@ contract Pool is Initializable, ReentrancyGuardUpgradeable, LzApp {
     * @param user deposit address
     **/
     function _deposit(bytes32 id, uint16 chainId, address user, uint tokenAmount) internal {
-        // if(rewardEnable){
-        // uint reward = FeeProvider(feeProvider).getFeeAmount(chainId, id);
-        // IERC20(cedroToken).transfer(user, reward);
-        // }
-        uint ceAmount = Core(core).deposit(id, chainId, user, tokenAmount);
-        emit Data.Deposit(user, id, chainId, tokenAmount, ceAmount);
+        
+        if(rewardEnable){
+        uint reward = IFeeProvider(feeProvider).getFeeAmount(chainId, id);
+        console.log("reward",reward);
+        IERC20(cedroToken).transfer(user, reward);
+        }
+        uint ceAmount = ICore(core).deposit(id, chainId, user, tokenAmount);
+        
+        emit Data.Deposit(user, id, chainId, tokenAmount, 10);
     }
 
     /** 

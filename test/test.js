@@ -55,6 +55,12 @@ describe("Ready", function () {
         ftm = await ERC20.deploy("FTM", "FTM")
         bnb = await ERC20.deploy("BNB", "BNB")
 
+        const Cedro = await ethers.getContractFactory("CedroToken");
+        this.cedro = await Cedro.deploy(toTokenAmount(1e9));
+
+        const FeeProvider = await ethers.getContractFactory("FeeProvider");
+        this.feeProvider = await upgrades.deployProxy(FeeProvider, []);
+
         const Oracle = await ethers.getContractFactory("Oracle");
         this.oracle = await Oracle.deploy();
 
@@ -69,6 +75,8 @@ describe("Ready", function () {
         const Core = await ethers.getContractFactory("Core");
         core =  await upgrades.deployProxy(Core, [treasury.address]);
 
+
+
         await this.ceMATIC.initialize(core.address);
         await this.ceFTM.initialize(core.address);
         await this.ceBNB.initialize(core.address);
@@ -79,6 +87,9 @@ describe("Ready", function () {
         await core.setOracle(this.oracle.address);
         await server.setCore(core.address);
         await core.setPool(server.address);
+        await server.setCedroToken(this.cedro.address);
+        await server.setFeeProvider(this.feeProvider.address);
+        await this.feeProvider.setCore(core.address);
         await this.oracle.setPrice([MATIC, FTM, BNB], [toTokenAmount(1), toTokenAmount(1), toTokenAmount(1)])
 
         await core.initPool(MATIC, [toTokenAmount(0.5), toTokenAmount(0.1), toTokenAmount(0.5), 0, toTokenAmount(0.5), toTokenAmount(0.5), toTokenAmount(0.1), toTokenAmount(0.05)], this.ceMATIC.address, this.debtMATIC.address);
@@ -212,5 +223,36 @@ describe("Ready", function () {
         await server.connect(bob).borrow(MATIC, this.chainIdClientA, toTokenAmount(2e5), ethers.utils.hexZeroPad(bob.address, 32), {value: fees});
         await network.provider.send("evm_increaseTime", [365 * 86400 - 1])
         await printInfo();
+    })
+
+    it("Test reward", async function () {
+        let fees = await this.clientA.connect(alice).estimateFees(1);
+
+        await server.setFeeRewardStatus(true, true);
+
+        await this.cedro.transfer(server.address, toTokenAmount(500000));
+
+        let balance_matic_client = await matic.balanceOf(this.clientA.address);
+        console.log("Before balance of matic pool", balance_matic_client.toString(), this.clientA.address);
+
+        await this.clientA.connect(alice).depositRequest(MATIC, toTokenAmount(500000), {value: fees});
+        
+        console.log("Alice gets cedro reward");
+        let balance = await this.cedro.balanceOf(alice.address);
+        console.log("reward", balance.toString(), alice.address);
+        expect(balance).to.equal(toTokenAmount(1));
+
+        balance = await this.cedro.balanceOf(server.address);
+        console.log("remaining balance", balance.toString(), server.address);
+    
+        await printInfo();
+
+        balance_matic_client = await matic.balanceOf(this.clientA.address);
+        console.log("After balance of matic pool", balance_matic_client.toString(), this.clientA.address);
+
+        balance = await this.ceMATIC.balanceOf(alice.address);
+        console.log("CEtoken", balance.toString(), alice.address);
+        expect(balance).to.equal(toTokenAmount(500000));
+
     })
 })

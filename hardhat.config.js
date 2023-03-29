@@ -1,5 +1,7 @@
 require("@nomicfoundation/hardhat-toolbox");
 require('@openzeppelin/hardhat-upgrades');
+require('@nomicfoundation/hardhat-chai-matchers');
+require('dotenv').config();
 const PRIVATE_KEY = process.env.PRIVATE_KEY;
 /** @type import('hardhat/config').HardhatUserConfig */
 task("accounts", "Prints the list of accounts", async (taskArgs, hre) => {

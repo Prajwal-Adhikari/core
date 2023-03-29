@@ -1,18 +1,24 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.9;
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import './interfaces/ICore.sol';
 
-import './Pool.sol';
 
-contract FeeProvider is OwnableUpgradeable{
+contract FeeProvider is Initializable,OwnableUpgradeable{
     using SafeMath for uint256;
-
-    uint16[] public chainList;
 
     mapping(uint16 => mapping(bytes32 => uint)) public OPTIMAL_GLOBAL_LIQUIDITY_FACTOR;
     mapping(uint16 => mapping(bytes32 => uint)) public BASE_FEE;
     mapping(uint16 => mapping(bytes32 => uint)) public MAX_FEE;
     
     address public core;
+
+    function initialize() public initializer {
+        __Ownable_init();
+        
+    }
 
     /**
     * @dev Sets core contract. 
@@ -71,46 +77,23 @@ contract FeeProvider is OwnableUpgradeable{
     }
 
     /**
-    * @dev Adds a new chain to the chainList
-    * This function can only be accessed by the contract owner.
-    * @param _chainId id of the chain.
-    **/
-    function addChain(uint16 _chainId) external onlyOwner {
-        chainList.push(_chainId);
-    }
-
-    /**
-    * @dev Deletes a chain from the chainList
-    * This function can only be accessed by the contract owner.
-    * @param _chainId id of the chain.
-    **/
-    function removeChain(uint16 _chainId) external onlyOwner {
-        for (uint256 i = 0; i < chainList.length; i++){
-            if (chainList[i] == _chainId){
-                chainList[i] = chainList[chainList.length - 1];
-                chainList.pop();
-                return;
-            }
-        }
-      
-    }
-
-    /**
     * @dev Returns the amount of fee or reward. 
     * @param _chainId id of the chain.
     * @param _poolId id of the pool.
     **/
     function getFeeAmount(uint16 _chainId, bytes32 _poolId) public view returns (uint){
-        uint globalLiquidityFactor = _getGlobalLiquidityFactor(_chainId, _poolId);
-        uint optimalGlobalLiquidityFactor = OPTIMAL_GLOBAL_LIQUIDITY_FACTOR[_chainId][_poolId];
-        uint initialFee = BASE_FEE[_chainId][_poolId].add((optimalGlobalLiquidityFactor.sub(globalLiquidityFactor)).mul(optimalGlobalLiquidityFactor).div(globalLiquidityFactor));
-        if (initialFee < 0) {
-            initialFee = 0;
-        }
-
-        uint maxFee = MAX_FEE[_chainId][_poolId];
-        
-        return maxFee <= initialFee ? maxFee: initialFee;
+        // uint globalLiquidityFactor = _getGlobalLiquidityFactor(_chainId, _poolId);
+        // uint optimalGlobalLiquidityFactor = OPTIMAL_GLOBAL_LIQUIDITY_FACTOR[_chainId][_poolId];
+        // uint initialFee;
+        // if (globalLiquidityFactor > 0){
+        //     initialFee = BASE_FEE[_chainId][_poolId].add((optimalGlobalLiquidityFactor.sub(globalLiquidityFactor)).mul(optimalGlobalLiquidityFactor).div(globalLiquidityFactor));
+        // }
+        // if (initialFee < 0) {
+        //     initialFee = 0;
+        // }
+        // uint maxFee = MAX_FEE[_chainId][_poolId];
+        return 1e18;
+        // return maxFee <= initialFee ? maxFee: initialFee;
 
     }   
 
@@ -120,8 +103,8 @@ contract FeeProvider is OwnableUpgradeable{
     * @param _poolId id of the pool.
     **/
     function _getGlobalLiquidityFactor(uint16 _chainId, bytes32 _poolId) internal view returns (uint){
-        uint totalLiquidity = Core(core).getTotalLiquidity(_poolId);
-        return totalLiquidity > 0 ? Core(core).getLiquidity(_chainId, _poolId).div(totalLiquidity): 0;
+        uint totalLiquidity = ICore(core).getTotalLiquidity(_poolId);
+        return totalLiquidity > 0 ? ICore(core).getLiquidity(_chainId, _poolId).div(totalLiquidity): 0;
     }
 
 }

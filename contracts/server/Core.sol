@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.9;
+import "hardhat/console.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
@@ -8,7 +9,6 @@ import './interfaces/ICEToken.sol';
 import './interfaces/IDebtToken.sol';
 import './interfaces/IOracle.sol';
 import './libraries/Data.sol';
-import './FeeProvider.sol';
 
 /** 
 * Title Root
@@ -20,6 +20,8 @@ import './FeeProvider.sol';
 **/
 contract Core is Initializable, OwnableUpgradeable {
     using SafeMath for uint256;
+
+    uint constant public MAX_HEALTH_FACTOR = 1e18;
 
     address public treasury; 
 
@@ -200,6 +202,7 @@ contract Core is Initializable, OwnableUpgradeable {
         chains[chainId][id] -= tokenAmount;
         totalLiquidity[id] -= tokenAmount;
         updateInterestRate(id);
+        checkHealth(user);
         return (tokenAmount);
     }
 
@@ -274,13 +277,19 @@ contract Core is Initializable, OwnableUpgradeable {
         return (params.repayAmount, params.debtAmount, ceAmount);
     }
 
+    function checkHealth(address user) view public {
+        require(healthFactor(user).factor < MAX_HEALTH_FACTOR, "Health failed");
+    }
+
     function addToken(address user, bytes32 id) internal {
         for(uint i = 0;i < users[user].length;i++) {
             if(users[user][i] == id) {
                 return;
             }
         }
+        console.log("first");
         users[user].push(id);
+        console.log("second");
     }
 
     function _getValues(address user, uint price, bytes32 id) internal view returns(uint collateralValue, uint debtValue) {

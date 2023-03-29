@@ -1,6 +1,7 @@
 {
   "name": "hardhat-project",
   "devDependencies": {
+    "@nomicfoundation/hardhat-chai-matchers": "^1.0.6",
     "@nomicfoundation/hardhat-toolbox": "^2.0.0",
     "hardhat": "^2.11.2"
   },
@@ -10,6 +11,7 @@
     "@openzeppelin/contracts-upgradeable": "^4.8.2",
     "@openzeppelin/hardhat-upgrades": "^1.22.1",
     "chain": "^0.4.0",
+    "dotenv": "^16.0.3",
     "socks-proxy-agent": "^7.0.0"
   }
 }
