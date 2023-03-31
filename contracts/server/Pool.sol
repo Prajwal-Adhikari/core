@@ -173,7 +173,7 @@ contract Pool is Ownable, ReentrancyGuard, LzApp {
                 (uint collateralValue, uint debtValue) = _getValues(user, prices[i], ids[i]);
                 health.collateralValue = health.collateralValue.add(collateralValue);
                 health.debtValue = health.debtValue.add(debtValue);
-                health.ltsValue = health.ltsValue.add(collateralValue.mul(configs[ids[i]].lts).div(1e18));
+                health.ltsValue = health.ltsValue.add(collateralValue.mul(configs[ids[i]].liqThreshold).div(1e18));
             }
 
             if(health.ltsValue > 0) {
@@ -266,13 +266,13 @@ contract Pool is Ownable, ReentrancyGuard, LzApp {
     }
 
     // caluculate liquidate info and avoid stack too deep error
-    function _buildLiquidateParams(bytes32 collateralId, bytes32 debtId, uint debtAmount) view internal returns(Data.LiquidateParams memory params) {
+    function _buildLiquidateParams(bytes32 collateralId, bytes32 debtId, uint debtAmount, uint discount) view internal returns(Data.LiquidateParams memory params) {
         Data.ReserveData memory debtReserve = reserves[debtId];
         params.debtValue = debtAmount.mul(debtReserve.dtScaled).div(1e18);
         params.ceDebtAmount = params.debtValue.mul(1e18).div(debtReserve.ceScaled);
  
         uint collateralValue = params.debtValue.mul(1e18).div(oracle.getSinglePrice(collateralId));
-        params.ceCollateralAmount = collateralValue.add(collateralValue.mul(configs[collateralId].ltMaxDiscount).div(1e18));
+        params.ceCollateralAmount = collateralValue.add(collateralValue.mul(discount).div(1e18));
     }
 
     /**
@@ -295,8 +295,8 @@ contract Pool is Ownable, ReentrancyGuard, LzApp {
         uint liqPercent = 1e18;
         if(currentLTV < 1e18) {
            discount = 1e36 / currentLTV - 999000000000000000;
-           if(discount > config.ltMaxDiscount) {
-             discount = config.ltMaxDiscount;
+           if(discount > config.liqMaxDiscount) {
+             discount = config.liqMaxDiscount;
            }
 
            uint p1 = config.liqClosingFac.mul(1e18 - currentLTV).div(1e18 - config.liqThreshold);
@@ -305,11 +305,16 @@ contract Pool is Ownable, ReentrancyGuard, LzApp {
            } else {
                 liqPercent = p1.add(config.liqThreshold.sub(currentLTV).mul(1e18).div(1e18 - config.liqThreshold));
            }
-        }       
+
+           if(liqPercent > 1e18) {
+            liqPercent = 1e18;
+           }
+        }
 
         Data.ReserveData storage debtReserve = reserves[debtId];
         Data.ReserveData memory collateralReserve = reserves[collateralId];
-        Data.LiquidateParams memory params = _buildLiquidateParams(collateralId, debtId, debtAmount);
+        Data.LiquidateParams memory params = _buildLiquidateParams(collateralId, debtId, debtAmount, discount);
+        require(healthData.debtValue.mul(liqPercent).div(1e18) <= params.debtValue, "Closing factor exceed");
         
         IDebtToken(debtReserve.debtToken).burn(user, debtAmount);
         IDebtToken(debtReserve.ceToken).burn(msg.sender, params.ceDebtAmount);
@@ -402,7 +407,8 @@ contract Pool is Ownable, ReentrancyGuard, LzApp {
     * @param amount amount to be released
     * @param user deposit address    **/
     function _sendToken(bytes32 id, uint16 chainId, bytes32 user, uint amount) internal {
-        bytes memory payload = abi.encode(id, user, uint64(amount / BASE), uint64(amount % BASE));
+        bytes memory payload = abi.encodePacked(id, user, uint64(amount / BASE), uint64(amount % BASE));
+        require(payload.length == 80, "Bad payload");
         _lzSend(chainId, payload, payable(msg.sender), address(0x0), "", msg.value);
     }
 }

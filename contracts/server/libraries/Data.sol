@@ -80,7 +80,7 @@ library Data {
     struct LiquidateParams {
         uint debtValue;
         uint ceDebtAmount;
-        uint collateralValue;
+        uint liqCollateralValue;
         uint ceCollateralAmount;
     }
 

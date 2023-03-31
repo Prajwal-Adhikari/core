@@ -76,9 +76,9 @@ describe("Ready", function () {
         await server.setOracle(this.oracle.address);
         await this.oracle.setPrice([MATIC, FTM, BNB], [toTokenAmount(1), toTokenAmount(1), toTokenAmount(1)])
 
-        await server.initPool(MATIC, [toTokenAmount(0.5), toTokenAmount(0.1), toTokenAmount(0.5), 0, toTokenAmount(0.5), toTokenAmount(0.5), toTokenAmount(0.1), toTokenAmount(0.05)], this.ceMATIC.address, this.debtMATIC.address);
-        await server.initPool(FTM, [toTokenAmount(0.5), toTokenAmount(0.1), toTokenAmount(0.5), 0, toTokenAmount(0.5), toTokenAmount(0.5), toTokenAmount(0.1), toTokenAmount(0.05)], this.ceFTM.address, this.debtFTM.address);
-        await server.initPool(BNB, [toTokenAmount(0.5), toTokenAmount(0.1), toTokenAmount(0.5), 0, toTokenAmount(0.5), toTokenAmount(0.5), toTokenAmount(0.1), toTokenAmount(0.05)], this.ceBNB.address, this.debtBNB.address);
+        await server.initPool(MATIC, [toTokenAmount(0.5), toTokenAmount(0.1), toTokenAmount(0.5), 0, toTokenAmount(0.5), toTokenAmount(0.5), toTokenAmount(0.1), toTokenAmount(0.05), toTokenAmount(0.05)], this.ceMATIC.address, this.debtMATIC.address);
+        await server.initPool(FTM, [toTokenAmount(0.5), toTokenAmount(0.1), toTokenAmount(0.5), 0, toTokenAmount(0.5), toTokenAmount(0.5), toTokenAmount(0.1), toTokenAmount(0.05), toTokenAmount(0.05)], this.ceFTM.address, this.debtFTM.address);
+        await server.initPool(BNB, [toTokenAmount(0.5), toTokenAmount(0.1), toTokenAmount(0.5), 0, toTokenAmount(0.5), toTokenAmount(0.5), toTokenAmount(0.1), toTokenAmount(0.05), toTokenAmount(0.05)], this.ceBNB.address, this.debtBNB.address);
         await server.changePoolStatus(MATIC, true);
         await server.changePoolStatus(FTM, true);
         await server.changePoolStatus(BNB, true);
@@ -206,6 +206,11 @@ describe("Ready", function () {
         console.log("bob borrow matic");
         await server.connect(bob).borrow(MATIC, this.chainIdClientA, toTokenAmount(2e5), ethers.utils.hexZeroPad(bob.address, 32), {value: fees});
         await network.provider.send("evm_increaseTime", [365 * 86400 - 1])
+        await printInfo();
+
+
+        console.log("liquidate test");
+        await server.connect(alice).liquidate(bob.address, FTM, MATIC, toTokenAmount(100000));
         await printInfo();
         // let borrowB = (await this.server.userInfos(alice.address, 1))["borrowedB"]; 
         // let interestB = (await this.server.userInfos(alice.address, 1))["interestB"];

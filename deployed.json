@@ -1,5 +1,5 @@
 {
-    "server": "0xb658996B5d49E3CAc812Ee9dEC68d58DC3a3089E",
+    "server": "0x26C3cb4CA6ff342665E3E6496f3994A6Bf4aF94e",
     "treasury": "0x2D83750BDB3139eed1F76952dB472A512685E3e0",
     "endpoint": "0x6Fcb97553D41516Cb228ac03FdC8B9a0a9df04A1",
     "oracle": "0xB3acd106e154bF9c62816D371ca970a6A4a2b75e",
@@ -57,7 +57,7 @@
             "chainId": 10143
         },
         "aptos": {
-            "branch": "0x7e02d4305ec622e666bc27e93d5db0f6b31e161312059a03c433703ed780dc9e",
+            "branch": "0xdcb4f856df49698e3f8d96d7e89bdd993eba0792a00615401e32c36151197eb7",
             "chainId": 10108,
             "endpoint": "0x1759cc0d3161f1eb79f65847d4feb9d1f74fb79014698a23b16b28b9cd4c37e3"
         }
