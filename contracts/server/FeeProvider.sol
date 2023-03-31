@@ -82,18 +82,17 @@ contract FeeProvider is Initializable,OwnableUpgradeable{
     * @param _poolId id of the pool.
     **/
     function getFeeAmount(uint16 _chainId, bytes32 _poolId) public view returns (uint){
-        // uint globalLiquidityFactor = _getGlobalLiquidityFactor(_chainId, _poolId);
-        // uint optimalGlobalLiquidityFactor = OPTIMAL_GLOBAL_LIQUIDITY_FACTOR[_chainId][_poolId];
-        // uint initialFee;
-        // if (globalLiquidityFactor > 0){
-        //     initialFee = BASE_FEE[_chainId][_poolId].add((optimalGlobalLiquidityFactor.sub(globalLiquidityFactor)).mul(optimalGlobalLiquidityFactor).div(globalLiquidityFactor));
-        // }
-        // if (initialFee < 0) {
-        //     initialFee = 0;
-        // }
-        // uint maxFee = MAX_FEE[_chainId][_poolId];
-        return 1e18;
-        // return maxFee <= initialFee ? maxFee: initialFee;
+        uint globalLiquidityFactor = _getGlobalLiquidityFactor(_chainId, _poolId);
+        uint optimalGlobalLiquidityFactor = OPTIMAL_GLOBAL_LIQUIDITY_FACTOR[_chainId][_poolId];
+        uint initialFee;
+        if (globalLiquidityFactor > 0){
+            initialFee = BASE_FEE[_chainId][_poolId].add((optimalGlobalLiquidityFactor.sub(globalLiquidityFactor)).mul(optimalGlobalLiquidityFactor).div(globalLiquidityFactor));
+        }
+        if (initialFee < 0) {
+            initialFee = 0;
+        }
+        uint maxFee = MAX_FEE[_chainId][_poolId];
+        return maxFee <= initialFee ? maxFee: initialFee;
 
     }   
 
@@ -103,7 +102,7 @@ contract FeeProvider is Initializable,OwnableUpgradeable{
     * @param _poolId id of the pool.
     **/
     function _getGlobalLiquidityFactor(uint16 _chainId, bytes32 _poolId) internal view returns (uint){
-        uint totalLiquidity = ICore(core).getTotalLiquidity(_poolId);
+        uint totalLiquidity = ICore(core).totalLiquidity(_poolId);
         return totalLiquidity > 0 ? ICore(core).getLiquidity(_chainId, _poolId).div(totalLiquidity): 0;
     }
 

@@ -27,6 +27,7 @@ contract Core is Initializable, OwnableUpgradeable {
 
     IOracle public oracle;
     address public pool;
+    address public liquidationManager;
 
     uint constant public YEAR = 365 * 86400;
     mapping(bytes32 => Data.ReserveData) public reserves;
@@ -44,6 +45,15 @@ contract Core is Initializable, OwnableUpgradeable {
         _;
     }
 
+    /**
+    * @dev only liquidation manager can use functions affected by this modifier
+    **/
+    modifier onlyLiquidationManager {
+        require(liquidationManager == msg.sender, "The caller must be a liquidation manager contract");
+        _;
+    }
+    
+
     function initialize(address _treasury) public initializer {
         treasury = _treasury;
         __Ownable_init();
@@ -57,6 +67,16 @@ contract Core is Initializable, OwnableUpgradeable {
     **/
     function setPool(address _poolAddress) external onlyOwner {
         pool = _poolAddress;
+
+    }
+
+    /**
+    * @dev Configures liquidation manager contract. 
+    * This function can only be accessed by the contract owner.
+    * @param _liquidationManagerAddress address of the fee provider contract.
+    **/
+    function setLiquidationManager(address _liquidationManagerAddress) external onlyOwner {
+        liquidationManager = _liquidationManagerAddress;
 
     }
 
@@ -90,7 +110,7 @@ contract Core is Initializable, OwnableUpgradeable {
     }
 
 
-    function updateInterestRate(bytes32 id) internal {
+    function updateInterestRate(bytes32 id) public {
         Data.ReserveData storage reserve = reserves[id];
         Data.ConfigData memory config = configs[id];
         if(reserve.debtSupply > 0) {
@@ -112,7 +132,7 @@ contract Core is Initializable, OwnableUpgradeable {
         
     }
 
-    function refresh(bytes32 id) internal {
+    function refresh(bytes32 id) public {
         Data.ReserveData storage reserve = reserves[id];
         if(reserve.ceSupply > 0) {
             uint increasedDebt = block.timestamp.sub(reserve.lastUpdateTime).mul(reserve.interestRate).div(YEAR);
@@ -150,7 +170,7 @@ contract Core is Initializable, OwnableUpgradeable {
                 (uint collateralValue, uint debtValue) = _getValues(user, prices[i], ids[i]);
                 health.collateralValue = health.collateralValue.add(collateralValue);
                 health.debtValue = health.debtValue.add(debtValue);
-                health.ltsValue = health.ltsValue.add(collateralValue.mul(configs[ids[i]].lts).div(1e18));
+                health.ltsValue = health.ltsValue.add(collateralValue.mul(configs[ids[i]].liqThreshold).div(1e18));
             }
 
             if(health.ltsValue > 0) {
@@ -277,6 +297,11 @@ contract Core is Initializable, OwnableUpgradeable {
         return (params.repayAmount, params.debtAmount, ceAmount);
     }
 
+    function updateCeAndDebtSupply(bytes32 id, uint ceAmount, uint debtAmount) external onlyLiquidationManager {
+        reserves[id].ceSupply = ceAmount;
+        reserves[id].debtSupply = debtAmount;
+    }
+
     function checkHealth(address user) view public {
         require(healthFactor(user).factor < MAX_HEALTH_FACTOR, "Health failed");
     }
@@ -287,9 +312,7 @@ contract Core is Initializable, OwnableUpgradeable {
                 return;
             }
         }
-        console.log("first");
         users[user].push(id);
-        console.log("second");
     }
 
     function _getValues(address user, uint price, bytes32 id) internal view returns(uint collateralValue, uint debtValue) {
@@ -310,14 +333,6 @@ contract Core is Initializable, OwnableUpgradeable {
     **/
     function getLiquidity( uint16 _chainId, bytes32 _poolId) public view returns (uint){
        return chains[_chainId][_poolId];
-    }
-
-    /**
-    * @dev Returns total liquidity of an asset 
-    * @param _poolId id of the pool.
-    **/
-    function getTotalLiquidity( bytes32 _poolId) public view returns (uint){
-       return totalLiquidity[_poolId];
     }
 
 }

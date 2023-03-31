@@ -10,6 +10,7 @@ import './interfaces/IDebtToken.sol';
 import './interfaces/IOracle.sol';
 import './interfaces/ICore.sol';
 import './interfaces/IFeeProvider.sol';
+import './interfaces/ILiquidationManager.sol';
 import './libraries/Data.sol';
 
 
@@ -26,6 +27,7 @@ contract Pool is Initializable, ReentrancyGuardUpgradeable, LzApp {
 
     address public cedroToken;
     address public feeProvider;
+    address public liquidationManager;
     address public core;
 
     bool public feeEnable;
@@ -70,6 +72,16 @@ contract Pool is Initializable, ReentrancyGuardUpgradeable, LzApp {
     **/
     function setCore(address _coreAddress) external onlyOwner {
         core = _coreAddress;
+
+    }
+
+    /**
+    * @dev Configures liquidation manager contract. 
+    * This function can only be accessed by the contract owner.
+    * @param _liquidationManagerAddress address of the fee provider contract.
+    **/
+    function setLiquidationManager(address _liquidationManagerAddress) external onlyOwner {
+        liquidationManager = _liquidationManagerAddress;
 
     }
 
@@ -130,10 +142,10 @@ contract Pool is Initializable, ReentrancyGuardUpgradeable, LzApp {
     **/
     function withdraw(bytes32 id, uint16 chainId, uint ceAmount, bytes32 to) payable nonReentrant external {
         uint tokenAmount = ICore(core).withdraw(id, chainId, ceAmount, msg.sender);
-        // if(feeEnable){
-        // uint fee = IFeeProvider(feeProvider).getFeeAmount(chainId, id);
-        // tokenAmount -= fee;
-        // }
+        if(feeEnable){
+        uint fee = IFeeProvider(feeProvider).getFeeAmount(chainId, id);
+        tokenAmount -= fee;
+        }
         _sendToken(id, chainId, to, tokenAmount);
         emit Data.Withdraw(msg.sender, _bytes32ToAddress(to), id, chainId, tokenAmount, ceAmount);
     }
@@ -148,23 +160,14 @@ contract Pool is Initializable, ReentrancyGuardUpgradeable, LzApp {
     **/
     function borrow(bytes32 id, uint16 chainId, uint tokenAmount, bytes32 to) payable nonReentrant external {
         uint debtAmount = ICore(core).borrow(id, chainId, tokenAmount, msg.sender);
-        // if(feeEnable){  
-        // uint fee = IFeeProvider(feeProvider).getFeeAmount(chainId, id);
-        // tokenAmount -= fee;
-        // }
+        if(feeEnable){  
+        uint fee = IFeeProvider(feeProvider).getFeeAmount(chainId, id);
+        tokenAmount -= fee;
+        }
         _sendToken(id, chainId, to, tokenAmount);
         emit Data.Borrow(msg.sender, _bytes32ToAddress(to), id, chainId, tokenAmount, debtAmount);
     }
 
-    // // caluculate liquidate info and avoid stack too deep error
-    // function _buildLiquidateParams(bytes32 collateralId, bytes32 debtId, uint debtAmount) view internal returns(Data.LiquidateParams memory params) {
-    //     Data.ReserveData memory debtReserve = reserves[debtId];
-    //     params.debtValue = debtAmount.mul(debtReserve.dtScaled).div(1e18);
-    //     params.ceDebtAmount = params.debtValue.mul(1e18).div(debtReserve.ceScaled);
- 
-    //     uint collateralValue = params.debtValue.mul(1e18).div(oracle.getSinglePrice(collateralId));
-    //     params.ceCollateralAmount = collateralValue.add(collateralValue.mul(configs[collateralId].ltBonus).div(1e18));
-    // }
     // /**
     // * @dev liquidates the position of address `user`.
     // * @param user the address whose position is to be liquidated
@@ -172,30 +175,11 @@ contract Pool is Initializable, ReentrancyGuardUpgradeable, LzApp {
     // * @param debtId the pool id of the debt asset
     // * @param debtAmount total debt amount of user
     // **/
-    // function liquidate(address user, bytes32 collateralId, bytes32 debtId, uint debtAmount) external nonReentrant {
-    //     require(user != msg.sender, "Same address");
-    //     refresh(collateralId);
-    //     refresh(debtId);
-    //     Data.HealthData memory healthData = healthFactor(user);
-    //     require(healthData.factor >= MAX_HEALTH_FACTOR, "Cannot liquidate now");
-    //     Data.ReserveData storage debtReserve = reserves[debtId];
-    //     Data.ReserveData memory collateralReserve = reserves[collateralId];
-    //     Data.LiquidateParams memory params = _buildLiquidateParams(collateralId, debtId, debtAmount);
-        
-    //     IDebtToken(debtReserve.debtToken).burn(user, debtAmount);
-    //     IDebtToken(debtReserve.ceToken).burn(msg.sender, params.ceDebtAmount);
-
-    //     debtReserve.debtSupply = debtReserve.debtSupply.sub(debtAmount);
-    //     debtReserve.ceSupply = debtReserve.ceSupply.sub(params.ceDebtAmount);
-        
-    //     IDebtToken(collateralReserve.ceToken).burn(user, params.ceCollateralAmount);
-    //     IDebtToken(collateralReserve.ceToken).mint(msg.sender, params.ceCollateralAmount);
-        
-    //     updateInterestRate(collateralId);
-    //     updateInterestRate(debtId);
-    //     emit Data.Liquidate(user, msg.sender, debtId, collateralId, debtAmount, params.ceDebtAmount, params.ceCollateralAmount);
-    // }
-
+    function liquidate(address user, bytes32 collateralId, bytes32 debtId, uint debtAmount) external nonReentrant {
+        require(user != msg.sender, "Same address");
+        (ceDebtAmount, ceCollateralAmount) = ILiquidationManager(liquidationManager).liquidate(user, collateralId, debtId, debtAmount);
+        emit Data.Liquidate(user, msg.sender, debtId, collateralId, debtAmount, ceDebtAmount, ceCollateralAmount);
+    }
     /** 
     * @dev updates the global protocol states after receiving repay information
     * of amount `tokenAmount` from address `user` for pool with pool id 'id' from
@@ -208,10 +192,10 @@ contract Pool is Initializable, ReentrancyGuardUpgradeable, LzApp {
     function _repay(bytes32 id, uint16 chainId, address user, uint tokenAmount) internal {
        
         (uint repayAmount, uint debtAmount, uint ceAmount) = ICore(core).repay(id, chainId, user, tokenAmount);
-        // if(rewardEnable){
-        // uint reward = IFeeProvider(feeProvider).getFeeAmount(chainId, id);
-        // IERC20(cedroToken).transfer(user, reward);
-        // }
+        if(rewardEnable){
+        uint reward = IFeeProvider(feeProvider).getFeeAmount(chainId, id);
+        IERC20(cedroToken).transfer(user, reward);
+        }
         emit Data.Repay(user, id, chainId, repayAmount, debtAmount, ceAmount);
     }
  
@@ -233,7 +217,7 @@ contract Pool is Initializable, ReentrancyGuardUpgradeable, LzApp {
         }
         uint ceAmount = ICore(core).deposit(id, chainId, user, tokenAmount);
         
-        emit Data.Deposit(user, id, chainId, tokenAmount, 10);
+        emit Data.Deposit(user, id, chainId, tokenAmount, ceAmount);
     }
 
     /** 
