@@ -1,0 +1,43 @@
+
+let deployed = require("../../deployed2.json");
+const { ethers } = require("hardhat");
+const FTM = ethers.utils.formatBytes32String("FTM");
+
+const owner = "0x5BA85D71ef9aE0EdC180a6bf5e65F0a749f062DC";
+
+let BN = require("bignumber.js");
+
+
+const toTokenAmount = (amount, decimals = 18) => {
+    return new BN(amount).multipliedBy(new BN("10").pow(decimals)).toFixed()
+}
+
+async function main() {
+    this.server = await hre.ethers.getContractAt("PoolV2", deployed.server);
+    console.log(this.server.address, 100e2);
+    // this.ftm = await hre.ethers.getContractAt("ERC20Mock", deployed.branches.ftm.FTM);
+    // let fees = await this.branch.estimateFees(1);
+    // console.log(fees);
+    // let balance_matic_client = await this.ftm.balanceOf(this.branch.address);
+   
+    // console.log("Before balance of matic pool", balance_matic_client.toString(), this.branch.address);
+    // balance_matic_client = await this.ftm.balanceOf(owner);
+    // console.log("Before balance of owner", balance_matic_client.toString(), owner);
+    // await (await this.server.withdraw(FTM, deployed.branches.ftm.chainId, toTokenAmount(1e3), ethers.utils.hexZeroPad(owner, 32), {value: ethers.utils.parseEther("0.1")})).wait();
+    console.log(FTM);
+
+    console.log("complete");
+}
+
+main().catch((error) => {
+  console.error(error);
+});
+// test()
+// test()
+
+
+
+
+        
+
+   

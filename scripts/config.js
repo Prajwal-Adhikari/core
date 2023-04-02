@@ -39,7 +39,7 @@ async function deployToken(name) {
   let DebtToken = await hre.ethers.getContractFactory("DebtToken");
   let debtToken = await DebtToken.deploy("debt" + name, "debt" + name);
   await this.server.initPool(getId(name), [toTokenAmount(0.5), toTokenAmount(0.1),
-   toTokenAmount(0.5), 0, toTokenAmount(0.5), toTokenAmount(0.8), toTokenAmount(0.1), toTokenAmount(0.05)],
+   toTokenAmount(0.5), 0, toTokenAmount(0.5), toTokenAmount(0.8), toTokenAmount(0.1), toTokenAmount(0.05), toTokenAmount(0.05)],
     ceToken.address, debtToken.address);
   await ceToken.initialize(this.server.address);
   await debtToken.initialize(this.server.address);

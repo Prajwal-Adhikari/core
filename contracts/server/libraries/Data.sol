@@ -37,11 +37,13 @@ library Data {
         //loan to value
         uint ltv;
         //liquidition threshold 
-        uint lts;
+        uint liqThreshold;
         //percent to treasury
         uint tsuPercent;
         //liquidity bonus
-        uint ltBonus;
+        uint liqMaxDiscount;
+        // liq closing factor
+        uint liqClosingFac;
     }
 
     struct HealthData {
@@ -78,7 +80,7 @@ library Data {
     struct LiquidateParams {
         uint debtValue;
         uint ceDebtAmount;
-        uint collateralValue;
+        uint liqCollateralValue;
         uint ceCollateralAmount;
     }
 

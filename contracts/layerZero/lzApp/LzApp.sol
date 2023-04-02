@@ -2,7 +2,9 @@
 
 pragma solidity ^0.8.0;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
+
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "../interfaces/ILayerZeroReceiver.sol";
 import "../interfaces/ILayerZeroUserApplicationConfig.sol";
 import "../interfaces/ILayerZeroEndpoint.sol";
@@ -10,17 +12,18 @@ import "../interfaces/ILayerZeroEndpoint.sol";
 /*
  * a generic LzReceiver implementation
  */
-contract LzApp is Ownable, ILayerZeroReceiver {
-    ILayerZeroEndpoint public immutable lzEndpoint;
+contract LzApp is Initializable, OwnableUpgradeable, ILayerZeroReceiver {
+    ILayerZeroEndpoint public lzEndpoint;
     uint public localId;
 
     mapping(uint16 => bytes) public trustedRemoteLookup;
 
     event SetTrustedRemote(uint16 _srcChainId, bytes _srcAddress);
 
-    constructor(address _endpoint, uint16 _localId) {
+    function __LzApp_init(address _endpoint, uint16 _localId) internal onlyInitializing {
         lzEndpoint = ILayerZeroEndpoint(_endpoint);
         localId = _localId;
+        __Ownable_init();
     }
 
     function localReceive(uint16 _srcChainId, bytes memory _payload) public virtual override {
