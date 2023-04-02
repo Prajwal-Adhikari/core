@@ -11,24 +11,19 @@ import './interfaces/IOracle.sol';
 import './libraries/Data.sol';
 
 /** 
-* Title Root
-* Root is deployed on a single chain where all the global data is stored. 
-* All the Branches are connected to Root, all of which sends deposit and repay information
-* to Root.
-* Most of the lending and borrowing logic like interest rate calculation, checks, etc. is in Root.
-* Users interact with Root for Borrow, Withdraw, and Liquidate actions.
+* Title Core
+* Core stores all the global data 
+* Most of the lending and borrowing logic like interest rate calculation, checks, etc. is in Core.
 **/
 contract Core is Initializable, OwnableUpgradeable {
     using SafeMath for uint256;
 
-    uint constant public MAX_HEALTH_FACTOR = 1e18;
-
-    address public treasury; 
-
     IOracle public oracle;
+    address public treasury; 
     address public pool;
     address public liquidationManager;
 
+    uint constant public MAX_HEALTH_FACTOR = 1e18;
     uint constant public YEAR = 365 * 86400;
     mapping(bytes32 => Data.ReserveData) public reserves;
     mapping(bytes32 => Data.ConfigData) public configs;
@@ -275,7 +270,7 @@ contract Core is Initializable, OwnableUpgradeable {
     * @param user repay address
     **/
     function repay(bytes32 id, uint16 chainId, address user, uint tokenAmount) external onlyPool returns (uint, uint, uint) {
-         refresh(id);
+        refresh(id);
         Data.RepayParams memory params = _buildRepayParams(reserves[id], user, tokenAmount);
         Data.ReserveData storage reserve = reserves[id];
         uint ceAmount = 0;  

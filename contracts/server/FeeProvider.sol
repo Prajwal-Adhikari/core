@@ -5,7 +5,10 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import './interfaces/ICore.sol';
 
-
+/** 
+* Title FeeProvider
+* Pool interact with FeeProvider for getting fee and reward amount.
+**/
 contract FeeProvider is Initializable,OwnableUpgradeable{
     using SafeMath for uint256;
 
@@ -23,7 +26,7 @@ contract FeeProvider is Initializable,OwnableUpgradeable{
     /**
     * @dev Sets core contract. 
     * This function can only be accessed by the contract owner.
-    * @param _coreAddress address of the pool.
+    * @param _coreAddress address of the core.
     **/
     function setCore(address _coreAddress) external onlyOwner {
         core = _coreAddress;

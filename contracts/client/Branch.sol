@@ -3,6 +3,7 @@ pragma solidity ^0.8.9;
 
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "../layerZero/lzApp/LzApp.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
@@ -25,6 +26,8 @@ contract Branch is Initializable, LzApp {
     uint8 internal constant TYPE_REPAY = 2;
 
     uint public GAS_USAGE;
+    uint public constant ROOT_DECIMALS = 18;
+    uint public constant BASE = 10 ** ROOT_DECIMALS;
     uint16 public serverChainId;
     using SafeERC20 for IERC20;
     using SafeMath for uint256;
@@ -37,10 +40,10 @@ contract Branch is Initializable, LzApp {
 
     mapping(bytes32 => PoolInfo) public pools;
 
-    function initialize(address _lzEndpoint, uint16 _localChainId, uint16 _serverChainId, uint _gas) public initializer {
+    function initialize(address _lzEndpoint, uint16 _localChainId, uint16 _serverChainId) public initializer {
         __LzApp_init(_lzEndpoint, _localChainId);
         serverChainId = _serverChainId;
-        GAS_USAGE = _gas;
+        GAS_USAGE = 300000;
     }
 
     function setPool(bytes32 id, address token, bool enable) external onlyOwner {
@@ -60,9 +63,9 @@ contract Branch is Initializable, LzApp {
     function estimateFees(uint8 functionType) public view returns (uint) {
         bytes memory payload = "";
         if(functionType == TYPE_DEPOSIT) {
-            payload = abi.encode(TYPE_DEPOSIT, 1, msg.sender, 1);
+            payload = abi.encode(TYPE_DEPOSIT, 1, msg.sender, 1, 1);
         } else if(functionType == TYPE_REPAY) {
-            payload = abi.encode(TYPE_REPAY, 1, msg.sender, 1);
+            payload = abi.encode(TYPE_REPAY, 1, msg.sender, 1, 1);
         } else {
             revert("Unsupport functionType");
         }
@@ -100,7 +103,8 @@ contract Branch is Initializable, LzApp {
     * @param functionType type of function
     **/
     function _pay(address token, uint amount, bytes32 id, uint8 functionType) internal {
-        bytes memory payload = abi.encode(functionType, id, msg.sender, amount);
+        (uint64 amountpx, uint64 amountsx) = _buildRemoteAmount(amount, id);
+        bytes memory payload = abi.encodePacked(functionType, id, addressToBytes32(msg.sender), amountpx, amountsx);
         if(token == address(0)) {
             require(msg.value >= amount, "Invalid amount");
             _send(serverChainId, payload, msg.value.sub(amount));
@@ -125,6 +129,25 @@ contract Branch is Initializable, LzApp {
         
     }
 
+    function addressToBytes32(address addr) public pure returns (bytes32) {
+        bytes32 result;
+        assembly {
+            mstore(0, addr)
+            result := mload(0)
+        }
+        return result;
+    }
+
+    function _buildRemoteAmount(uint _localAmount, bytes32 _id) view internal returns (uint64 amountpx, uint64 amountsx) {
+        (, bytes memory data) = pools[_id].token.staticcall(
+            abi.encodeWithSignature("decimals()")
+        );
+        uint8 decimal = abi.decode(data, (uint8));
+        _localAmount = decimal > ROOT_DECIMALS ? _localAmount / (10 ** (decimal - ROOT_DECIMALS)): _localAmount * (10 ** (ROOT_DECIMALS - decimal));
+        amountpx = uint64(_localAmount / BASE);
+        amountsx = uint64(_localAmount % BASE);
+    }
+
     // LayerZero functions
     function _send(uint16 chainId, bytes memory payload, uint gasValue) internal {
         _lzSend(chainId, payload, payable(msg.sender), address(this), abi.encodePacked(uint16(1), GAS_USAGE), gasValue);
@@ -132,7 +155,17 @@ contract Branch is Initializable, LzApp {
 
     function _blockingLzReceive(uint16 _srcId, bytes memory, uint64, bytes memory _payload) internal override {
         require(serverChainId == _srcId, "Invalid chainId");
-        (bytes32 id, bytes32 to, uint amount) = abi.decode(_payload, (bytes32, bytes32, uint256));
+        bytes32 id;
+        bytes32 to;
+        uint64 amountpx;
+        uint64 amountsx;
+        assembly {
+            id := mload(add(_payload, 32))
+            to := mload(add(_payload, 64))
+            amountpx := mload(add(_payload, 72))
+            amountsx := mload(add(_payload, 80))
+        }
+        uint amount = uint(amountpx) * BASE +  uint(amountsx);
         _receive(pools[id].token, amount, address(uint160(uint256(to))));
     }
 }

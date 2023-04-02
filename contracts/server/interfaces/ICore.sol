@@ -12,6 +12,7 @@ interface ICore {
     function refresh(bytes32 id) external;
     function updateInterestRate(bytes32 id) external;
     function healthFactor(address user) external view returns(Data.HealthData memory health);
+    function checkHealth(address user) view external;
     function getLiquidity( uint16 _chainId, bytes32 _poolId) external view returns (uint);
     function totalLiquidity( bytes32 _poolId) external view returns (uint);
     function reserves(bytes32 _poolId) external view returns (Data.ReserveData memory reserve);

@@ -3,6 +3,7 @@ pragma solidity ^0.8.9;
 import "hardhat/console.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
 import './interfaces/IDebtToken.sol';
@@ -11,58 +12,48 @@ import './interfaces/ICore.sol';
 import './libraries/Data.sol';
 
 /** 
-* Title Root
-* Root is deployed on a single chain where all the global data is stored. 
-* All the Branches are connected to Root, all of which sends deposit and repay information
-* to Root.
-* Most of the lending and borrowing logic like interest rate calculation, checks, etc. is in Root.
-* Users interact with Root for Borrow, Withdraw, and Liquidate actions.
+* Title LiquidationManager
+
+* Users interact with LiquidationManager for Liquidate actions.
 **/
 
-contract LiquidationManager is Initializable, OwnableUpgradeable {
+contract LiquidationManager is Initializable,OwnableUpgradeable,ReentrancyGuardUpgradeable {
 
-     using SafeMath for uint256;
+    using SafeMath for uint256;
 
     uint constant public MAX_HEALTH_FACTOR = 1e18;
-    address public pool;
-    address public core;
 
+    address public core;
     IOracle public oracle;
 
-    /**
-    * @dev only pool can use functions affected by this modifier
-    **/
-    modifier onlyPool {
-        require(pool == msg.sender, "The caller must be a pool contract");
-        _;
+    function initialize() public initializer {
+        __Ownable_init();
+        __ReentrancyGuard_init();
+        
     }
 
     /**
-    * @dev Configures pool contract. 
+    * @dev Configures Core contract. 
     * This function can only be accessed by the contract owner.
-    * @param _poolAddress address of the fee provider contract.
-    **/
-    function setPool(address _poolAddress) external onlyOwner {
-        pool = _poolAddress;
-
-    }
-    /**
-    * @dev Configures core contract. 
-    * This function can only be accessed by the contract owner.
-    * @param _coreAddress address of the fee provider contract.
+    * @param _coreAddress address of the core contract.
     **/
     function setCore(address _coreAddress) external onlyOwner {
         core = _coreAddress;
 
     }
 
+    /**
+    * @dev Configures Oracle contract. 
+    * This function can only be accessed by the contract owner.
+    * @param _oracle address of the oracle contract.
+    **/
     function setOracle(IOracle _oracle) external onlyOwner {
         oracle = _oracle;
     }
 
     
 
-    // caluculate liquidate info and avoid stack too deep error
+    // calculate liquidate info and avoid stack too deep error
     function _buildLiquidateParams(bytes32 collateralId, bytes32 debtId, uint debtAmount, uint discount) view internal returns(Data.LiquidateParams memory params) {
         Data.ReserveData memory debtReserve = ICore(core).reserves(debtId);
         params.debtValue = debtAmount.mul(debtReserve.dtScaled).div(1e18);
@@ -79,7 +70,7 @@ contract LiquidationManager is Initializable, OwnableUpgradeable {
     * @param debtId the pool id of the debt asset
     * @param debtAmount total debt amount of user
     **/
-    function liquidate(address user, bytes32 collateralId, bytes32 debtId, uint debtAmount) external onlyPool returns (uint, uint){
+    function liquidate(address user, bytes32 collateralId, bytes32 debtId, uint debtAmount) external nonReentrant returns (uint, uint){
         ICore(core).refresh(collateralId);
         ICore(core).refresh(debtId);
         Data.HealthData memory healthData = ICore(core).healthFactor(user);
