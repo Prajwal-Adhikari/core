@@ -10,7 +10,6 @@ import './interfaces/IDebtToken.sol';
 import './interfaces/IOracle.sol';
 import './interfaces/ICore.sol';
 import './interfaces/IFeeProvider.sol';
-import './interfaces/ILiquidationManager.sol';
 import './libraries/Data.sol';
 
 
