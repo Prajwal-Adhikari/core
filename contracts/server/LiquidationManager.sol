@@ -115,6 +115,7 @@ contract LiquidationManager is Initializable,OwnableUpgradeable,ReentrancyGuardU
         
         ICore(core).updateInterestRate(collateralId);
         ICore(core).updateInterestRate(debtId);
+        emit Data.Liquidate(user, msg.sender, debtId, collateralId, debtAmount, params.ceDebtAmount, params.ceCollateralAmount);
         return (params.ceDebtAmount, params.ceCollateralAmount);
     }
 }
