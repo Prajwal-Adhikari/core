@@ -56,9 +56,9 @@ contract Core is Initializable, OwnableUpgradeable {
     }
 
     /**
-    * @dev Configures core contract. 
+    * @dev Configures pool contract. 
     * This function can only be accessed by the contract owner.
-    * @param _poolAddress address of the fee provider contract.
+    * @param _poolAddress address of the pool contract.
     **/
     function setPool(address _poolAddress) external onlyOwner {
         pool = _poolAddress;
@@ -68,7 +68,7 @@ contract Core is Initializable, OwnableUpgradeable {
     /**
     * @dev Configures liquidation manager contract. 
     * This function can only be accessed by the contract owner.
-    * @param _liquidationManagerAddress address of the fee provider contract.
+    * @param _liquidationManagerAddress address of the liquidation manager contract.
     **/
     function setLiquidationManager(address _liquidationManagerAddress) external onlyOwner {
         liquidationManager = _liquidationManagerAddress;
