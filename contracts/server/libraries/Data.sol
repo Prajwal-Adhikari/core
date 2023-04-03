@@ -90,6 +90,6 @@ library Data {
     event Borrow(address user, address to, bytes32 id, uint16 chainId, uint tokenAmount, uint debtAmount);
     event Repay(address user, bytes32 id, uint16 chainId, uint tokenAmount, uint debtAmount, uint ceAmount);
     event Liquidate(address user, address liquidator, bytes32 debtId, bytes32 collateralId, 
-        uint debtAmount, uint ceDebtAmount, uint ceCollateralAmount);
+        uint ceDebtAmount, uint ceCollateralAmount);
     event ChangePoolStatus(bytes32 id, bool enable);
 }

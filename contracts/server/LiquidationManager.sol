@@ -70,7 +70,7 @@ contract LiquidationManager is Initializable,OwnableUpgradeable,ReentrancyGuardU
     * @param debtId the pool id of the debt asset
     * @param debtAmount total debt amount of user
     **/
-    function liquidate(address user, bytes32 collateralId, bytes32 debtId, uint debtAmount) external nonReentrant returns (uint, uint){
+    function liquidate(address user, bytes32 collateralId, bytes32 debtId, uint debtAmount) external nonReentrant{
         ICore(core).refresh(collateralId);
         ICore(core).refresh(debtId);
         Data.HealthData memory healthData = ICore(core).healthFactor(user);
@@ -115,7 +115,6 @@ contract LiquidationManager is Initializable,OwnableUpgradeable,ReentrancyGuardU
         
         ICore(core).updateInterestRate(collateralId);
         ICore(core).updateInterestRate(debtId);
-        emit Data.Liquidate(user, msg.sender, debtId, collateralId, debtAmount, params.ceDebtAmount, params.ceCollateralAmount);
-        return (params.ceDebtAmount, params.ceCollateralAmount);
+        emit Data.Liquidate(user, msg.sender, debtId, collateralId, params.ceDebtAmount, params.ceCollateralAmount);
     }
 }
