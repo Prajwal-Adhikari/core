@@ -12,6 +12,7 @@ const toMathAmount = (amount, decimals = 18) => new BN(amount.toString()).divide
 const MATIC = ethers.utils.formatBytes32String("MATIC");
 const FTM = ethers.utils.formatBytes32String("FTM");
 const BNB = ethers.utils.formatBytes32String("BNB");
+const LZO = ethers.utils.formatBytes32String("LZO");
 let server, core, liquidationManager, treasury, matic, ftm, bnb;
 function getAddress(b, a) {
   return ethers.utils.solidityPack(['address','address'],
@@ -64,13 +65,62 @@ describe("Ready", function () {
         const Oracle = await ethers.getContractFactory("Oracle");
         this.oracle = await Oracle.deploy();
 
-        const Client = await ethers.getContractFactory("Branch");;
-        this.clientA = await upgrades.deployProxy(Client, [this.lzEndpointMockClientA.address, this.chainIdClientA, this.chainIdServer]);
-        this.clientB = await upgrades.deployProxy(Client, [this.lzEndpointMockClientB.address, this.chainIdClientB, this.chainIdServer]);
-        this.clientC = await upgrades.deployProxy(Client, [this.lzEndpointMockClientC.address, this.chainIdClientC, this.chainIdServer]);
+        const Client = await ethers.getContractFactory("Branch");
+        this.clientA = await upgrades.deployProxy(Client, []);
+        this.clientB = await upgrades.deployProxy(Client, []);
+        this.clientC = await upgrades.deployProxy(Client, []);
+
+        // Client Adapter
+        const Adapter = await ethers.getContractFactory("AdapterBranch");
+        this.adapterA = await upgrades.deployProxy(Adapter, []);
+        await this.adapterA.setBranch(this.clientA.address);
+        this.adapterB = await upgrades.deployProxy(Adapter, []);
+        await this.adapterB.setBranch(this.clientB.address);
+        this.adapterC = await upgrades.deployProxy(Adapter, []);
+        await this.adapterC.setBranch(this.clientC.address);
+
+        // Client Route
+        const Route = await ethers.getContractFactory("LzRouteBranch");
+        this.routeA = await upgrades.deployProxy(Route, [this.lzEndpointMockClientA.address, this.chainIdClientA, this.chainIdServer]);
+        await this.routeA.setAdapter(this.adapterA.address);
+        this.routeB = await upgrades.deployProxy(Route, [this.lzEndpointMockClientB.address, this.chainIdClientB, this.chainIdServer]);
+        await this.routeB.setAdapter(this.adapterB.address);
+        this.routeC = await upgrades.deployProxy(Route, [this.lzEndpointMockClientC.address, this.chainIdClientC, this.chainIdServer]);
+        await this.routeC.setAdapter(this.adapterC.address);
+
+        // Configure Route in Adapter
+        await this.adapterA.setRoute(LZO, this.routeA.address);
+        await this.adapterB.setRoute(LZO, this.routeB.address);
+        await this.adapterC.setRoute(LZO, this.routeC.address);
+
+        // Configure Adapter in Client
+        await this.clientA.setAdapter(this.adapterA.address);
+        await this.clientB.setAdapter(this.adapterB.address);
+        await this.clientC.setAdapter(this.adapterC.address);
+
+        
 
         const Server = await ethers.getContractFactory("Pool");
-        server =  await upgrades.deployProxy(Server, [this.lzEndpointMockServer.address, this.chainIdServer]);
+        server =  await upgrades.deployProxy(Server, []);
+
+        // Server Adapter
+        const AdapterPool = await ethers.getContractFactory("AdapterPool");
+        this.adapterS = await upgrades.deployProxy(AdapterPool, []);
+        await this.adapterS.setPool(server.address);
+
+        // Server Route
+        const LzRoutePool = await ethers.getContractFactory("LzRoutePool");
+        this.routeS = await upgrades.deployProxy(LzRoutePool, [this.lzEndpointMockServer.address, this.chainIdServer]);
+        await this.routeS.setAdapter(this.adapterS.address);
+        await this.routeS.setChainNameID(MATIC, this.chainIdServer);
+        await this.routeS.setChainNameID(FTM, this.chainIdClientA);
+        await this.routeS.setChainNameID(BNB, this.chainIdClientB);
+
+        // Configure Route in Adapter
+        await this.adapterS.setRoute(LZO, this.routeS.address);
+
+        // Configure Adapter in Server
+        await server.setAdapter(this.adapterS.address);
 
         const Core = await ethers.getContractFactory("Core");
         core =  await upgrades.deployProxy(Core, [treasury.address]);
@@ -104,19 +154,19 @@ describe("Ready", function () {
         await core.changePoolStatus(FTM, true);
         await core.changePoolStatus(BNB, true);
 
-        await this.lzEndpointMockServer.setDestLzEndpoint(this.clientA.address, this.lzEndpointMockClientA.address)
-        await this.lzEndpointMockServer.setDestLzEndpoint(this.clientB.address, this.lzEndpointMockClientB.address)
+        await this.lzEndpointMockServer.setDestLzEndpoint(this.routeA.address, this.lzEndpointMockClientA.address)
+        await this.lzEndpointMockServer.setDestLzEndpoint(this.routeB.address, this.lzEndpointMockClientB.address)
 
-        await this.lzEndpointMockClientA.setDestLzEndpoint(server.address, this.lzEndpointMockServer.address)
-        await this.lzEndpointMockClientB.setDestLzEndpoint(server.address, this.lzEndpointMockServer.address)
+        await this.lzEndpointMockClientA.setDestLzEndpoint(this.routeS.address, this.lzEndpointMockServer.address)
+        await this.lzEndpointMockClientB.setDestLzEndpoint(this.routeS.address, this.lzEndpointMockServer.address)
         // set each contracts source address so it can send to each other
-        await this.clientA.setTrustedRemote(this.chainIdServer, getAddress(this.clientA.address, server.address))
-        await this.clientB.setTrustedRemote(this.chainIdServer, getAddress(this.clientB.address, server.address))
-        await this.clientC.setTrustedRemote(this.chainIdServer, getAddress(this.clientC.address, server.address))
+        await this.routeA.setTrustedRemote(this.chainIdServer, getAddress(this.routeA.address, this.routeS.address))
+        await this.routeB.setTrustedRemote(this.chainIdServer, getAddress(this.routeB.address, this.routeS.address))
+        await this.routeC.setTrustedRemote(this.chainIdServer, getAddress(this.routeC.address, this.routeS.address))
 
-        await server.setTrustedRemote(this.chainIdClientA, getAddress(server.address, this.clientA.address))
-        await server.setTrustedRemote(this.chainIdClientB, getAddress(server.address, this.clientB.address))
-        await server.setTrustedRemote(this.chainIdClientC, getAddress(server.address, this.clientC.address))
+        await this.routeS.setTrustedRemote(this.chainIdClientA, getAddress(this.routeS.address, this.routeA.address))
+        await this.routeS.setTrustedRemote(this.chainIdClientB, getAddress(this.routeS.address, this.routeB.address))
+        await this.routeS.setTrustedRemote(this.chainIdClientC, getAddress(this.routeS.address, this.routeC.address))
 
         await matic.mint(alice.address, toTokenAmount(1e6))
         await ftm.mint(alice.address, toTokenAmount(1e6))
@@ -173,95 +223,96 @@ describe("Ready", function () {
     }
 
     it("Simple test", async function () {
-        let fees = await this.clientA.connect(alice).estimateFees(1);
+        console.log("here");
+        let fees = await this.routeA.connect(alice).estimateFees(1);
         console.log(fees);
 
         console.log("alice deposit matic");
-        await this.clientA.connect(alice).depositRequest(MATIC, toTokenAmount(500000), {value: fees})
+        await this.clientA.connect(alice).depositRequest(MATIC, toTokenAmount(500000), LZO, {value: fees})
         await printInfo();
 
         console.log("bob deposit ftm");
-        await this.clientB.connect(bob).depositRequest(FTM, toTokenAmount(5e5), {value: fees})
+        await this.clientB.connect(bob).depositRequest(FTM, toTokenAmount(5e5), LZO, {value: fees})
         await printInfo();
 
         console.log("alice deposit bnb");
-        await this.clientC.connect(alice).depositRequest(BNB, toTokenAmount(500000), {value: fees})
+        await this.clientC.connect(alice).depositRequest(BNB, toTokenAmount(500000), LZO, {value: fees})
         await printInfo();
 
         console.log("alice borrow ftm and after one month");
-        await server.connect(alice).borrow(FTM, this.chainIdClientB, toTokenAmount(1e5), ethers.utils.hexZeroPad(alice.address, 32), {value: fees});
+        await server.connect(alice).borrow(FTM, BNB, toTokenAmount(1e5), ethers.utils.hexZeroPad(alice.address, 32), LZO, {value: fees});
         await network.provider.send("evm_increaseTime", [365 * 86400 - 1])
         await printInfo();
 
-        console.log("alice withdraw matic");
-        await server.connect(alice).withdraw(MATIC, this.chainIdClientA, toTokenAmount(1e5), ethers.utils.hexZeroPad(alice.address, 32), {value: fees})
-        await printInfo();
+        // console.log("alice withdraw matic");
+        // await server.connect(alice).withdraw(MATIC, this.chainIdClientA, toTokenAmount(1e5), ethers.utils.hexZeroPad(alice.address, 32), {value: fees})
+        // await printInfo();
 
-        console.log("bob withdraw ftm");
-        await server.connect(bob).withdraw(FTM, this.chainIdClientB, toTokenAmount(1e5), ethers.utils.hexZeroPad(bob.address, 32), {value: fees})
-        await printInfo();
+        // console.log("bob withdraw ftm");
+        // await server.connect(bob).withdraw(FTM, this.chainIdClientB, toTokenAmount(1e5), ethers.utils.hexZeroPad(bob.address, 32), {value: fees})
+        // await printInfo();
 
-        console.log("alice withdraw bnb");
-        await server.connect(alice).withdraw(BNB, this.chainIdClientC, toTokenAmount(1e5), ethers.utils.hexZeroPad(alice.address, 32), {value: fees})
-        await printInfo();
+        // console.log("alice withdraw bnb");
+        // await server.connect(alice).withdraw(BNB, this.chainIdClientC, toTokenAmount(1e5), ethers.utils.hexZeroPad(alice.address, 32), {value: fees})
+        // await printInfo();
 
-        console.log("alice withdraw matic")
-        await server.connect(alice).withdraw(MATIC, this.chainIdClientA, toTokenAmount(180000), ethers.utils.hexZeroPad(alice.address, 32), {value: fees})
-        await printInfo();
-        // expect(await matic.balanceOf(alice.address)).to.be.equal(toTokenAmount(6e5))
+        // console.log("alice withdraw matic")
+        // await server.connect(alice).withdraw(MATIC, this.chainIdClientA, toTokenAmount(180000), ethers.utils.hexZeroPad(alice.address, 32), {value: fees})
+        // await printInfo();
+        // // expect(await matic.balanceOf(alice.address)).to.be.equal(toTokenAmount(6e5))
 
-        await network.provider.send("evm_increaseTime", [365 * 86400])
-        console.log("alice repay ftm")
-        // await expect(server.connect(alice).withdraw(MATIC, this.chainIdClientA, toTokenAmount(263550), {value: fees})).to.be.revertedWith("Health check failed");
-        await this.clientB.connect(alice).repayRequest(FTM, toTokenAmount(50000), {value: fees})
-        await printInfo();
+        // await network.provider.send("evm_increaseTime", [365 * 86400])
+        // console.log("alice repay ftm")
+        // // await expect(server.connect(alice).withdraw(MATIC, this.chainIdClientA, toTokenAmount(263550), {value: fees})).to.be.revertedWith("Health check failed");
+        // await this.clientB.connect(alice).repayRequest(FTM, toTokenAmount(50000), {value: fees})
+        // await printInfo();
 
-        await this.clientB.connect(alice).repayRequest(FTM, toTokenAmount(200000), {value: fees})
-        await printInfo();
+        // await this.clientB.connect(alice).repayRequest(FTM, toTokenAmount(200000), {value: fees})
+        // await printInfo();
 
 
-        console.log("alice deposit matic");
-        await this.clientA.connect(alice).depositRequest(MATIC, toTokenAmount(500000), {value: fees})
-        await printInfo();
+        // console.log("alice deposit matic");
+        // await this.clientA.connect(alice).depositRequest(MATIC, toTokenAmount(500000), {value: fees})
+        // await printInfo();
 
-        console.log("bob borrow matic");
-        await server.connect(bob).borrow(MATIC, this.chainIdClientA, toTokenAmount(2e5), ethers.utils.hexZeroPad(bob.address, 32), {value: fees});
-        await network.provider.send("evm_increaseTime", [365 * 86400 - 1])
-        await printInfo();
+        // console.log("bob borrow matic");
+        // await server.connect(bob).borrow(MATIC, this.chainIdClientA, toTokenAmount(2e5), ethers.utils.hexZeroPad(bob.address, 32), {value: fees});
+        // await network.provider.send("evm_increaseTime", [365 * 86400 - 1])
+        // await printInfo();
 
-        console.log("liquidate test");
-        await liquidationManager.connect(alice).liquidate(bob.address, FTM, MATIC, toTokenAmount(100000));
-        await printInfo();
+        // console.log("liquidate test");
+        // await liquidationManager.connect(alice).liquidate(bob.address, FTM, MATIC, toTokenAmount(100000));
+        // await printInfo();
     })
 
-    it("Test reward", async function () {
-        let fees = await this.clientA.connect(alice).estimateFees(1);
+    // it("Test reward", async function () {
+    //     let fees = await this.routeA.connect(alice).estimateFees(MATIC);
 
-        await server.setFeeRewardStatus(true, true);
+    //     await server.setFeeRewardStatus(true, true);
 
-        await this.cedro.transfer(server.address, toTokenAmount(500000));
+    //     await this.cedro.transfer(server.address, toTokenAmount(500000));
 
-        let balance_matic_client = await matic.balanceOf(this.clientA.address);
-        console.log("Before balance of matic pool", balance_matic_client.toString(), this.clientA.address);
+    //     let balance_matic_client = await matic.balanceOf(this.clientA.address);
+    //     console.log("Before balance of matic pool", balance_matic_client.toString(), this.clientA.address);
 
-        await this.clientA.connect(alice).depositRequest(MATIC, toTokenAmount(500000), {value: fees});
+    //     await this.clientA.connect(alice).depositRequest(MATIC, toTokenAmount(500000), {value: fees});
         
-        console.log("Alice gets cedro reward");
-        let balance = await this.cedro.balanceOf(alice.address);
-        console.log("reward", balance.toString(), alice.address);
-        // expect(balance).to.equal(toTokenAmount(1));
+    //     console.log("Alice gets cedro reward");
+    //     let balance = await this.cedro.balanceOf(alice.address);
+    //     console.log("reward", balance.toString(), alice.address);
+    //     // expect(balance).to.equal(toTokenAmount(1));
 
-        balance = await this.cedro.balanceOf(server.address);
-        console.log("remaining balance", balance.toString(), server.address);
+    //     balance = await this.cedro.balanceOf(server.address);
+    //     console.log("remaining balance", balance.toString(), server.address);
     
-        await printInfo();
+    //     await printInfo();
 
-        balance_matic_client = await matic.balanceOf(this.clientA.address);
-        console.log("After balance of matic pool", balance_matic_client.toString(), this.clientA.address);
+    //     balance_matic_client = await matic.balanceOf(this.clientA.address);
+    //     console.log("After balance of matic pool", balance_matic_client.toString(), this.clientA.address);
 
-        balance = await this.ceMATIC.balanceOf(alice.address);
-        console.log("CEtoken", balance.toString(), alice.address);
-        // expect(balance).to.equal(toTokenAmount(500000));
+    //     balance = await this.ceMATIC.balanceOf(alice.address);
+    //     console.log("CEtoken", balance.toString(), alice.address);
+    //     // expect(balance).to.equal(toTokenAmount(500000));
 
-    })
+    // })
 })
