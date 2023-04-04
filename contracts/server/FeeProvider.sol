@@ -12,9 +12,9 @@ import './interfaces/ICore.sol';
 contract FeeProvider is Initializable,OwnableUpgradeable{
     using SafeMath for uint256;
 
-    mapping(uint16 => mapping(bytes32 => uint)) public OPTIMAL_GLOBAL_LIQUIDITY_FACTOR;
-    mapping(uint16 => mapping(bytes32 => uint)) public BASE_FEE;
-    mapping(uint16 => mapping(bytes32 => uint)) public MAX_FEE;
+    mapping(bytes32 => mapping(bytes32 => uint)) public OPTIMAL_GLOBAL_LIQUIDITY_FACTOR;
+    mapping(bytes32 => mapping(bytes32 => uint)) public BASE_FEE;
+    mapping(bytes32 => mapping(bytes32 => uint)) public MAX_FEE;
     
     address public core;
 
@@ -40,7 +40,7 @@ contract FeeProvider is Initializable,OwnableUpgradeable{
     * @param _poolId ids of the pool.
     * @param _liquidityFactor optimal global liquidity factor for each pool in diff chain.
     **/
-    function configureOptimalGlobalLiquidityFactor(uint16[] memory _chainId, bytes32[] memory _poolId, uint[] memory _liquidityFactor) external onlyOwner {
+    function configureOptimalGlobalLiquidityFactor(bytes32[] memory _chainId, bytes32[] memory _poolId, uint[] memory _liquidityFactor) external onlyOwner {
         require( _chainId.length == _poolId.length && _poolId.length == _liquidityFactor.length , "Arguments number mismatched");
         for (uint256 i = 0; i < _poolId.length; i++){
             OPTIMAL_GLOBAL_LIQUIDITY_FACTOR[_chainId[i]][_poolId[i]] = _liquidityFactor[i];
@@ -55,7 +55,7 @@ contract FeeProvider is Initializable,OwnableUpgradeable{
     * @param _poolId ids of the pool.
     * @param _baseFee base fee for each pool in diff chain.
     **/
-    function configureBaseFee(uint16[] memory _chainId, bytes32[] memory _poolId, uint[] memory _baseFee) external onlyOwner {
+    function configureBaseFee(bytes32[] memory _chainId, bytes32[] memory _poolId, uint[] memory _baseFee) external onlyOwner {
         require( _chainId.length == _poolId.length && _poolId.length == _baseFee.length , "Arguments number mismatched");
         for (uint256 i = 0; i < _poolId.length; i++){
             BASE_FEE[_chainId[i]][_poolId[i]] = _baseFee[i];
@@ -71,7 +71,7 @@ contract FeeProvider is Initializable,OwnableUpgradeable{
     * @param _maxFee upper limit of fee for each pool in diff chain.
     
     **/
-    function configureMaxFee(uint16[] memory _chainId, bytes32[] memory _poolId, uint[] memory _maxFee) external onlyOwner {
+    function configureMaxFee(bytes32[] memory _chainId, bytes32[] memory _poolId, uint[] memory _maxFee) external onlyOwner {
         require( _chainId.length == _poolId.length && _poolId.length == _maxFee.length , "Arguments number mismatched");
         for (uint256 i = 0; i < _poolId.length; i++){
             MAX_FEE[_chainId[i]][_poolId[i]] = _maxFee[i];
@@ -84,7 +84,7 @@ contract FeeProvider is Initializable,OwnableUpgradeable{
     * @param _chainId id of the chain.
     * @param _poolId id of the pool.
     **/
-    function getFeeAmount(uint16 _chainId, bytes32 _poolId) public view returns (uint){
+    function getFeeAmount(bytes32  _chainId, bytes32 _poolId) public view returns (uint){
         uint globalLiquidityFactor = _getGlobalLiquidityFactor(_chainId, _poolId);
         uint optimalGlobalLiquidityFactor = OPTIMAL_GLOBAL_LIQUIDITY_FACTOR[_chainId][_poolId];
         uint initialFee;
@@ -104,9 +104,9 @@ contract FeeProvider is Initializable,OwnableUpgradeable{
     * @param _chainId id of the chain.
     * @param _poolId id of the pool.
     **/
-    function _getGlobalLiquidityFactor(uint16 _chainId, bytes32 _poolId) internal view returns (uint){
+    function _getGlobalLiquidityFactor(bytes32  _chainId, bytes32 _poolId) internal view returns (uint){
         uint totalLiquidity = ICore(core).totalLiquidity(_poolId);
-        return totalLiquidity > 0 ? ICore(core).getLiquidity(_chainId, _poolId).div(totalLiquidity): 0;
+        return totalLiquidity > 0 ? ICore(core).getLiquidity(_chainId, _poolId).div(totalLiquidity): 0; 
     }
 
 }

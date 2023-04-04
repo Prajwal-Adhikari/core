@@ -27,7 +27,7 @@ contract Core is Initializable, OwnableUpgradeable {
     uint constant public YEAR = 365 * 86400;
     mapping(bytes32 => Data.ReserveData) public reserves;
     mapping(bytes32 => Data.ConfigData) public configs;
-    mapping(uint16 => mapping(bytes32 => uint)) public chains;
+    mapping(bytes32 => mapping(bytes32 => uint)) public chains;
     mapping(bytes32 => uint) public totalLiquidity;
     mapping(address => bytes32[]) public users;
 
@@ -183,7 +183,7 @@ contract Core is Initializable, OwnableUpgradeable {
     * @param tokenAmount amount deposited
     * @param user deposit address
     **/
-    function deposit(bytes32 id, uint16 chainId, address user, uint tokenAmount) external onlyPool returns (uint) {
+    function deposit(bytes32 id, bytes32 chainId, address user, uint tokenAmount) external onlyPool returns (uint) {
         refresh(id);
         Data.ReserveData storage reserve = reserves[id];
         require(reserve.enable, "Not enable now");
@@ -205,7 +205,7 @@ contract Core is Initializable, OwnableUpgradeable {
     * @param chainId chain id of chain to withdraw from
     * @param ceAmount amount to withdraw
     **/
-    function withdraw(bytes32 id, uint16 chainId, uint ceAmount, address user) external onlyPool returns (uint) {
+    function withdraw(bytes32 id, bytes32 chainId, uint ceAmount, address user) external onlyPool returns (uint) {
         refresh(id);
         Data.ReserveData storage reserve = reserves[id];
         require(reserve.enable, "Not enable now");
@@ -222,7 +222,7 @@ contract Core is Initializable, OwnableUpgradeable {
     }
 
     // avoid stack too deep error
-    function _buildBorrowParams(bytes32 id, uint16 chainId, uint tokenAmount) view internal returns(Data.BorrowParams memory params)  {
+    function _buildBorrowParams(bytes32 id, bytes32 chainId, uint tokenAmount) view internal returns(Data.BorrowParams memory params)  {
         Data.ReserveData memory reserve = reserves[id];
         Data.ConfigData memory config = configs[id];
         params.liquidity = chains[chainId][id];
@@ -232,7 +232,7 @@ contract Core is Initializable, OwnableUpgradeable {
         params.debtToken = reserve.debtToken;
     }
 
-    function borrow(bytes32 id, uint16 chainId, uint tokenAmount, address user) external onlyPool returns (uint) {
+    function borrow(bytes32 id, bytes32 chainId, uint tokenAmount, address user) external onlyPool returns (uint) {
         refresh(id);
         Data.BorrowParams memory params = _buildBorrowParams(id, chainId, tokenAmount);    
 
@@ -269,7 +269,7 @@ contract Core is Initializable, OwnableUpgradeable {
     * @param tokenAmount amount repaid
     * @param user repay address
     **/
-    function repay(bytes32 id, uint16 chainId, address user, uint tokenAmount) external onlyPool returns (uint, uint, uint) {
+    function repay(bytes32 id, bytes32 chainId, address user, uint tokenAmount) external onlyPool returns (uint, uint, uint) {
         refresh(id);
         Data.RepayParams memory params = _buildRepayParams(reserves[id], user, tokenAmount);
         Data.ReserveData storage reserve = reserves[id];
@@ -326,7 +326,7 @@ contract Core is Initializable, OwnableUpgradeable {
     * @param _chainId id of the chain.
     * @param _poolId id of the pool.
     **/
-    function getLiquidity( uint16 _chainId, bytes32 _poolId) public view returns (uint){
+    function getLiquidity( bytes32 _chainId, bytes32 _poolId) public view returns (uint){
        return chains[_chainId][_poolId];
     }
 
