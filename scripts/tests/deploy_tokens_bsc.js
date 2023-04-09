@@ -15,36 +15,33 @@ const toTokenAmount = (amount, decimals = 18) => {
 }
 
 async function main() {
-    console.log("deploy");
+  console.log("deploy");
 
-    console.log(`deploy token`);
-    let name = "FTM"
-    let CEToken = await hre.ethers.getContractFactory("CEToken");
-    let ceToken = await CEToken.deploy("ce" + name, "ce" + name);
-    let DebtToken = await hre.ethers.getContractFactory("DebtToken");
-    let debtToken = await DebtToken.deploy("debt" + name, "debt" + name);
-    let data = deployed.branches.ftm
-    data.ceToken = ceToken.address;
-    data.debtToken = debtToken.address;
-   
-    console.log("deployed ce and debt Tokens", data.ceToken, data.debtToken);
+  console.log(`deploy token`);
+  let name = "FTM"
+  let CEToken = await hre.ethers.getContractFactory("CEToken");
+  let ceToken = await CEToken.deploy("ce" + name, "ce" + name);
+  let DebtToken = await hre.ethers.getContractFactory("DebtToken");
+  let debtToken = await DebtToken.deploy("debt" + name, "debt" + name);
+  let data = deployed.branches.ftm
+  data.ceToken = ceToken.address;
+  data.debtToken = debtToken.address;
+  
+  console.log("deployed ce and debt Tokens", data.ceToken, data.debtToken);
 
-    const Cedro = await hre.ethers.getContractFactory("CedroToken");
-    this.cedro = await Cedro.deploy(toTokenAmount(1e9));
+  const Cedro = await hre.ethers.getContractFactory("CedroToken");
+  this.cedro = await Cedro.deploy(toTokenAmount(1e9));
 
-    deployed["cedroToken"] = this.cedro.address;
-    console.log("deployed cedro Token", deployed["cedroToken"]);
+  deployed["cedroToken"] = this.cedro.address;
+  console.log("deployed cedro Token", deployed["cedroToken"]);
+  this.ceToken = await ethers.getContractAt("CEToken", deployed.branches.ftm.ceToken);
+  this.debtToken = await ethers.getContractAt("DebtToken", deployed.branches.ftm.debtToken);
+
+  await (await this.ceToken.initialize(deployed.core,deployed.core)).wait();
+  await (await this.debtToken.initialize(deployed.core,deployed.core)).wait();
 
     
-    
-    // let Token = await hre.ethers.getContractFactory("ERC20Mock");
-    // this.ftm = await Token.deploy("testFTM", "testFTM");
-    // this.usdc =  await Token.deploy("testUSDC", "testUSDC");
-
-    // data["FTM"] = this.ftm.address;
-    // data["USDC"] = this.usdc.address;
-    // console.log("FTM", data["FTM"], "USDC", data["USDC"]);
-    fs.writeFileSync("./deployed2.json", JSON.stringify(deployed, null, 4))
+  fs.writeFileSync("./deployed2.json", JSON.stringify(deployed, null, 4))
 
 }
 

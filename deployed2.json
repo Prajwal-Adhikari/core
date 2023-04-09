@@ -1,8 +1,6 @@
 {
-    "server": "0x48648C81DE8FDf6389C2Adb5D22F247C3706f747",
     "treasury": "0x2D83750BDB3139eed1F76952dB472A512685E3e0",
     "endpoint": "0x6Fcb97553D41516Cb228ac03FdC8B9a0a9df04A1",
-    "oracle": "0x46436c94Bc416FF299992B9BB4C5f8827110DF82",
     "serverId": 10102,
     "tokens": [
         "AVAX",
@@ -14,51 +12,42 @@
     ],
     "branches": {
         "avax": {
-            "AVAX": "0x1E7CF2cF80C11D76bcde56B419EF3A5222Af302D",
-            "USDC": "0xE437cc77E3d1C2336e0ba38A4d688Ba7eC4fFd7E",
-            "branch": "0x8dDD9Aa9c8786B0530043F99A3F1c6dd784E4bb6",
             "endpoint": "0x93f54D755A063cE7bB9e6Ac47Eccc8e33411d706",
             "chainId": 10106
         },
         "ftm": {
-            "FTM": "0x81C8502341bD44913f4F29Bf4f07F9f019BC67FA",
-            "USDC": "0x41423F687dD09C800b0eac4390c0ED392fA0D66c",
-            "branch": "0x6d72EDF8526362b45036b49dA7118C5Eedc59Bd1",
             "endpoint": "0x7dcAD72640F835B0FA36EFD3D6d3ec902C7E5acf",
             "chainId": 10112,
-            "ceToken": "0x2Cea37a0bD16C8ccB8DB3dD8da6DA375bbDDB6Dd",
-            "debtToken": "0x2c5A0a63ce1EAF64E463360D899633526f2e0C7B"
+            "FTM": "0x13A0b289583511627c2408387AF7185d0E2D478B",
+            "USDC": "0xC987b4D6e7d55Cf322A33c185AbC06EF4A360448",
+            "branch": "0x89591C7eA617Eb13C18ED4117de4564c13fA9cbF",
+            "adapter": "0xe806285e5A236BbB6b0f2dBA4864677987430b94",
+            "route": "0x9EeE68B08c8218A872363723b8933b23F6Cad560",
+            "ceToken": "0x21367EF3c29C3917a071b57eA31B4595e0B8D0E5",
+            "debtToken": "0x7D330326Af7768B71ac4e5cB5d9F2613728ecE4B"
         },
         "bsc": {
-            "BNB": "0x9429cBda5490094363919137ada8b54229737f54",
-            "USDC": "0xf36789052325D1ad1832308B31D7cd00B2fD6aAe",
-            "branch": "0x2A1dD61FF45b5594a477E91D6aeB99b1B5798E24",
             "endpoint": "0x6Fcb97553D41516Cb228ac03FdC8B9a0a9df04A1",
             "chainId": 10102
         },
         "goerli": {
-            "ETH": "0xF095df1FBf18ff123BBF3b73E82b748433314335",
-            "USDC": "0x751644f08065C9e6E7378be96F069408Ae32022f",
-            "branch": "0x4657D1c87689f8D99a2E79B461478adcaa08d38a",
             "endpoint": "0xbfD2135BFfbb0B5378b56643c2Df8a87552Bfa23",
             "chainId": 10121
         },
         "polygon": {
-            "MATIC": "0x228AbEf3B3E79B2f28d6bD2B2DFA7421448B38a3",
-            "USDC": "0x750cC84eFA378967dE4f99c48Fcd9006F300D216",
-            "branch": "0x47971fA51E44BB790f7755D461FaF127C5CAfb58",
             "endpoint": "0xf69186dfBa60DdB133E91E9A4B5673624293d8F8",
             "chainId": 10109
         },
         "arbitrum": {
-            "ETH": "0x7b2d99E1D1656a820Caa5DC145c0f9E5D5976DC4",
-            "USDC": "0x69E28E205913D6E4Fd7913269EE545Bdf55fD0Ff",
-            "branch": "0x69D61942348E8c68cA4239f81b24741110D7F234",
             "endpoint": "0x6aB5Ae6822647046626e83ee6dB8187151E1d5ab",
             "chainId": 10143
         }
     },
-    "feeProvider": "0x6cEBc54d285fDEDEa9651f7D49c8E6c08bc82390",
-    "core": "0xbE05b5507a6384adE07505c8e6Aefea0b953037A",
-    "cedroToken": "0x11A10d9CdC57f87173b717966990618278F36365"
+    "server": "0xd15Def19E5ACb4d1d47348ddBe3f0644Fb43164D",
+    "core": "0x66986bC0247c77C673C4B41232d80976eE8ADe21",
+    "adapter": "0xC0800f8E3bd0682f2fF157293eDd56c9347c5e19",
+    "route": "0x3cFAf07E3c2D1D0654Ace3999B32A200dbFd4fAA",
+    "feeProvider": "0x6F7fC6eB01B397aDFE47ffDCCd7685E57acbF24c",
+    "oracle": "0x1F377a0e50f9a4C1947C1a63F0D68dc0681A79Eb",
+    "cedroToken": "0x748bf843a04a1E86FE12e875fBBd0218E15611bD"
 }

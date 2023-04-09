@@ -1,10 +1,11 @@
 const { ethers, upgrades } = require('hardhat');
 
 async function main () {
-  const PoolV2 = await ethers.getContractFactory('PoolV2');
+  const Pool = await ethers.getContractFactory('Pool');
   console.log('Upgrading Pool...');
-  await upgrades.upgradeProxy('0x48648C81DE8FDf6389C2Adb5D22F247C3706f747', PoolV2);
+  await upgrades.upgradeProxy('0xd15Def19E5ACb4d1d47348ddBe3f0644Fb43164D', Pool);
   console.log('Pool upgraded');
 }
 
 main();
+

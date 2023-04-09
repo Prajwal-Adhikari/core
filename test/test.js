@@ -244,45 +244,45 @@ describe("Ready", function () {
         await network.provider.send("evm_increaseTime", [365 * 86400 - 1])
         await printInfo();
 
-        // console.log("alice withdraw matic");
-        // await server.connect(alice).withdraw(MATIC, this.chainIdClientA, toTokenAmount(1e5), ethers.utils.hexZeroPad(alice.address, 32), {value: fees})
-        // await printInfo();
+        console.log("alice withdraw matic");
+        await server.connect(alice).withdraw(MATIC, FTM, toTokenAmount(1e5), ethers.utils.hexZeroPad(alice.address, 32), {value: fees})
+        await printInfo();
 
-        // console.log("bob withdraw ftm");
-        // await server.connect(bob).withdraw(FTM, this.chainIdClientB, toTokenAmount(1e5), ethers.utils.hexZeroPad(bob.address, 32), {value: fees})
-        // await printInfo();
+        console.log("bob withdraw ftm");
+        await server.connect(bob).withdraw(FTM, BNB, toTokenAmount(1e5), ethers.utils.hexZeroPad(bob.address, 32), {value: fees})
+        await printInfo();
 
-        // console.log("alice withdraw bnb");
-        // await server.connect(alice).withdraw(BNB, this.chainIdClientC, toTokenAmount(1e5), ethers.utils.hexZeroPad(alice.address, 32), {value: fees})
-        // await printInfo();
+        console.log("alice withdraw bnb");
+        await server.connect(alice).withdraw(BNB, MATIC, toTokenAmount(1e5), ethers.utils.hexZeroPad(alice.address, 32), {value: fees})
+        await printInfo();
 
-        // console.log("alice withdraw matic")
-        // await server.connect(alice).withdraw(MATIC, this.chainIdClientA, toTokenAmount(180000), ethers.utils.hexZeroPad(alice.address, 32), {value: fees})
-        // await printInfo();
-        // // expect(await matic.balanceOf(alice.address)).to.be.equal(toTokenAmount(6e5))
+        console.log("alice withdraw matic")
+        await server.connect(alice).withdraw(MATIC, FTM, toTokenAmount(180000), ethers.utils.hexZeroPad(alice.address, 32), {value: fees})
+        await printInfo();
+        // expect(await matic.balanceOf(alice.address)).to.be.equal(toTokenAmount(6e5))
 
-        // await network.provider.send("evm_increaseTime", [365 * 86400])
-        // console.log("alice repay ftm")
-        // // await expect(server.connect(alice).withdraw(MATIC, this.chainIdClientA, toTokenAmount(263550), {value: fees})).to.be.revertedWith("Health check failed");
-        // await this.clientB.connect(alice).repayRequest(FTM, toTokenAmount(50000), {value: fees})
-        // await printInfo();
+        await network.provider.send("evm_increaseTime", [365 * 86400])
+        console.log("alice repay ftm")
+        // await expect(server.connect(alice).withdraw(MATIC, FTM, toTokenAmount(263550), {value: fees})).to.be.revertedWith("Health check failed");
+        await this.clientB.connect(alice).repayRequest(FTM, toTokenAmount(50000), {value: fees})
+        await printInfo();
 
-        // await this.clientB.connect(alice).repayRequest(FTM, toTokenAmount(200000), {value: fees})
-        // await printInfo();
+        await this.clientB.connect(alice).repayRequest(FTM, toTokenAmount(200000), {value: fees})
+        await printInfo();
 
 
-        // console.log("alice deposit matic");
-        // await this.clientA.connect(alice).depositRequest(MATIC, toTokenAmount(500000), {value: fees})
-        // await printInfo();
+        console.log("alice deposit matic");
+        await this.clientA.connect(alice).depositRequest(MATIC, toTokenAmount(500000), {value: fees})
+        await printInfo();
 
-        // console.log("bob borrow matic");
-        // await server.connect(bob).borrow(MATIC, this.chainIdClientA, toTokenAmount(2e5), ethers.utils.hexZeroPad(bob.address, 32), {value: fees});
-        // await network.provider.send("evm_increaseTime", [365 * 86400 - 1])
-        // await printInfo();
+        console.log("bob borrow matic");
+        await server.connect(bob).borrow(MATIC, this.FTM, toTokenAmount(2e5), ethers.utils.hexZeroPad(bob.address, 32), {value: fees});
+        await network.provider.send("evm_increaseTime", [365 * 86400 - 1])
+        await printInfo();
 
-        // console.log("liquidate test");
-        // await liquidationManager.connect(alice).liquidate(bob.address, FTM, MATIC, toTokenAmount(100000));
-        // await printInfo();
+        console.log("liquidate test");
+        await liquidationManager.connect(alice).liquidate(bob.address, FTM, MATIC, toTokenAmount(100000));
+        await printInfo();
     })
 
     // it("Test reward", async function () {
@@ -314,5 +314,5 @@ describe("Ready", function () {
     //     console.log("CEtoken", balance.toString(), alice.address);
     //     // expect(balance).to.equal(toTokenAmount(500000));
 
-    // })
+    })
 })
