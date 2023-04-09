@@ -129,7 +129,7 @@ contract Pool is Initializable,OwnableUpgradeable,ReentrancyGuardUpgradeable {
         uint fee = IFeeProvider(feeProvider).getFeeAmount(chainId, id);
         tokenAmount -= fee;
         }
-        IAdapter(adapter).sendToken(id, chainId, to, msg.sender, tokenAmount, route);
+        IAdapter(adapter).sendToken{value: msg.value}(id, chainId, to, msg.sender, tokenAmount, route);
         emit Data.Withdraw(msg.sender, _bytesToAddress(to), id, chainId, tokenAmount, ceAmount);
     }
 
