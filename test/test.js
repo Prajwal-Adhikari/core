@@ -314,5 +314,5 @@ describe("Ready", function () {
     //     console.log("CEtoken", balance.toString(), alice.address);
     //     // expect(balance).to.equal(toTokenAmount(500000));
 
-    })
+    // })
 })
