@@ -1,13 +1,14 @@
-// SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.9;
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {AxelarExecutable} from "../axelar/executable/AxelarExecutable.sol";
 import {IAxelarGateway} from "../axelar/interfaces/IAxelarGateway.sol";
 import {IAxelarGasService} from "../axelar/interfaces/IAxelarGasService.sol";
 import "./interfaces/IAdapter.sol";
 
-contract AxlRoutePool is AxelarExecutable, Ownable{
+
+contract AxlRoutePool is Initializable, OwnableUpgradeable, AxelarExecutable {
 
     mapping(bytes32 => string) public destChain;
     mapping(bytes32 => string) public destAddress;
@@ -22,12 +23,16 @@ contract AxlRoutePool is AxelarExecutable, Ownable{
     uint public constant BASE = 10 ** 18;
     IAxelarGasService gasService;
 
-    constructor(
+
+    function initialize(
         address _gateway,
         address _gasReceiver
-    ) AxelarExecutable(_gateway) {
+    ) public initializer {
+        __AxelarExecutable_init(_gateway);
+        __Ownable_init();
         gasService = IAxelarGasService(_gasReceiver);
     }
+
 
     event Executed();
 

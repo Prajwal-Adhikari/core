@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.9;
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {AxelarExecutable} from "../axelar/executable/AxelarExecutable.sol";
 import {IAxelarGateway} from "../axelar/interfaces/IAxelarGateway.sol";
 import {IAxelarGasService} from "../axelar/interfaces/IAxelarGasService.sol";
 import "./interfaces/IAdapter.sol";
 
-contract AxlRouteBranch is AxelarExecutable, Ownable{
-
+contract AxlRouteBranch is Initializable, OwnableUpgradeable, AxelarExecutable {
     string public destinationChain;
     string public destinationAddress;
 
@@ -17,32 +17,46 @@ contract AxlRouteBranch is AxelarExecutable, Ownable{
     uint public constant BASE = 10 ** 18;
     IAxelarGasService gasService;
 
-    constructor(
+    function initialize(
         address _gateway,
         address _gasReceiver
-    ) AxelarExecutable(_gateway) {
+    ) public initializer {
+        __AxelarExecutable_init(_gateway);
+        __Ownable_init();
         gasService = IAxelarGasService(_gasReceiver);
     }
 
     event Executed();
 
     /**
-    * @dev only adapter can use functions affected by this modifier
-    **/
-    modifier onlyAdapter {
+     * @dev only adapter can use functions affected by this modifier
+     **/
+    modifier onlyAdapter() {
         require(adapter == msg.sender, "The caller must be a pool contract");
         _;
     }
 
-
     /**
-    * @dev Configures adapter contract. 
-    * This function can only be accessed by the contract owner.
-    * @param adapterAddress address of the adapter contract.
-    **/
+     * @dev Configures adapter contract.
+     * This function can only be accessed by the contract owner.
+     * @param adapterAddress address of the adapter contract.
+     **/
     function setAdapter(address adapterAddress) external onlyOwner {
         adapter = adapterAddress;
+    }
 
+    /**
+     * @dev Configures adapter contract.
+     * This function can only be accessed by the contract owner.
+     * @param name name of the destination chain.
+     * @param addr address of the destination contract.
+     **/
+    function setDestChainNameAddress(
+        string calldata name,
+        string calldata addr
+    ) external onlyOwner {
+        destinationChain = name;
+        destinationAddress = addr;
     }
 
     function send(

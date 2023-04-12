@@ -1,18 +1,19 @@
 // SPDX-License-Identifier: MIT
 
 pragma solidity ^0.8.0;
-
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import { IAxelarGateway } from '../interfaces/IAxelarGateway.sol';
 import { IAxelarExecutable } from '../interfaces/IAxelarExecutable.sol';
 
-contract AxelarExecutable is IAxelarExecutable {
-    IAxelarGateway public immutable gateway;
+contract AxelarExecutable is Initializable, IAxelarExecutable {
+    IAxelarGateway public gateway;
 
-    constructor(address gateway_) {
+    function __AxelarExecutable_init(address gateway_) internal onlyInitializing {
         if (gateway_ == address(0)) revert InvalidAddress();
 
         gateway = IAxelarGateway(gateway_);
     }
+
 
     function execute(
         bytes32 commandId,
