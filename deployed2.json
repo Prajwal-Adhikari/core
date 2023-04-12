@@ -1,4 +1,7 @@
 {
+    "chain": "binance",
+    "gateway": "0x4D147dCb984e6affEEC47e44293DA442580A3Ec0",
+    "gasservice": "0xbE406F0189A0B4cf3A05C286473D23791Dd44Cc6",
     "treasury": "0x2D83750BDB3139eed1F76952dB472A512685E3e0",
     "endpoint": "0x6Fcb97553D41516Cb228ac03FdC8B9a0a9df04A1",
     "serverId": 10102,
@@ -16,6 +19,9 @@
             "chainId": 10106
         },
         "ftm": {
+            "chain": "Fantom",
+            "gateway": "0x97837985Ec0494E7b9C71f5D3f9250188477ae14",
+            "gasservice": "0xbE406F0189A0B4cf3A05C286473D23791Dd44Cc6",
             "endpoint": "0x7dcAD72640F835B0FA36EFD3D6d3ec902C7E5acf",
             "chainId": 10112,
             "FTM": "0x13A0b289583511627c2408387AF7185d0E2D478B",
