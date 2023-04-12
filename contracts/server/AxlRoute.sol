@@ -7,7 +7,7 @@ import {IAxelarGateway} from "../axelar/interfaces/IAxelarGateway.sol";
 import {IAxelarGasService} from "../axelar/interfaces/IAxelarGasService.sol";
 import "./interfaces/IAdapter.sol";
 
-contract AxlRouteBranch is AxelarExecutable, Ownable{
+contract AxlRoutePool is AxelarExecutable, Ownable{
 
     mapping(bytes32 => string) public destChain;
     mapping(bytes32 => string) public destAddress;
@@ -85,8 +85,10 @@ contract AxlRouteBranch is AxelarExecutable, Ownable{
         string calldata sourceAddress_,
         bytes calldata payload_
     ) internal override {
+        bytes32 chain = keccak256(abi.encodePacked(sourceChain_));
+        bytes32 addr = keccak256(abi.encodePacked(sourceAddress_));
         require(
-            trustedContract[keccak256(abi.encodePacked(sourceChain_))] == keccak256(abi.encodePacked(sourceAddress_)),
+            trustedContract[chain] == addr,
             "Invalid contract"
         );
         bytes32 tokenId;
@@ -105,9 +107,9 @@ contract AxlRouteBranch is AxelarExecutable, Ownable{
 
         uint amount = uint(amountpx) * BASE +  uint(amountsx);
         if(functionType == TYPE_DEPOSIT) {
-            IAdapter(adapter).deposit(tokenId, chainName[keccak256(abi.encodePacked(sourceChain_))], _bytesToAddress(user), amount);
+            IAdapter(adapter).deposit(tokenId, chainName[chain], _bytesToAddress(user), amount);
         } else if(functionType == TYPE_REPAY) { 
-            IAdapter(adapter).repay(tokenId, chainName[keccak256(abi.encodePacked(sourceChain_))], _bytesToAddress(user), amount);
+            IAdapter(adapter).repay(tokenId, chainName[chain], _bytesToAddress(user), amount);
         } 
     }
 
