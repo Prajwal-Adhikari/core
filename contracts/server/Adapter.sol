@@ -69,7 +69,6 @@ contract AdapterPool is Initializable, OwnableUpgradeable {
 
     function deposit(bytes32 id, bytes32 chainId, address user, uint tokenAmount) external onlyRoutes {
         IPool(pool).deposit(id, chainId, user, tokenAmount);
-        
     }
 
     function repay(bytes32 id, bytes32 chainId, address user, uint tokenAmount) external onlyRoutes {

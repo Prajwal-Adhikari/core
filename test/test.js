@@ -190,6 +190,9 @@ describe("Ready", function () {
 
     async function printInfo() {
         let matic_reserve = await core.reserves(MATIC);
+        console.log(core.address);
+        console.log(MATIC);
+        console.log(matic_reserve);
         console.log("MATIC");
         console.log(`interest rate: ${matic_reserve[0]} currentRatio: ${matic_reserve[1]} ceScaled: ${matic_reserve[4]}`)
         console.log(`dtScaled: ${matic_reserve[5]} ceSupply: ${matic_reserve[7]} debtSupply: ${matic_reserve[8]}`)
@@ -228,7 +231,7 @@ describe("Ready", function () {
         console.log(fees);
 
         console.log("alice deposit matic");
-        await this.clientA.connect(alice).depositRequest(MATIC, toTokenAmount(500000), LZO, {value: fees})
+        (await this.clientA.connect(alice).depositRequest(MATIC, toTokenAmount(500000), LZO, {value: fees})).wait()
         await printInfo();
 
         console.log("bob deposit ftm");
@@ -314,5 +317,5 @@ describe("Ready", function () {
     //     console.log("CEtoken", balance.toString(), alice.address);
     //     // expect(balance).to.equal(toTokenAmount(500000));
 
-    })
+    // })
 })

@@ -36,7 +36,7 @@ contract LzRouteBranch is Initializable, LzApp {
     function initialize(address _lzEndpoint, uint16 _localChainId, uint16 _serverChainId) public initializer {
         __LzApp_init(_lzEndpoint, _localChainId);
         serverChainId = _serverChainId;
-        GAS_USAGE = 300000;
+        GAS_USAGE = 400000;
     }
 
 
