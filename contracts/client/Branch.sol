@@ -140,6 +140,12 @@ contract Branch is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable
         return result;
     }
 
+    /**
+    * @dev split the amount into 2 uint64 number to fix other not evm branch like aptos witch not support uint256 and keep the message send to root chain in the same format
+    * For example 123456789000000000987654321 = 123456789 * 1e18 + 987654321 
+    * @param _localAmount the amount in evm branch
+    * @param _id the pool id to get the token decimal
+    **/
     function _buildRemoteAmount(uint _localAmount, bytes32 _id) view internal returns (uint64 amountpx, uint64 amountsx) {
         (, bytes memory data) = pools[_id].token.staticcall(
             abi.encodeWithSignature("decimals()")

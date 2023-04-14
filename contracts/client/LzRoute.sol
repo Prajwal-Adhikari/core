@@ -19,7 +19,7 @@ contract LzRouteBranch is Initializable, LzApp {
     uint8 internal constant TYPE_DEPOSIT = 1;
     uint8 internal constant TYPE_REPAY = 2;
 
-    uint public GAS_USAGE;
+    uint public gasUsage;
 
     uint constant public BASE = 10 ** 18;
 
@@ -33,10 +33,10 @@ contract LzRouteBranch is Initializable, LzApp {
     }
 
 
-    function initialize(address _lzEndpoint, uint16 _localChainId, uint16 _serverChainId) public initializer {
+    function initialize(address _lzEndpoint, uint16 _localChainId, uint16 _serverChainId, uint _gasUsage) public initializer {
         __LzApp_init(_lzEndpoint, _localChainId);
         serverChainId = _serverChainId;
-        GAS_USAGE = 400000;
+        gasUsage = _gasUsage;
     }
 
 
@@ -52,7 +52,7 @@ contract LzRouteBranch is Initializable, LzApp {
 
     // LayerZero functions
     function send(bytes memory payload, address sender, uint gasValue) external payable onlyAdapter {
-        _lzSend(serverChainId, payload, payable(sender), address(this), abi.encodePacked(uint16(1), GAS_USAGE), gasValue);
+        _lzSend(serverChainId, payload, payable(sender), address(this), abi.encodePacked(uint16(1), gasUsage), gasValue);
     }
 
     /** 
@@ -89,7 +89,7 @@ contract LzRouteBranch is Initializable, LzApp {
             revert("Unsupport functionType");
         }
 
-        (uint fees, ) = lzEndpoint.estimateFees(serverChainId, address(this), payload, false, abi.encodePacked(uint16(1), GAS_USAGE));
+        (uint fees, ) = lzEndpoint.estimateFees(serverChainId, address(this), payload, false, abi.encodePacked(uint16(1), gasUsage));
         return fees;
     }
 }

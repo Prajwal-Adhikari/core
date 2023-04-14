@@ -23,8 +23,7 @@ contract LzRoutePool is Initializable, LzApp {
     uint8 internal constant TYPE_DEPOSIT = 1;
     uint8 internal constant TYPE_REPAY = 2;
 
-    uint public GAS_USAGE;
-
+    uint public gasUsage;
     uint constant public BASE = 10 ** 18;
 
 
@@ -37,10 +36,9 @@ contract LzRoutePool is Initializable, LzApp {
     }
 
 
-    function initialize(address _lzEndpoint, uint16 _localChainId) public initializer {
+    function initialize(address _lzEndpoint, uint16 _localChainId, uint _gasUsage) public initializer {
         __LzApp_init(_lzEndpoint, _localChainId);
-        GAS_USAGE = 200000;
-          
+        gasUsage = _gasUsage;
     }
 
 
@@ -112,7 +110,7 @@ contract LzRoutePool is Initializable, LzApp {
     **/
     function estimateFees(bytes32 chainId) public view returns (uint) {
         bytes memory payload = abi.encode("", chainID[chainId], msg.sender, 0);
-        (uint fees, ) = lzEndpoint.estimateFees(chainID[chainId], address(this), payload, false, abi.encodePacked(uint16(1), GAS_USAGE));
+        (uint fees, ) = lzEndpoint.estimateFees(chainID[chainId], address(this), payload, false, abi.encodePacked(uint16(1), gasUsage));
         return fees;
     }
 

@@ -79,13 +79,13 @@ describe("Ready", function () {
         this.adapterC = await upgrades.deployProxy(Adapter, []);
         await this.adapterC.setBranch(this.clientC.address);
 
-        // Client Route
+        // Client Route 350000 gas for testing
         const Route = await ethers.getContractFactory("LzRouteBranch");
-        this.routeA = await upgrades.deployProxy(Route, [this.lzEndpointMockClientA.address, this.chainIdClientA, this.chainIdServer]);
+        this.routeA = await upgrades.deployProxy(Route, [this.lzEndpointMockClientA.address, this.chainIdClientA, this.chainIdServer, 350000]);
         await this.routeA.setAdapter(this.adapterA.address);
-        this.routeB = await upgrades.deployProxy(Route, [this.lzEndpointMockClientB.address, this.chainIdClientB, this.chainIdServer]);
+        this.routeB = await upgrades.deployProxy(Route, [this.lzEndpointMockClientB.address, this.chainIdClientB, this.chainIdServer, 350000]);
         await this.routeB.setAdapter(this.adapterB.address);
-        this.routeC = await upgrades.deployProxy(Route, [this.lzEndpointMockClientC.address, this.chainIdClientC, this.chainIdServer]);
+        this.routeC = await upgrades.deployProxy(Route, [this.lzEndpointMockClientC.address, this.chainIdClientC, this.chainIdServer, 350000]);
         await this.routeC.setAdapter(this.adapterC.address);
 
         // Configure Route in Adapter
@@ -110,7 +110,7 @@ describe("Ready", function () {
 
         // Server Route
         const LzRoutePool = await ethers.getContractFactory("LzRoutePool");
-        this.routeS = await upgrades.deployProxy(LzRoutePool, [this.lzEndpointMockServer.address, this.chainIdServer]);
+        this.routeS = await upgrades.deployProxy(LzRoutePool, [this.lzEndpointMockServer.address, this.chainIdServer, 200000]);
         await this.routeS.setAdapter(this.adapterS.address);
         await this.routeS.setChainNameID(MATIC, this.chainIdServer);
         await this.routeS.setChainNameID(FTM, this.chainIdClientA);
@@ -125,6 +125,7 @@ describe("Ready", function () {
         const Core = await ethers.getContractFactory("Core");
         core =  await upgrades.deployProxy(Core, [treasury.address]);
 
+
         const LiquidationManager = await ethers.getContractFactory("LiquidationManager");
         liquidationManager =  await upgrades.deployProxy(LiquidationManager, []);
 
@@ -137,6 +138,7 @@ describe("Ready", function () {
         await this.debtFTM.initialize(core.address, liquidationManager.address);
         await this.debtBNB.initialize(core.address, liquidationManager.address);
 
+        await core.setLiquidationManager(liquidationManager.address);
         await core.setOracle(this.oracle.address);
         await server.setCore(core.address);
         await core.setPool(server.address);
@@ -147,9 +149,9 @@ describe("Ready", function () {
         await liquidationManager.setOracle(this.oracle.address);
         await liquidationManager.setCore(core.address);
 
-        await core.initPool(MATIC, [toTokenAmount(0.5), toTokenAmount(0.1), toTokenAmount(0.5), 0, toTokenAmount(0.5), toTokenAmount(0.5), toTokenAmount(0.1), toTokenAmount(0.05), toTokenAmount(0.05)], this.ceMATIC.address, this.debtMATIC.address);
-        await core.initPool(FTM, [toTokenAmount(0.5), toTokenAmount(0.1), toTokenAmount(0.5), 0, toTokenAmount(0.5), toTokenAmount(0.5), toTokenAmount(0.1), toTokenAmount(0.05), toTokenAmount(0.05)], this.ceFTM.address, this.debtFTM.address);
-        await core.initPool(BNB, [toTokenAmount(0.5), toTokenAmount(0.1), toTokenAmount(0.5), 0, toTokenAmount(0.5), toTokenAmount(0.5), toTokenAmount(0.1), toTokenAmount(0.05), toTokenAmount(0.05)], this.ceBNB.address, this.debtBNB.address);
+        await core.initPool(MATIC, [toTokenAmount(0.5), toTokenAmount(0.1), toTokenAmount(0.5), 0, toTokenAmount(0.5), toTokenAmount(0.5), toTokenAmount(0.1), toTokenAmount(1), toTokenAmount(0.15)], this.ceMATIC.address, this.debtMATIC.address);
+        await core.initPool(FTM, [toTokenAmount(0.5), toTokenAmount(0.1), toTokenAmount(0.5), 0, toTokenAmount(0.5), toTokenAmount(0.5), toTokenAmount(0.1), toTokenAmount(1), toTokenAmount(0.15)], this.ceFTM.address, this.debtFTM.address);
+        await core.initPool(BNB, [toTokenAmount(0.5), toTokenAmount(0.1), toTokenAmount(0.5), 0, toTokenAmount(0.5), toTokenAmount(0.5), toTokenAmount(0.1), toTokenAmount(1), toTokenAmount(0.15)], this.ceBNB.address, this.debtBNB.address);
         await core.changePoolStatus(MATIC, true);
         await core.changePoolStatus(FTM, true);
         await core.changePoolStatus(BNB, true);
@@ -190,9 +192,6 @@ describe("Ready", function () {
 
     async function printInfo() {
         let matic_reserve = await core.reserves(MATIC);
-        console.log(core.address);
-        console.log(MATIC);
-        console.log(matic_reserve);
         console.log("MATIC");
         console.log(`interest rate: ${matic_reserve[0]} currentRatio: ${matic_reserve[1]} ceScaled: ${matic_reserve[4]}`)
         console.log(`dtScaled: ${matic_reserve[5]} ceSupply: ${matic_reserve[7]} debtSupply: ${matic_reserve[8]}`)
@@ -231,7 +230,7 @@ describe("Ready", function () {
         console.log(fees);
 
         console.log("alice deposit matic");
-        (await this.clientA.connect(alice).depositRequest(MATIC, toTokenAmount(500000), LZO, {value: fees})).wait()
+        await this.clientA.connect(alice).depositRequest(MATIC, toTokenAmount(500000), LZO, {value: fees})
         await printInfo();
 
         console.log("bob deposit ftm");
@@ -248,43 +247,43 @@ describe("Ready", function () {
         await printInfo();
 
         console.log("alice withdraw matic");
-        await server.connect(alice).withdraw(MATIC, FTM, toTokenAmount(1e5), ethers.utils.hexZeroPad(alice.address, 32), {value: fees})
+        await server.connect(alice).withdraw(MATIC, FTM, toTokenAmount(1e5), ethers.utils.hexZeroPad(alice.address, 32), LZO, {value: fees})
         await printInfo();
 
         console.log("bob withdraw ftm");
-        await server.connect(bob).withdraw(FTM, BNB, toTokenAmount(1e5), ethers.utils.hexZeroPad(bob.address, 32), {value: fees})
+        await server.connect(bob).withdraw(FTM, BNB, toTokenAmount(1e5), ethers.utils.hexZeroPad(bob.address, 32), LZO, {value: fees})
         await printInfo();
 
         console.log("alice withdraw bnb");
-        await server.connect(alice).withdraw(BNB, MATIC, toTokenAmount(1e5), ethers.utils.hexZeroPad(alice.address, 32), {value: fees})
+        await server.connect(alice).withdraw(BNB, MATIC, toTokenAmount(1e5), ethers.utils.hexZeroPad(alice.address, 32), LZO, {value: fees})
         await printInfo();
 
         console.log("alice withdraw matic")
-        await server.connect(alice).withdraw(MATIC, FTM, toTokenAmount(180000), ethers.utils.hexZeroPad(alice.address, 32), {value: fees})
+        await server.connect(alice).withdraw(MATIC, FTM, toTokenAmount(180000), ethers.utils.hexZeroPad(alice.address, 32), LZO, {value: fees})
         await printInfo();
         // expect(await matic.balanceOf(alice.address)).to.be.equal(toTokenAmount(6e5))
 
         await network.provider.send("evm_increaseTime", [365 * 86400])
         console.log("alice repay ftm")
         // await expect(server.connect(alice).withdraw(MATIC, FTM, toTokenAmount(263550), {value: fees})).to.be.revertedWith("Health check failed");
-        await this.clientB.connect(alice).repayRequest(FTM, toTokenAmount(50000), {value: fees})
+        await this.clientB.connect(alice).repayRequest(FTM, toTokenAmount(50000), LZO,  {value: fees})
         await printInfo();
 
-        await this.clientB.connect(alice).repayRequest(FTM, toTokenAmount(200000), {value: fees})
+        await this.clientB.connect(alice).repayRequest(FTM, toTokenAmount(200000), LZO,  {value: fees})
         await printInfo();
 
 
         console.log("alice deposit matic");
-        await this.clientA.connect(alice).depositRequest(MATIC, toTokenAmount(500000), {value: fees})
+        await this.clientA.connect(alice).depositRequest(MATIC, toTokenAmount(500000), LZO,  {value: fees})
         await printInfo();
 
         console.log("bob borrow matic");
-        await server.connect(bob).borrow(MATIC, this.FTM, toTokenAmount(2e5), ethers.utils.hexZeroPad(bob.address, 32), {value: fees});
+        await server.connect(bob).borrow(MATIC, FTM, toTokenAmount(2e5), ethers.utils.hexZeroPad(bob.address, 32), LZO,  {value: fees});
         await network.provider.send("evm_increaseTime", [365 * 86400 - 1])
         await printInfo();
 
         console.log("liquidate test");
-        await liquidationManager.connect(alice).liquidate(bob.address, FTM, MATIC, toTokenAmount(100000));
+        await liquidationManager.connect(alice).liquidate(bob.address, FTM, MATIC, toTokenAmount(50000));
         await printInfo();
     })
 

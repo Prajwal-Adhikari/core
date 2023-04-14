@@ -54,13 +54,16 @@ contract LiquidationManager is Initializable,OwnableUpgradeable,ReentrancyGuardU
     
 
     // calculate liquidate info and avoid stack too deep error
-    function _buildLiquidateParams(bytes32 collateralId, bytes32 debtId, uint debtAmount, uint discount) view internal returns(Data.LiquidateParams memory params) {
+    function _buildLiquidateParams(bytes32 collateralId, bytes32 debtId, uint collateralAmount, uint discount) view internal returns(Data.LiquidateParams memory params) {
+        Data.ReserveData memory collateralReserve = ICore(core).reserves(collateralId);
         Data.ReserveData memory debtReserve = ICore(core).reserves(debtId);
-        params.debtValue = debtAmount.mul(debtReserve.dtScaled).div(1e18);
-        params.ceDebtAmount = params.debtValue.mul(1e18).div(debtReserve.ceScaled);
- 
-        uint collateralValue = params.debtValue.mul(1e18).div(oracle.getSinglePrice(collateralId));
-        params.ceCollateralAmount = collateralValue.add(collateralValue.mul(discount).div(1e18));
+        params.liqCEAmount = collateralAmount.mul(1e18).div(collateralReserve.ceScaled);
+        params.liqValue = collateralAmount.mul(oracle.getSinglePrice(collateralId)).div(1e18);
+
+        uint burnValue = params.liqValue.sub(params.liqValue.mul(discount).div(1e18));
+        uint burnTokenAmount = burnValue.mul(1e18).div(oracle.getSinglePrice(debtId)); 
+        params.burnDebtAmount = burnTokenAmount.mul(1e18).div(debtReserve.dtScaled);
+        params.repayDebtAmount = burnTokenAmount.mul(1e18).div(debtReserve.ceScaled);
     }
 
     /**
@@ -68,9 +71,9 @@ contract LiquidationManager is Initializable,OwnableUpgradeable,ReentrancyGuardU
     * @param user the address whose position is to be liquidated
     * @param collateralId the pool id of the collateral asset
     * @param debtId the pool id of the debt asset
-    * @param debtAmount total debt amount of user
+    * @param collateralAmount the collateral user want to liquidate
     **/
-    function liquidate(address user, bytes32 collateralId, bytes32 debtId, uint debtAmount) external nonReentrant{
+    function liquidate(address user, bytes32 collateralId, bytes32 debtId, uint collateralAmount) external nonReentrant{
         ICore(core).refresh(collateralId);
         ICore(core).refresh(debtId);
         Data.HealthData memory healthData = ICore(core).healthFactor(user);
@@ -100,21 +103,18 @@ contract LiquidationManager is Initializable,OwnableUpgradeable,ReentrancyGuardU
 
         Data.ReserveData memory debtReserve = ICore(core).reserves(debtId);
         Data.ReserveData memory collateralReserve = ICore(core).reserves(collateralId);
-        Data.LiquidateParams memory params = _buildLiquidateParams(collateralId, debtId, debtAmount, discount);
-        require(healthData.debtValue.mul(liqPercent).div(1e18) <= params.debtValue, "Closing factor exceed");
+        Data.LiquidateParams memory params = _buildLiquidateParams(collateralId, debtId, collateralAmount, discount);
+        require(healthData.collateralValue.mul(liqPercent).div(1e18) >= params.liqValue, "Closing factor exceed");
         
-        IDebtToken(debtReserve.debtToken).burn(user, debtAmount);
-        IDebtToken(debtReserve.ceToken).burn(msg.sender, params.ceDebtAmount);
-
-        debtReserve.debtSupply = debtReserve.debtSupply.sub(debtAmount);
-        debtReserve.ceSupply = debtReserve.ceSupply.sub(params.ceDebtAmount);
+        IDebtToken(debtReserve.debtToken).burn(user, params.burnDebtAmount);
+        IDebtToken(debtReserve.ceToken).burn(msg.sender, params.repayDebtAmount);
         ICore(core).updateCeAndDebtSupply(debtId, debtReserve.ceSupply, debtReserve.debtSupply);
         
-        IDebtToken(collateralReserve.ceToken).burn(user, params.ceCollateralAmount);
-        IDebtToken(collateralReserve.ceToken).mint(msg.sender, params.ceCollateralAmount);
+        IDebtToken(collateralReserve.ceToken).burn(user, params.liqCEAmount);
+        IDebtToken(collateralReserve.ceToken).mint(msg.sender, params.liqCEAmount);
         
         ICore(core).updateInterestRate(collateralId);
         ICore(core).updateInterestRate(debtId);
-        emit Data.Liquidate(user, msg.sender, debtId, collateralId, params.ceDebtAmount, params.ceCollateralAmount);
+        emit Data.Liquidate(user, msg.sender, debtId, collateralId, collateralAmount, params.burnDebtAmount, params.repayDebtAmount, discount);
     }
 }

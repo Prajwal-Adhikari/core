@@ -235,7 +235,8 @@ contract Core is Initializable, OwnableUpgradeable {
     function borrow(bytes32 id, bytes32 chainId, uint tokenAmount, address user) external onlyPool returns (uint) {
         refresh(id);
         Data.BorrowParams memory params = _buildBorrowParams(id, chainId, tokenAmount);    
-
+        addToken(user, id);
+        
         require(params.liquidity >= tokenAmount, "No enough liquidity");
         IDebtToken(params.debtToken).mint(user, params.debtAmount);
         reserves[id].debtSupply += params.debtAmount;
