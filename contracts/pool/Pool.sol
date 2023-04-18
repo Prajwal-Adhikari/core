@@ -34,6 +34,10 @@ contract Pool is Initializable,OwnableUpgradeable,ReentrancyGuardUpgradeable {
     bool public feeEnable;
     bool public rewardEnable;
 
+    mapping(bytes32 => mapping(bytes32 => bool)) public withdrawPause;
+    mapping(bytes32 => mapping(bytes32 => bool)) public borrowPause;
+    bool public protocolPause;
+
 
 
     uint constant public BASE = 10 ** 18;
@@ -47,7 +51,7 @@ contract Pool is Initializable,OwnableUpgradeable,ReentrancyGuardUpgradeable {
     * @dev only adapter can use functions affected by this modifier
     **/
     modifier onlyAdapter {
-        require(adapter == msg.sender, "The caller must be a pool contract");
+        require(adapter == msg.sender, "Pool: The caller must be a pool contract");
         _;
     }
 
@@ -111,6 +115,21 @@ contract Pool is Initializable,OwnableUpgradeable,ReentrancyGuardUpgradeable {
         rewardEnable = _rewardEnable;
 
     }
+
+    function pauseWithdraw(bytes32 id, bytes32 chainId) external onlyOwner {
+        withdrawPause[id][chainId] = true;
+
+    }
+
+    function pauseBorrow(bytes32 id, bytes32 chainId) external onlyOwner {
+        borrowPause[id][chainId] = true;
+
+    }
+
+    function toggleProtocolStatus() external onlyOwner {
+        protocolPause = !protocolPause;
+
+    }
     
     function _bytesToAddress(bytes32 bys) private pure returns (address addr) {
         return address(uint160(uint256(bys)));
@@ -124,6 +143,7 @@ contract Pool is Initializable,OwnableUpgradeable,ReentrancyGuardUpgradeable {
     * @param to withdraw address
     **/
     function withdraw(bytes32 id, bytes32 chainId, uint ceAmount, bytes32 to, bytes32 route) payable nonReentrant external {
+        require(!(withdrawPause[id][chainId] || protocolPause), "Pool: Withdraw paused");
         uint tokenAmount = ICore(core).withdraw(id, chainId, ceAmount, msg.sender);
         if(feeEnable){
         uint fee = IFeeProvider(feeProvider).getFeeAmount(chainId, id);
@@ -142,6 +162,7 @@ contract Pool is Initializable,OwnableUpgradeable,ReentrancyGuardUpgradeable {
     * @param to borrow address
     **/
     function borrow(bytes32 id, bytes32 chainId, uint tokenAmount, bytes32 to, bytes32 route) payable nonReentrant external {
+        require(!(borrowPause[id][chainId] || protocolPause), "Pool: Borrow paused");
         uint debtAmount = ICore(core).borrow(id, chainId, tokenAmount, msg.sender);
         if(feeEnable){  
         uint fee = IFeeProvider(feeProvider).getFeeAmount(chainId, id);

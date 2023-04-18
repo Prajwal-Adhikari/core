@@ -41,6 +41,10 @@ contract Branch is
     address public adapter;
     address public stargateRouter;
 
+    mapping(bytes32 => bool) public depositPause;
+    mapping(bytes32 => bool) public repayPause;
+    bool public protocolPause;
+
     struct PoolInfo {
         bool enable;
         address token;
@@ -57,7 +61,7 @@ contract Branch is
      * @dev only adapter can use functions affected by this modifier
      **/
     modifier onlyAdapter() {
-        require(adapter == msg.sender, "The caller must be adapter contract");
+        require(adapter == msg.sender, "Branch: The caller must be adapter contract");
         _;
     }
 
@@ -89,6 +93,21 @@ contract Branch is
         stargateRouter = routerAddress;
     }
 
+    function pauseDeposit(bytes32 id) external onlyOwner {
+        depositPause[id] = true;
+
+    }
+
+    function pauseRepay(bytes32 id) external onlyOwner {
+        repayPause[id] = true;
+
+    }
+
+    function toggleProtocolStatus() external onlyOwner {
+        protocolPause = !protocolPause;
+
+    }
+
     /**
      * @dev sends a deposit information message to the Root.
      * @param id pool id of the pool of the deposited amount
@@ -100,7 +119,8 @@ contract Branch is
         uint amount,
         bytes32 route
     ) external payable nonReentrant {
-        require(pools[id].enable, "Pool not enable");
+        require(!(depositPause[id] || protocolPause), "Branch: Deposit paused");
+        require(pools[id].enable, "Branch: Pool not enable");
         _pay(pools[id].token, amount, id, TYPE_DEPOSIT, route);
     }
 
@@ -114,14 +134,14 @@ contract Branch is
         uint amount,
         bytes32 route
     ) external payable nonReentrant {
-        require(pools[id].enable, "Pool not enable");
+        require(!(repayPause[id] || protocolPause), "Branch: Deposit paused");
+        require(pools[id].enable, "Branch: Pool not enable");
         _pay(pools[id].token, amount, id, TYPE_REPAY, route);
     }
 
     function swap(
         uint qty,
         uint minAmount,
-        uint gasValue,
         address bridgeToken,
         uint16 dstChainId,
         uint16 srcPoolId,
@@ -144,7 +164,7 @@ contract Branch is
             payable(msg.sender), // refund adddress. if msg.sender pays too much gas, return extra eth
             qty, // total tokens to send to destination chain
             minAmount, // min amount allowed out
-            IStargateRouter.lzTxObj(gasValue, 0, "0x"), // default lzTxObj
+            IStargateRouter.lzTxObj(0, 0, "0x"), // default lzTxObj
             abi.encodePacked(destination), // destination address
             bytes("") // bytes payload
         );
