@@ -161,13 +161,8 @@ contract Pool is Initializable,OwnableUpgradeable,ReentrancyGuardUpgradeable {
     * @param user repay address
     **/
     function repay(bytes32 id, bytes32 chainId, address user, uint tokenAmount) external onlyAdapter {
-       
         (uint repayAmount, uint debtAmount, uint ceAmount) = ICore(core).repay(id, chainId, user, tokenAmount);
-        if(rewardEnable){
-        uint reward = IFeeProvider(feeProvider).getFeeAmount(chainId, id);
-        IERC20(cedroToken).transfer(user, reward);
-        }
-        emit Data.Repay(user, id, chainId, repayAmount, debtAmount, ceAmount); 
+        emit Data.Repay(user, id, chainId, repayAmount, debtAmount, ceAmount);
     }
  
     /** 
@@ -180,13 +175,7 @@ contract Pool is Initializable,OwnableUpgradeable,ReentrancyGuardUpgradeable {
     * @param user deposit address
     **/
     function deposit(bytes32 id, bytes32 chainId, address user, uint tokenAmount) external onlyAdapter {
-        if(rewardEnable){
-        uint reward = IFeeProvider(feeProvider).getFeeAmount(chainId, id);
-        console.log("reward",reward);
-        IERC20(cedroToken).transfer(user, reward);
-        }
         uint ceAmount = ICore(core).deposit(id, chainId, user, tokenAmount);
-        
         emit Data.Deposit(user, id, chainId, tokenAmount, ceAmount);
     }
 
