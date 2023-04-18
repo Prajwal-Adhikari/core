@@ -3,10 +3,10 @@ pragma solidity ^0.8.9;
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import {AxelarExecutable} from "../axelar/executable/AxelarExecutable.sol";
-import {IAxelarGateway} from "../axelar/interfaces/IAxelarGateway.sol";
-import {IAxelarGasService} from "../axelar/interfaces/IAxelarGasService.sol";
-import "./interfaces/IAdapter.sol";
+import {AxelarExecutable} from "../../axelar/executable/AxelarExecutable.sol";
+import {IAxelarGateway} from "../../axelar/interfaces/IAxelarGateway.sol";
+import {IAxelarGasService} from "../../axelar/interfaces/IAxelarGasService.sol";
+import "../interfaces/IAdapter.sol";
 
 contract AxlRouteBranch is Initializable, OwnableUpgradeable, AxelarExecutable {
     string public destinationChain;
