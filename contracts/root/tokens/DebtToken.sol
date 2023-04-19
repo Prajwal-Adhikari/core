@@ -13,8 +13,6 @@ contract DebtToken is ERC20, Ownable {
     uint public balanceScale = 1e18;
     uint constant public MAG = 1e18;
 
-    mapping(address => uint) balanceDebt;
-
     constructor(string memory name_, string memory symbol_) ERC20(name_, symbol_) {
     }
 
