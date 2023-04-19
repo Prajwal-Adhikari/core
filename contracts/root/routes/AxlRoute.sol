@@ -8,9 +8,7 @@ import {IAxelarGateway} from "../../axelar/interfaces/IAxelarGateway.sol";
 import {IAxelarGasService} from "../../axelar/interfaces/IAxelarGasService.sol";
 import "../interfaces/IAdapter.sol";
 
-
 contract AxlRoutePool is Initializable, OwnableUpgradeable, AxelarExecutable {
-
     mapping(bytes32 => string) public destChain;
     mapping(bytes32 => string) public destAddress;
     mapping(bytes32 => bytes32) public chainName;
@@ -20,10 +18,10 @@ contract AxlRoutePool is Initializable, OwnableUpgradeable, AxelarExecutable {
 
     uint8 internal constant TYPE_DEPOSIT = 1;
     uint8 internal constant TYPE_REPAY = 2;
+    uint8 internal constant TYPE_SWAP = 3;
 
     uint public constant BASE = 10 ** 18;
     IAxelarGasService gasService;
-
 
     function initialize(
         address _gateway,
@@ -34,44 +32,59 @@ contract AxlRoutePool is Initializable, OwnableUpgradeable, AxelarExecutable {
         gasService = IAxelarGasService(_gasReceiver);
     }
 
-
     event Executed();
 
     /**
-    * @dev only adapter can use functions affected by this modifier
-    **/
-    modifier onlyAdapter {
+     * @dev only adapter can use functions affected by this modifier
+     **/
+    modifier onlyAdapter() {
         require(adapter == msg.sender, "The caller must be a pool contract");
         _;
     }
-    
+
     /**
-    * @dev Configures adapter contract. 
-    * This function can only be accessed by the contract owner.
-    * @param adapterAddress address of the adapter contract.
-    **/
+     * @dev Configures adapter contract.
+     * This function can only be accessed by the contract owner.
+     * @param adapterAddress address of the adapter contract.
+     **/
     function setAdapter(address adapterAddress) external onlyOwner {
         adapter = adapterAddress;
-
     }
 
     /**
-    * @dev Links chain key with chain name and destination contract 
-    * This function can only be accessed by the contract owner.
-    * @param chain key of the chain.
-    * @param name name of the chain.
-    * @param addr address of the destination contract
-    **/
-    function setDestChainNameAddress(bytes32 chain, string calldata name, string calldata addr) external onlyOwner {
+     * @dev Links chain key with chain name and destination contract
+     * This function can only be accessed by the contract owner.
+     * @param chain key of the chain.
+     * @param name name of the chain.
+     * @param addr address of the destination contract
+     **/
+    function setDestChainNameAddress(
+        bytes32 chain,
+        string calldata name,
+        string calldata addr
+    ) external onlyOwner {
         destChain[chain] = name;
         destAddress[chain] = addr;
         chainName[keccak256(abi.encodePacked(name))] = chain;
-        trustedContract[keccak256(abi.encodePacked(name))] = keccak256(abi.encodePacked(addr));
-
+        trustedContract[keccak256(abi.encodePacked(name))] = keccak256(
+            abi.encodePacked(addr)
+        );
     }
 
-   function sendToken(bytes32 id, bytes32 chainId, bytes32 user, address sender, uint amount) external payable onlyAdapter {
-        bytes memory payload = abi.encodePacked(id, user, uint64(amount / BASE), uint64(amount % BASE));
+    function sendToken(
+        bytes32 id,
+        bytes32 chainId,
+        bytes32 user,
+        address sender,
+        uint amount,
+        uint
+    ) external payable onlyAdapter {
+        bytes memory payload = abi.encodePacked(
+            id,
+            user,
+            uint64(amount / BASE),
+            uint64(amount % BASE)
+        );
         require(payload.length == 80, "Bad payload");
         if (msg.value > 0) {
             gasService.payNativeGasForContractCall{value: msg.value}(
@@ -83,7 +96,6 @@ contract AxlRoutePool is Initializable, OwnableUpgradeable, AxelarExecutable {
             );
         }
         gateway.callContract(destChain[chainId], destAddress[chainId], payload);
-
     }
 
     function _execute(
@@ -93,12 +105,9 @@ contract AxlRoutePool is Initializable, OwnableUpgradeable, AxelarExecutable {
     ) internal override {
         bytes32 chain = keccak256(abi.encodePacked(sourceChain_));
         bytes32 addr = keccak256(abi.encodePacked(sourceAddress_));
-        require(
-            trustedContract[chain] == addr,
-            "Invalid contract"
-        );
+        require(trustedContract[chain] == addr, "Invalid contract");
         bytes32 tokenId;
-        bytes32 user;
+        bytes32 data;
         uint64 amountpx;
         uint64 amountsx;
 
@@ -106,17 +115,29 @@ contract AxlRoutePool is Initializable, OwnableUpgradeable, AxelarExecutable {
         uint8 functionType = uint8(_payload[0]);
         assembly {
             tokenId := mload(add(_payload, 33))
-            user := mload(add(_payload, 65))
+            data := mload(add(_payload, 65))
             amountpx := mload(add(_payload, 73))
             amountsx := mload(add(_payload, 81))
         }
 
-        uint amount = uint(amountpx) * BASE +  uint(amountsx);
-        if(functionType == TYPE_DEPOSIT) {
-            IAdapter(adapter).deposit(tokenId, chainName[chain], _bytesToAddress(user), amount);
-        } else if(functionType == TYPE_REPAY) { 
-            IAdapter(adapter).repay(tokenId, chainName[chain], _bytesToAddress(user), amount);
-        } 
+        uint amount = uint(amountpx) * BASE + uint(amountsx);
+        if (functionType == TYPE_DEPOSIT) {
+            IAdapter(adapter).deposit(
+                tokenId,
+                chainName[chain],
+                _bytesToAddress(data),
+                amount
+            );
+        } else if (functionType == TYPE_REPAY) {
+            IAdapter(adapter).repay(
+                tokenId,
+                chainName[chain],
+                _bytesToAddress(data),
+                amount
+            );
+        } else if (functionType == TYPE_SWAP) {
+            IAdapter(adapter).swap(tokenId, chainName[chain], data, amount);
+        }
     }
 
     function _bytesToAddress(bytes32 bys) private pure returns (address addr) {

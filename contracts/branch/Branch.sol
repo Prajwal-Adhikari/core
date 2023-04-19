@@ -32,6 +32,7 @@ contract Branch is
 {
     uint8 internal constant TYPE_DEPOSIT = 1;
     uint8 internal constant TYPE_REPAY = 2;
+    uint8 internal constant TYPE_SWAP = 3;
 
     uint public constant ROOT_DECIMALS = 18;
     uint public constant BASE = 10 ** ROOT_DECIMALS;
@@ -42,7 +43,9 @@ contract Branch is
     address public adapter;
     address public stargateRouter;
     address public stargateEthVault;
-
+    bool public swapDisable;
+    
+    mapping(uint16 => bytes32) public chainName;
     mapping(bytes32 => bool) public depositPause;
     mapping(bytes32 => bool) public repayPause;
     bool public protocolPause;
@@ -53,6 +56,8 @@ contract Branch is
     }
 
     mapping(bytes32 => PoolInfo) public pools;
+
+    event SendToken(address user, bytes32 id, uint tokenAmount);
 
     function initialize() public initializer {
         __Ownable_init();
@@ -114,6 +119,20 @@ contract Branch is
         protocolPause = !protocolPause;
     }
 
+    function toggleSwapStatus() external onlyOwner {
+        swapDisable = !swapDisable;
+    }
+    /**
+    * @dev Links chainId with chain name. 
+    * This function can only be accessed by the contract owner.
+    * @param chain name of the chain.
+    * @param id chain id of the chain.
+    **/
+    function setChainName(bytes32 chain, uint16 id) external onlyOwner {
+        chainName[id] = chain;
+
+    }
+
     /**
      * @dev sends a deposit information message to the Root.
      * @param id pool id of the pool of the deposited amount
@@ -123,11 +142,12 @@ contract Branch is
     function depositRequest(
         bytes32 id,
         uint amount,
-        bytes32 route
+        bytes32 route,
+        uint airdropAmount
     ) external payable nonReentrant {
         require(!(depositPause[id] || protocolPause), "Branch: Deposit paused");
         require(pools[id].enable, "Branch: Pool not enable");
-        _pay(pools[id].token, amount, id, TYPE_DEPOSIT, route);
+        _pay(pools[id].token, amount, id, TYPE_DEPOSIT, route, airdropAmount);
     }
 
     /**
@@ -138,40 +158,43 @@ contract Branch is
     function repayRequest(
         bytes32 id,
         uint amount,
-        bytes32 route
+        bytes32 route,
+        uint airdropAmount
     ) external payable nonReentrant {
         require(!(repayPause[id] || protocolPause), "Branch: Deposit paused");
         require(pools[id].enable, "Branch: Pool not enable");
-        _pay(pools[id].token, amount, id, TYPE_REPAY, route);
+        _pay(pools[id].token, amount, id, TYPE_REPAY, route, airdropAmount);
     }
 
     function swap(
         uint qty,
         uint minAmount,
-        address token,
+        bytes32 id,
         uint16 dstChainId,
         uint16 srcPoolId,
         uint16 dstPoolId,
-        address destination
+        address destination,
+        bytes32 route,
+        uint fee
     ) external payable onlyOwner {
         require(
-            msg.value > 0,
-            "stargate requires a msg.value to pay crosschain message"
+            msg.value > 0 && fee > 0,
+            "requires a msg.value to pay crosschain message"
         );
         require(qty > 0, "error: swap() requires qty > 0");
+        if (!swapDisable){
         uint messageFee;
-        if (token == address(0)) {
-            require(msg.value > qty, "msg.value must be > qty");
+        if (pools[id].token == address(0)) {
+            require(msg.value > qty - fee, "msg.value must be > qty");
 
             // wrap the ETH into WETH
             IStargateEthVault(stargateEthVault).deposit{value: qty}();
             IStargateEthVault(stargateEthVault).approve(stargateRouter, qty);
 
-            // messageFee is the remainder of the msg.value after wrap
-            messageFee = msg.value - qty;
+            messageFee = msg.value - qty - fee;
         } else {
-            IERC20(token).approve(stargateRouter, qty);
-            messageFee = msg.value;
+            IERC20(pools[id].token).approve(stargateRouter, qty);
+            messageFee = msg.value - fee;
         }
 
         IStargateRouter(stargateRouter).swap{value: messageFee}(
@@ -185,6 +208,23 @@ contract Branch is
             abi.encodePacked(destination), // destination address, the sgReceive() implementer
             bytes("") // bytes payload
         );
+        }
+
+        (uint64 amountpx, uint64 amountsx) = _buildRemoteAmount(qty, id);
+        bytes memory payload = abi.encodePacked(
+            TYPE_SWAP,
+            id,
+            chainName[dstChainId],
+            amountpx,
+            amountsx
+        );
+
+        IAdapter(adapter).send{value: fee}(
+                payload,
+                msg.sender,
+                0,
+                route
+            );
     }
 
     /**
@@ -200,7 +240,8 @@ contract Branch is
         uint amount,
         bytes32 id,
         uint8 functionType,
-        bytes32 route
+        bytes32 route,
+        uint airdropAmount
     ) internal {
         (uint64 amountpx, uint64 amountsx) = _buildRemoteAmount(amount, id);
         bytes memory payload = abi.encodePacked(
@@ -215,18 +256,20 @@ contract Branch is
             IAdapter(adapter).send{value: msg.value.sub(amount)}(
                 payload,
                 msg.sender,
-                msg.value.sub(amount),
+                airdropAmount,
                 route
+                
             );
         } else {
             IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
             IAdapter(adapter).send{value: msg.value}(
                 payload,
                 msg.sender,
-                msg.value,
+                airdropAmount,
                 route
             );
         }
+        emit SendToken(msg.sender, id, amount);
     }
 
     /**

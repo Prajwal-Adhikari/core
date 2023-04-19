@@ -62,10 +62,10 @@ contract AxlRouteBranch is Initializable, OwnableUpgradeable, AxelarExecutable {
     function send(
         bytes memory payload,
         address sender,
-        uint gasValue
+        uint
     ) external payable onlyAdapter {
-        if (gasValue > 0) {
-            gasService.payNativeGasForContractCall{value: gasValue}(
+        if (msg.value > 0) {
+            gasService.payNativeGasForContractCall{value: msg.value}(
                 address(this),
                 destinationChain,
                 destinationAddress,

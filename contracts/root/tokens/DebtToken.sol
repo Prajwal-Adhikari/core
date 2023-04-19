@@ -11,17 +11,25 @@ contract DebtToken is ERC20, Ownable {
     address public core;
     address public liquidationManager;
     uint public balanceScale = 1e18;
-    uint constant public MAG = 1e18;
+    uint public constant MAG = 1e18;
 
-    constructor(string memory name_, string memory symbol_) ERC20(name_, symbol_) {
-    }
+    constructor(
+        string memory name_,
+        string memory symbol_
+    ) ERC20(name_, symbol_) {}
 
     modifier onlyCoreAndLiquidation() {
-        require(msg.sender == core || msg.sender == liquidationManager, "Permission denied");
+        require(
+            msg.sender == core || msg.sender == liquidationManager,
+            "Permission denied"
+        );
         _;
     }
 
-    function initialize(address _core, address _liquidationManager) external onlyOwner {
+    function initialize(
+        address _core,
+        address _liquidationManager
+    ) external onlyOwner {
         core = _core;
         liquidationManager = _liquidationManager;
     }

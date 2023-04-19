@@ -6,23 +6,22 @@ import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
-import './interfaces/ICEToken.sol';
-import './interfaces/IDebtToken.sol';
-import './interfaces/IOracle.sol';
-import './interfaces/ICore.sol';
-import './interfaces/IFeeProvider.sol';
-import './interfaces/IAdapter.sol';
-import './libraries/Data.sol';
+import "./interfaces/ICEToken.sol";
+import "./interfaces/IDebtToken.sol";
+import "./interfaces/IOracle.sol";
+import "./interfaces/ICore.sol";
+import "./interfaces/IFeeProvider.sol";
+import "./interfaces/IAdapter.sol";
+import "./libraries/Data.sol";
 
-
-/** 
-* Title Pool
-* Pool is deployed on a single chain
-* All the Branches are connected to Pool, all of which sends deposit and repay information
-* to Pool
-* Users interact with Pool for Borrow, Withdraw, and Liquidate actions
-**/
-contract Pool is Initializable,OwnableUpgradeable,ReentrancyGuardUpgradeable {
+/**
+ * Title Pool
+ * Pool is deployed on a single chain
+ * All the Branches are connected to Pool, all of which sends deposit and repay information
+ * to Pool
+ * Users interact with Pool for Borrow, Withdraw, and Liquidate actions
+ **/
+contract Pool is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
     using SafeMath for uint256;
 
     address public cedroToken;
@@ -38,9 +37,7 @@ contract Pool is Initializable,OwnableUpgradeable,ReentrancyGuardUpgradeable {
     mapping(bytes32 => mapping(bytes32 => bool)) public borrowPause;
     bool public protocolPause;
 
-
-
-    uint constant public BASE = 10 ** 18;
+    uint public constant BASE = 10 ** 18;
 
     function initialize() public initializer {
         __Ownable_init();
@@ -48,157 +45,241 @@ contract Pool is Initializable,OwnableUpgradeable,ReentrancyGuardUpgradeable {
     }
 
     /**
-    * @dev only adapter can use functions affected by this modifier
-    **/
-    modifier onlyAdapter {
-        require(adapter == msg.sender, "Pool: The caller must be a pool contract");
+     * @dev only adapter can use functions affected by this modifier
+     **/
+    modifier onlyAdapter() {
+        require(
+            adapter == msg.sender,
+            "Pool: The caller must be a pool contract"
+        );
         _;
     }
 
     /**
-    * @dev Sets Cedro contract. 
-    * This function can only be accessed by the contract owner.
-    * @param _cedroTokenAddress address of the Cedro Token contract.
-    **/
+     * @dev Sets Cedro contract.
+     * This function can only be accessed by the contract owner.
+     * @param _cedroTokenAddress address of the Cedro Token contract.
+     **/
     function setCedroToken(address _cedroTokenAddress) external onlyOwner {
         cedroToken = _cedroTokenAddress;
-
     }
 
     /**
-    * @dev Configures fee provider contract. 
-    * This function can only be accessed by the contract owner.
-    * @param _feeProviderAddress address of the fee provider contract.
-    **/
+     * @dev Configures fee provider contract.
+     * This function can only be accessed by the contract owner.
+     * @param _feeProviderAddress address of the fee provider contract.
+     **/
     function setFeeProvider(address _feeProviderAddress) external onlyOwner {
         feeProvider = _feeProviderAddress;
-
     }
+
     /**
-    * @dev Configures core contract. 
-    * This function can only be accessed by the contract owner.
-    * @param _coreAddress address of the fee provider contract.
-    **/
+     * @dev Configures core contract.
+     * This function can only be accessed by the contract owner.
+     * @param _coreAddress address of the fee provider contract.
+     **/
     function setCore(address _coreAddress) external onlyOwner {
         core = _coreAddress;
-
     }
 
     /**
-    * @dev Configures liquidation manager contract. 
-    * This function can only be accessed by the contract owner.
-    * @param _liquidationManagerAddress address of the fee provider contract.
-    **/
-    function setLiquidationManager(address _liquidationManagerAddress) external onlyOwner {
+     * @dev Configures liquidation manager contract.
+     * This function can only be accessed by the contract owner.
+     * @param _liquidationManagerAddress address of the fee provider contract.
+     **/
+    function setLiquidationManager(
+        address _liquidationManagerAddress
+    ) external onlyOwner {
         liquidationManager = _liquidationManagerAddress;
-
     }
 
     /**
-    * @dev Configures pool contract. 
-    * This function can only be accessed by the contract owner.
-    * @param adapterAddress address of the pool contract.
-    **/
+     * @dev Configures pool contract.
+     * This function can only be accessed by the contract owner.
+     * @param adapterAddress address of the pool contract.
+     **/
     function setAdapter(address adapterAddress) external onlyOwner {
         adapter = adapterAddress;
-
     }
 
     /**
-    * @dev Configures fee and reward status. 
-    * This function can only be accessed by the contract owner.
-    * @param _feeEnable status of the fee.
-    * @param _rewardEnable status of the reward.
-    **/
-    function setFeeRewardStatus(bool _feeEnable, bool _rewardEnable) external onlyOwner {
+     * @dev Configures fee and reward status.
+     * This function can only be accessed by the contract owner.
+     * @param _feeEnable status of the fee.
+     * @param _rewardEnable status of the reward.
+     **/
+    function setFeeRewardStatus(
+        bool _feeEnable,
+        bool _rewardEnable
+    ) external onlyOwner {
         feeEnable = _feeEnable;
         rewardEnable = _rewardEnable;
-
     }
 
     function pauseWithdraw(bytes32 id, bytes32 chainId) external onlyOwner {
         withdrawPause[id][chainId] = true;
-
     }
 
     function pauseBorrow(bytes32 id, bytes32 chainId) external onlyOwner {
         borrowPause[id][chainId] = true;
-
     }
 
     function toggleProtocolStatus() external onlyOwner {
         protocolPause = !protocolPause;
-
     }
-    
+
     function _bytesToAddress(bytes32 bys) private pure returns (address addr) {
         return address(uint160(uint256(bys)));
-    }  
-    /** 
-    * @dev sends a withdraw request of amount `ceAmount` to address `to` from pool with pool id `id`
-    * in chain with chain id `chainId`.
-    * @param id pool id of pool to withdraw from
-    * @param chainId chain id of chain to withdraw from
-    * @param ceAmount amount to withdraw
-    * @param to withdraw address
-    **/
-    function withdraw(bytes32 id, bytes32 chainId, uint ceAmount, bytes32 to, bytes32 route) payable nonReentrant external {
-        require(!(withdrawPause[id][chainId] || protocolPause), "Pool: Withdraw paused");
-        uint tokenAmount = ICore(core).withdraw(id, chainId, ceAmount, msg.sender);
-        if(feeEnable){
-        uint fee = IFeeProvider(feeProvider).getFeeAmount(chainId, id);
-        tokenAmount -= fee;
-        }
-        IAdapter(adapter).sendToken{value: msg.value}(id, chainId, to, msg.sender, tokenAmount, route);
-        emit Data.Withdraw(msg.sender, _bytesToAddress(to), id, chainId, tokenAmount, ceAmount);
     }
 
-    /** 
-    * sends a borrow request of amount `tokenAmount` to address `to` from pool with pool id `id`
-    * in chain with chain id `chainId`.
-    * @param id pool id of pool to borrow from
-    * @param chainId chain id of chain to borrow from
-    * @param tokenAmount amount to borrow
-    * @param to borrow address
-    **/
-    function borrow(bytes32 id, bytes32 chainId, uint tokenAmount, bytes32 to, bytes32 route) payable nonReentrant external {
-        require(!(borrowPause[id][chainId] || protocolPause), "Pool: Borrow paused");
-        uint debtAmount = ICore(core).borrow(id, chainId, tokenAmount, msg.sender);
-        if(feeEnable){  
-        uint fee = IFeeProvider(feeProvider).getFeeAmount(chainId, id);
-        tokenAmount -= fee;
+    /**
+     * @dev sends a withdraw request of amount `ceAmount` to address `to` from pool with pool id `id`
+     * in chain with chain id `chainId`.
+     * @param id pool id of pool to withdraw from
+     * @param chainId chain id of chain to withdraw from
+     * @param ceAmount amount to withdraw
+     * @param to withdraw address
+     **/
+    function withdraw(
+        bytes32 id,
+        bytes32 chainId,
+        uint ceAmount,
+        bytes32 to,
+        bytes32 route,
+        uint airdropAmount
+    ) external payable nonReentrant {
+        require(
+            !(withdrawPause[id][chainId] || protocolPause),
+            "Pool: Withdraw paused"
+        );
+        uint tokenAmount = ICore(core).withdraw(
+            id,
+            chainId,
+            ceAmount,
+            msg.sender
+        );
+        if (feeEnable) {
+            uint fee = IFeeProvider(feeProvider).getFeeAmount(chainId, id);
+            tokenAmount -= fee;
         }
-        IAdapter(adapter).sendToken{value: msg.value}(id, chainId, to, msg.sender, tokenAmount, route);
-        emit Data.Borrow(msg.sender, _bytesToAddress(to), id, chainId, tokenAmount, debtAmount);
+        IAdapter(adapter).sendToken{value: msg.value}(
+            id,
+            chainId,
+            to,
+            msg.sender,
+            tokenAmount,
+            airdropAmount,
+            route
+        );
+        emit Data.Withdraw(
+            msg.sender,
+            _bytesToAddress(to),
+            id,
+            chainId,
+            tokenAmount,
+            ceAmount
+        );
     }
 
-    /** 
-    * @dev updates the global protocol states after receiving repay information
-    * of amount `tokenAmount` from address `user` for pool with pool id 'id' from
-    * chain with chain id `chainId`.
-    * @param id pool id of pool where amount was repaid to
-    * @param chainId chain id of chain repaid from
-    * @param tokenAmount amount repaid
-    * @param user repay address
-    **/
-    function repay(bytes32 id, bytes32 chainId, address user, uint tokenAmount) external onlyAdapter {
-        (uint repayAmount, uint debtAmount, uint ceAmount) = ICore(core).repay(id, chainId, user, tokenAmount);
+    /**
+     * sends a borrow request of amount `tokenAmount` to address `to` from pool with pool id `id`
+     * in chain with chain id `chainId`.
+     * @param id pool id of pool to borrow from
+     * @param chainId chain id of chain to borrow from
+     * @param tokenAmount amount to borrow
+     * @param to borrow address
+     **/
+    function borrow(
+        bytes32 id,
+        bytes32 chainId,
+        uint tokenAmount,
+        bytes32 to,
+        bytes32 route,
+        uint airdropAmount
+    ) external payable nonReentrant {
+        require(
+            !(borrowPause[id][chainId] || protocolPause),
+            "Pool: Borrow paused"
+        );
+        uint debtAmount = ICore(core).borrow(
+            id,
+            chainId,
+            tokenAmount,
+            msg.sender
+        );
+        if (feeEnable) {
+            uint fee = IFeeProvider(feeProvider).getFeeAmount(chainId, id);
+            tokenAmount -= fee;
+        }
+        IAdapter(adapter).sendToken{value: msg.value}(
+            id,
+            chainId,
+            to,
+            msg.sender,
+            tokenAmount,
+            airdropAmount,
+            route
+        );
+        emit Data.Borrow(
+            msg.sender,
+            _bytesToAddress(to),
+            id,
+            chainId,
+            tokenAmount,
+            debtAmount
+        );
+    }
+
+    /**
+     * @dev updates the global protocol states after receiving repay information
+     * of amount `tokenAmount` from address `user` for pool with pool id 'id' from
+     * chain with chain id `chainId`.
+     * @param id pool id of pool where amount was repaid to
+     * @param chainId chain id of chain repaid from
+     * @param tokenAmount amount repaid
+     * @param user repay address
+     **/
+    function repay(
+        bytes32 id,
+        bytes32 chainId,
+        address user,
+        uint tokenAmount
+    ) external onlyAdapter {
+        (uint repayAmount, uint debtAmount, uint ceAmount) = ICore(core).repay(
+            id,
+            chainId,
+            user,
+            tokenAmount
+        );
         emit Data.Repay(user, id, chainId, repayAmount, debtAmount, ceAmount);
     }
- 
-    /** 
-    * @dev updates the global protocol states after receiving deposit information
-    * of amount `tokenAmount` from address `user` for pool with pool id 'id' from
-    * chain with chain id `chainId`.
-    * @param id pool id of pool where amount was deposited to
-    * @param chainId chain id of chain deposited to
-    * @param tokenAmount amount deposited
-    * @param user deposit address
-    **/
-    function deposit(bytes32 id, bytes32 chainId, address user, uint tokenAmount) external onlyAdapter {
+
+    /**
+     * @dev updates the global protocol states after receiving deposit information
+     * of amount `tokenAmount` from address `user` for pool with pool id 'id' from
+     * chain with chain id `chainId`.
+     * @param id pool id of pool where amount was deposited to
+     * @param chainId chain id of chain deposited to
+     * @param tokenAmount amount deposited
+     * @param user deposit address
+     **/
+    function deposit(
+        bytes32 id,
+        bytes32 chainId,
+        address user,
+        uint tokenAmount
+    ) external onlyAdapter {
         uint ceAmount = ICore(core).deposit(id, chainId, user, tokenAmount);
         emit Data.Deposit(user, id, chainId, tokenAmount, ceAmount);
     }
 
-  
+    function swap(
+        bytes32 id,
+        bytes32 srcChainId,
+        bytes32 destChainId,
+        uint tokenAmount
+    ) external onlyAdapter {
+        ICore(core).swap(id, srcChainId, destChainId, tokenAmount);
+        emit Data.Swap(id, srcChainId, destChainId, tokenAmount);
+    }
 }

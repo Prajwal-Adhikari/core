@@ -12,15 +12,20 @@ contract CEToken is ERC20, Ownable {
     address public core;
     address public liquidationManager;
     address public controller;
-    uint public transferBlockWait;           //Amount of blocks to wait before user can transfer minted ceToken
-    uint public lockupTriggerAmt;            //amount where lockup will kick in after cross-chain transfer
-    mapping (address => uint) public transferBlockRelease;    //Block number
+    uint public transferBlockWait; //Amount of blocks to wait before user can transfer minted ceToken
+    uint public lockupTriggerAmt; //amount where lockup will kick in after cross-chain transfer
+    mapping(address => uint) public transferBlockRelease; //Block number
 
-    constructor(string memory name_, string memory symbol_) ERC20(name_, symbol_) {
-    }
+    constructor(
+        string memory name_,
+        string memory symbol_
+    ) ERC20(name_, symbol_) {}
 
     modifier onlyCoreAndLiquidation() {
-        require(msg.sender == core || msg.sender == liquidationManager, "Permission denied");
+        require(
+            msg.sender == core || msg.sender == liquidationManager,
+            "Permission denied"
+        );
         _;
     }
 
@@ -29,10 +34,12 @@ contract CEToken is ERC20, Ownable {
         _;
     }
 
-    function initialize(address _core, address _liquidationManager) external onlyOwner {
+    function initialize(
+        address _core,
+        address _liquidationManager
+    ) external onlyOwner {
         core = _core;
         liquidationManager = _liquidationManager;
-       
     }
 
     function setController(address _controller) external onlyOwner {
@@ -43,7 +50,10 @@ contract CEToken is ERC20, Ownable {
         transferBlockWait = num;
     }
 
-    function setTransferBlockRelease(address user, uint blockNumber) external onlyController {
+    function setTransferBlockRelease(
+        address user,
+        uint blockNumber
+    ) external onlyController {
         transferBlockRelease[user] = blockNumber;
     }
 
@@ -55,21 +65,27 @@ contract CEToken is ERC20, Ownable {
         address from,
         address to,
         uint256 amount
-      ) internal override {
-        require(block.number > transferBlockRelease[from], "transfer too soon after cross-chain mint");
+    ) internal override {
+        require(
+            block.number > transferBlockRelease[from],
+            "transfer too soon after cross-chain mint"
+        );
         super._transfer(from, to, amount);
         ICore(core).checkHealth(from);
-      }
+    }
 
     function mint(address to, uint amount) external onlyCoreAndLiquidation {
-        if(amount > lockupTriggerAmt){
+        if (amount > lockupTriggerAmt) {
             transferBlockRelease[to] = block.number + transferBlockWait;
         }
         _mint(to, amount);
     }
 
     function burn(address from, uint amount) external onlyCoreAndLiquidation {
-        require(block.number > transferBlockRelease[from], "burn too soon after cross-chain mint");
+        require(
+            block.number > transferBlockRelease[from],
+            "burn too soon after cross-chain mint"
+        );
         _burn(from, amount);
     }
 }

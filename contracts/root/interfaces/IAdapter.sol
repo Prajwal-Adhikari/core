@@ -4,6 +4,7 @@ pragma solidity ^0.8.9;
 interface IAdapter {
     function deposit(bytes32 id, bytes32 chainId, address user, uint tokenAmount) external;
     function repay(bytes32 id, bytes32 chainId, address user, uint tokenAmount) external;
-    function sendToken(bytes32 id,bytes32 chainId, bytes32 user, address sender, uint amount, bytes32 route) external payable;
+    function sendToken(bytes32 id, bytes32 chainId, bytes32 user, address sender, uint amount, uint airdropAmount, bytes32 route) external payable;
+    function swap(bytes32 id, bytes32 srcChainId, bytes32 destChainId, uint tokenAmount) external;
 
 }

@@ -9,6 +9,7 @@ interface ICore {
     function borrow(bytes32 id, bytes32 chainId, uint tokenAmount, address user) external returns (uint);
     function repay(bytes32 id, bytes32 chainId, address user, uint tokenAmount) external returns (uint, uint, uint);
     function updateCeAndDebtSupply(bytes32 id, uint ceAmount, uint debtAmount) external;
+    function swap(bytes32 id, bytes32 srcChainId, bytes32 destChainId, uint tokenAmount) external;
     function refresh(bytes32 id) external;
     function updateInterestRate(bytes32 id) external;
     function healthFactor(address user) external view returns(Data.HealthData memory health);
