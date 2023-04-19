@@ -10,6 +10,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./interfaces/IAdapter.sol";
 import "./interfaces/IStargateRouter.sol";
+import "./interfaces/IStargateEthVault.sol";
 
 // todo
 // 1.decimal
@@ -40,6 +41,7 @@ contract Branch is
 
     address public adapter;
     address public stargateRouter;
+    address public stargateEthVault;
 
     mapping(bytes32 => bool) public depositPause;
     mapping(bytes32 => bool) public repayPause;
@@ -61,7 +63,10 @@ contract Branch is
      * @dev only adapter can use functions affected by this modifier
      **/
     modifier onlyAdapter() {
-        require(adapter == msg.sender, "Branch: The caller must be adapter contract");
+        require(
+            adapter == msg.sender,
+            "Branch: The caller must be adapter contract"
+        );
         _;
     }
 
@@ -89,23 +94,24 @@ contract Branch is
      * This function can only be accessed by the contract owner.
      * @param routerAddress address of the router contract.
      **/
-    function setStargateRouter(address routerAddress) external onlyOwner {
+    function setStargateRouterAndVault(
+        address routerAddress,
+        address vaultAddress
+    ) external onlyOwner {
         stargateRouter = routerAddress;
+        stargateEthVault = vaultAddress;
     }
 
     function pauseDeposit(bytes32 id) external onlyOwner {
         depositPause[id] = true;
-
     }
 
     function pauseRepay(bytes32 id) external onlyOwner {
         repayPause[id] = true;
-
     }
 
     function toggleProtocolStatus() external onlyOwner {
         protocolPause = !protocolPause;
-
     }
 
     /**
@@ -142,7 +148,7 @@ contract Branch is
     function swap(
         uint qty,
         uint minAmount,
-        address bridgeToken,
+        address token,
         uint16 dstChainId,
         uint16 srcPoolId,
         uint16 dstPoolId,
@@ -153,11 +159,22 @@ contract Branch is
             "stargate requires a msg.value to pay crosschain message"
         );
         require(qty > 0, "error: swap() requires qty > 0");
+        uint messageFee;
+        if (token == address(0)) {
+            require(msg.value > qty, "msg.value must be > qty");
 
-        IERC20(bridgeToken).approve(stargateRouter, qty);
+            // wrap the ETH into WETH
+            IStargateEthVault(stargateEthVault).deposit{value: qty}();
+            IStargateEthVault(stargateEthVault).approve(stargateRouter, qty);
 
-        // Stargate's Router.swap() function sends the tokens to the destination chain.
-        IStargateRouter(stargateRouter).swap{value: msg.value}(
+            // messageFee is the remainder of the msg.value after wrap
+            messageFee = msg.value - qty;
+        } else {
+            IERC20(token).approve(stargateRouter, qty);
+            messageFee = msg.value;
+        }
+
+        IStargateRouter(stargateRouter).swap{value: messageFee}(
             dstChainId, // the destination chain id
             srcPoolId, // the source Stargate poolId
             dstPoolId, // the destination Stargate poolId
@@ -165,7 +182,7 @@ contract Branch is
             qty, // total tokens to send to destination chain
             minAmount, // min amount allowed out
             IStargateRouter.lzTxObj(0, 0, "0x"), // default lzTxObj
-            abi.encodePacked(destination), // destination address
+            abi.encodePacked(destination), // destination address, the sgReceive() implementer
             bytes("") // bytes payload
         );
     }
