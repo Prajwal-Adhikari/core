@@ -168,7 +168,6 @@ contract Branch is
 
     function swap(
         uint qty,
-        uint minAmount,
         bytes32 id,
         uint16 dstChainId,
         uint16 srcPoolId,
@@ -203,7 +202,7 @@ contract Branch is
             dstPoolId, // the destination Stargate poolId
             payable(msg.sender), // refund adddress. if msg.sender pays too much gas, return extra eth
             qty, // total tokens to send to destination chain
-            minAmount, // min amount allowed out
+            0, // min amount allowed out
             IStargateRouter.lzTxObj(0, 0, "0x"), // default lzTxObj
             abi.encodePacked(destination), // destination address, the sgReceive() implementer
             bytes("") // bytes payload
