@@ -76,20 +76,22 @@ library Data {
     }
 
 
-    //using to avoid stack too dept 
+    //using to avoid stack too deep
     struct LiquidateParams {
-        uint debtValue;
-        uint ceDebtAmount;
-        uint liqCollateralValue;
-        uint ceCollateralAmount;
+        uint liqValue;
+        uint repayDebtAmount;
+        uint burnDebtAmount;
+        uint liqCEAmount;
     }
 
     event MintToTreasury(bytes32 id, uint tokenAmount, uint ceAmount);
-    event Deposit(address user, bytes32 id, uint16 chainId, uint tokenAmount, uint ceAmount);
-    event Withdraw(address user, address to, bytes32 id, uint16 chainId, uint tokenAmount, uint ceAmount);
-    event Borrow(address user, address to, bytes32 id, uint16 chainId, uint tokenAmount, uint debtAmount);
-    event Repay(address user, bytes32 id, uint16 chainId, uint tokenAmount, uint debtAmount, uint ceAmount);
+    event Deposit(address user, bytes32 id, bytes32 chainId, uint tokenAmount, uint ceAmount);
+    event Withdraw(address user, address to, bytes32 id, bytes32 chainId, uint tokenAmount, uint ceAmount);
+    event Borrow(address user, address to, bytes32 id, bytes32 chainId, uint tokenAmount, uint debtAmount);
+    event Repay(address user, bytes32 id, bytes32 chainId, uint tokenAmount, uint debtAmount, uint ceAmount);
     event Liquidate(address user, address liquidator, bytes32 debtId, bytes32 collateralId, 
-        uint debtAmount, uint ceDebtAmount, uint ceCollateralAmount);
+        uint collateralAmount, uint burnDebtAmount, uint repayAmount, uint discount);
     event ChangePoolStatus(bytes32 id, bool enable);
+    event ReceiveToken(address user, bytes32 id, uint tokenAmount);
+    event Swap(bytes32 id, bytes32 srcChainId, bytes32 destChainId, uint tokenAmount);
 }

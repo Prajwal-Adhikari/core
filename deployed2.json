@@ -1,0 +1,59 @@
+{
+    "chain": "binance",
+    "gateway": "0x4D147dCb984e6affEEC47e44293DA442580A3Ec0",
+    "gasservice": "0xbE406F0189A0B4cf3A05C286473D23791Dd44Cc6",
+    "treasury": "0x2D83750BDB3139eed1F76952dB472A512685E3e0",
+    "endpoint": "0x6Fcb97553D41516Cb228ac03FdC8B9a0a9df04A1",
+    "serverId": 10102,
+    "tokens": [
+        "AVAX",
+        "FTM",
+        "USDC",
+        "BNB",
+        "ETH",
+        "MATIC"
+    ],
+    "branches": {
+        "avax": {
+            "endpoint": "0x93f54D755A063cE7bB9e6Ac47Eccc8e33411d706",
+            "chainId": 10106
+        },
+        "ftm": {
+            "chain": "Fantom",
+            "gateway": "0x97837985Ec0494E7b9C71f5D3f9250188477ae14",
+            "gasservice": "0xbE406F0189A0B4cf3A05C286473D23791Dd44Cc6",
+            "endpoint": "0x7dcAD72640F835B0FA36EFD3D6d3ec902C7E5acf",
+            "chainId": 10112,
+            "FTM": "0x13A0b289583511627c2408387AF7185d0E2D478B",
+            "USDC": "0xC987b4D6e7d55Cf322A33c185AbC06EF4A360448",
+            "branch": "0x89591C7eA617Eb13C18ED4117de4564c13fA9cbF",
+            "adapter": "0xe806285e5A236BbB6b0f2dBA4864677987430b94",
+            "route": "0x9EeE68B08c8218A872363723b8933b23F6Cad560",
+            "ceToken": "0x21367EF3c29C3917a071b57eA31B4595e0B8D0E5",
+            "debtToken": "0x7D330326Af7768B71ac4e5cB5d9F2613728ecE4B"
+        },
+        "bsc": {
+            "endpoint": "0x6Fcb97553D41516Cb228ac03FdC8B9a0a9df04A1",
+            "chainId": 10102
+        },
+        "goerli": {
+            "endpoint": "0xbfD2135BFfbb0B5378b56643c2Df8a87552Bfa23",
+            "chainId": 10121
+        },
+        "polygon": {
+            "endpoint": "0xf69186dfBa60DdB133E91E9A4B5673624293d8F8",
+            "chainId": 10109
+        },
+        "arbitrum": {
+            "endpoint": "0x6aB5Ae6822647046626e83ee6dB8187151E1d5ab",
+            "chainId": 10143
+        }
+    },
+    "server": "0xd15Def19E5ACb4d1d47348ddBe3f0644Fb43164D",
+    "core": "0x66986bC0247c77C673C4B41232d80976eE8ADe21",
+    "adapter": "0xC0800f8E3bd0682f2fF157293eDd56c9347c5e19",
+    "route": "0x3cFAf07E3c2D1D0654Ace3999B32A200dbFd4fAA",
+    "feeProvider": "0x6F7fC6eB01B397aDFE47ffDCCd7685E57acbF24c",
+    "oracle": "0x1F377a0e50f9a4C1947C1a63F0D68dc0681A79Eb",
+    "cedroToken": "0x748bf843a04a1E86FE12e875fBBd0218E15611bD"
+}
