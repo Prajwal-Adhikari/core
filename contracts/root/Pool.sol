@@ -24,14 +24,12 @@ import "./libraries/Data.sol";
 contract Pool is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
     using SafeMath for uint256;
 
-    address public cedroToken;
     address public feeProvider;
     address public liquidationManager;
     address public core;
     address public adapter;
 
     bool public feeEnable;
-    bool public rewardEnable;
 
     mapping(bytes32 => mapping(bytes32 => bool)) public withdrawPause;
     mapping(bytes32 => mapping(bytes32 => bool)) public borrowPause;
@@ -53,15 +51,6 @@ contract Pool is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
             "Pool: The caller must be a pool contract"
         );
         _;
-    }
-
-    /**
-     * @dev Sets Cedro contract.
-     * This function can only be accessed by the contract owner.
-     * @param _cedroTokenAddress address of the Cedro Token contract.
-     **/
-    function setCedroToken(address _cedroTokenAddress) external onlyOwner {
-        cedroToken = _cedroTokenAddress;
     }
 
     /**
@@ -105,23 +94,25 @@ contract Pool is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
     /**
      * @dev Configures fee and reward status.
      * This function can only be accessed by the contract owner.
-     * @param _feeEnable status of the fee.
-     * @param _rewardEnable status of the reward.
      **/
-    function setFeeRewardStatus(
-        bool _feeEnable,
-        bool _rewardEnable
+    function toggleFeeEnable() external onlyOwner {
+        feeEnable = !feeEnable;
+    }
+
+    function setWithdrawPause(
+        bytes32 id,
+        bytes32 chainId,
+        bool status
     ) external onlyOwner {
-        feeEnable = _feeEnable;
-        rewardEnable = _rewardEnable;
+        withdrawPause[id][chainId] = status;
     }
 
-    function pauseWithdraw(bytes32 id, bytes32 chainId) external onlyOwner {
-        withdrawPause[id][chainId] = true;
-    }
-
-    function pauseBorrow(bytes32 id, bytes32 chainId) external onlyOwner {
-        borrowPause[id][chainId] = true;
+    function setBorrowPause(
+        bytes32 id,
+        bytes32 chainId,
+        bool status
+    ) external onlyOwner {
+        borrowPause[id][chainId] = status;
     }
 
     function toggleProtocolStatus() external onlyOwner {

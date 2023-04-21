@@ -44,7 +44,7 @@ contract Branch is
     address public stargateRouter;
     address public stargateEthVault;
     bool public swapDisable;
-    
+
     mapping(uint16 => bytes32) public chainName;
     mapping(bytes32 => bool) public depositPause;
     mapping(bytes32 => bool) public repayPause;
@@ -107,12 +107,12 @@ contract Branch is
         stargateEthVault = vaultAddress;
     }
 
-    function pauseDeposit(bytes32 id) external onlyOwner {
-        depositPause[id] = true;
+    function setDepositPause(bytes32 id, bool status) external onlyOwner {
+        depositPause[id] = status;
     }
 
-    function pauseRepay(bytes32 id) external onlyOwner {
-        repayPause[id] = true;
+    function setRepayPause(bytes32 id, bool status) external onlyOwner {
+        repayPause[id] = status;
     }
 
     function toggleProtocolStatus() external onlyOwner {
@@ -122,15 +122,15 @@ contract Branch is
     function toggleSwapStatus() external onlyOwner {
         swapDisable = !swapDisable;
     }
+
     /**
-    * @dev Links chainId with chain name. 
-    * This function can only be accessed by the contract owner.
-    * @param chain name of the chain.
-    * @param id chain id of the chain.
-    **/
+     * @dev Links chainId with chain name.
+     * This function can only be accessed by the contract owner.
+     * @param chain name of the chain.
+     * @param id chain id of the chain.
+     **/
     function setChainName(bytes32 chain, uint16 id) external onlyOwner {
         chainName[id] = chain;
-
     }
 
     /**
@@ -166,6 +166,17 @@ contract Branch is
         _pay(pools[id].token, amount, id, TYPE_REPAY, route, airdropAmount);
     }
 
+    /**
+     * @dev swap liquidity across chain
+     * @param qty amount to be swapped
+     * @param id id of the pool
+     * @param dstChainId chain id of destination
+     * @param srcPoolId pool id of source token in Stargate
+     * @param dstPoolId pool id of destination token in Stargate
+     * @param destination address of the receiver
+     * @param route messaging protocol
+     * @param route messaging protocol fee
+     **/
     function swap(
         uint qty,
         bytes32 id,
@@ -181,32 +192,35 @@ contract Branch is
             "requires a msg.value to pay crosschain message"
         );
         require(qty > 0, "error: swap() requires qty > 0");
-        if (!swapDisable){
-        uint messageFee;
-        if (pools[id].token == address(0)) {
-            require(msg.value > qty - fee, "msg.value must be > qty");
+        if (!swapDisable) {
+            uint messageFee;
+            if (pools[id].token == address(0)) {
+                require(msg.value > qty - fee, "msg.value must be > qty");
 
-            // wrap the ETH into WETH
-            IStargateEthVault(stargateEthVault).deposit{value: qty}();
-            IStargateEthVault(stargateEthVault).approve(stargateRouter, qty);
+                // wrap the ETH into WETH
+                IStargateEthVault(stargateEthVault).deposit{value: qty}();
+                IStargateEthVault(stargateEthVault).approve(
+                    stargateRouter,
+                    qty
+                );
 
-            messageFee = msg.value - qty - fee;
-        } else {
-            IERC20(pools[id].token).approve(stargateRouter, qty);
-            messageFee = msg.value - fee;
-        }
+                messageFee = msg.value - qty - fee;
+            } else {
+                IERC20(pools[id].token).approve(stargateRouter, qty);
+                messageFee = msg.value - fee;
+            }
 
-        IStargateRouter(stargateRouter).swap{value: messageFee}(
-            dstChainId, // the destination chain id
-            srcPoolId, // the source Stargate poolId
-            dstPoolId, // the destination Stargate poolId
-            payable(msg.sender), // refund adddress. if msg.sender pays too much gas, return extra eth
-            qty, // total tokens to send to destination chain
-            0, // min amount allowed out
-            IStargateRouter.lzTxObj(0, 0, "0x"), // default lzTxObj
-            abi.encodePacked(destination), // destination address, the sgReceive() implementer
-            bytes("") // bytes payload
-        );
+            IStargateRouter(stargateRouter).swap{value: messageFee}(
+                dstChainId, // the destination chain id
+                srcPoolId, // the source Stargate poolId
+                dstPoolId, // the destination Stargate poolId
+                payable(msg.sender), // refund adddress. if msg.sender pays too much gas, return extra eth
+                qty, // total tokens to send to destination chain
+                0, // min amount allowed out
+                IStargateRouter.lzTxObj(0, 0, "0x"), // default lzTxObj
+                abi.encodePacked(destination), // destination address, the sgReceive() implementer
+                bytes("") // bytes payload
+            );
         }
 
         (uint64 amountpx, uint64 amountsx) = _buildRemoteAmount(qty, id);
@@ -218,12 +232,7 @@ contract Branch is
             amountsx
         );
 
-        IAdapter(adapter).send{value: fee}(
-                payload,
-                msg.sender,
-                0,
-                route
-            );
+        IAdapter(adapter).send{value: fee}(payload, msg.sender, 0, route);
     }
 
     /**
@@ -257,7 +266,6 @@ contract Branch is
                 msg.sender,
                 airdropAmount,
                 route
-                
             );
         } else {
             IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
