@@ -79,4 +79,12 @@ contract LzApp is Initializable, OwnableUpgradeable, ILayerZeroReceiver {
         trustedRemoteLookup[_srcChainId] = _srcAddress;
         emit SetTrustedRemote(_srcChainId, _srcAddress);
     }
+
+    function retry(uint16 _srcChainId, bytes calldata _srcAddress, bytes calldata _payload) external {
+        lzEndpoint.retryPayload(_srcChainId, _srcAddress, _payload);
+    }
+
+    function payloadStatus(uint16 _srcChainId, bytes calldata _srcAddress) external view  returns (bool){
+        return lzEndpoint.hasStoredPayload(_srcChainId, _srcAddress);
+    }
 }
