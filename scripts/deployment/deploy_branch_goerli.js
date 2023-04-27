@@ -14,21 +14,20 @@ let fs = require("fs")
 const toTokenAmount = (amount, decimals = 18) => {
     return new BN(amount).multipliedBy(new BN("10").pow(decimals)).toFixed()
 }
-const LZO = ethers.utils.formatBytes32String("LZO");
 
 let deployed = require("../../deployed2.json");
-let data = deployed.branches.ftm;
+let data = deployed.branches.goerli;
 
 
 async function main() {
   console.log(`deploy token`);
   let Token = await ethers.getContractFactory("ERC20Mock");
-  this.ftm = await Token.deploy("testFTM", "testFTM");
+  this.eth = await Token.deploy("testETH", "testETH");
   this.usdc =  await Token.deploy("testUSDC", "testUSDC");
 
-  data["FTM"] = this.ftm.address;
+  data["ETH"] = this.eth.address;
   data["USDC"] = this.usdc.address;
-  console.log("FTM", data["FTM"], "USDC", data["USDC"]);
+  console.log("ETH", data["ETH"], "USDC", data["USDC"]);
 
   console.log("deploy branch")
 
@@ -44,16 +43,24 @@ async function main() {
   data["adapter"] = this.adapter.address;
   console.log("Adapter", data["adapter"]);
   
-  // Client Route
+  // Client LZ Route
   const Route = await ethers.getContractFactory("LzRouteBranch");
-  this.route = await upgrades.deployProxy(Route, [data.endpoint, data.chainId, deployed.serverId]);
-  
+  this.route = await upgrades.deployProxy(Route, [data.endpoint, data.chainId, deployed.chainId, 350000]);
+
   data["route"] = this.route.address;
   console.log("Route", data["route"]);
 
-  await (await this.ftm.mint(owner, toTokenAmount(1000000))).wait();
+  // Client AXL Route
+  let Axelar = await ethers.getContractFactory("AxlRouteBranch");
+  this.axelar = await upgrades.deployProxy(Axelar, [data.gateway, data.gasservice]);
+
+  data["axelar"] = this.axelar.address;
+  console.log("Axelar", data["axelar"]);
+  
+
+  await (await this.eth.mint(owner, toTokenAmount(1000000))).wait();
   console.log("mint done");
-  await (await this.ftm.approve(data.branch, toTokenAmount(1000000))).wait();
+  await (await this.eth.approve(data.branch, toTokenAmount(1000000))).wait();
   console.log("approve done");
   await (await this.usdc.mint(owner, toTokenAmount(1000000))).wait();
   console.log("mint done");

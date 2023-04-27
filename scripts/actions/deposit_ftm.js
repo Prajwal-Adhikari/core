@@ -13,11 +13,14 @@ const toTokenAmount = (amount, decimals = 18) => {
 async function main() {
   this.branch = await hre.ethers.getContractAt("Branch", deployed.branches.ftm.branch);
   this.route = await hre.ethers.getContractAt("LzRouteBranch", deployed.branches.ftm.route);
-
-  let fees = await this.route.estimateFees(1);
+  this.ftm = await hre.ethers.getContractAt("ERC20Mock", deployed.branches.ftm.FTM);
+  let fees = await this.route.estimateFees(1,1);
   console.log(fees);
-
-  await( await this.branch.repayRequest(FTM, toTokenAmount(1), LZO, {value: fees})).wait();
+  let balance_matic_client = await this.ftm.balanceOf(this.branch.address);
+  console.log("Before balance of matic pool", balance_matic_client.toString(), this.branch.address);
+  balance_matic_client = await this.ftm.balanceOf(owner);
+  console.log("Before balance of owner", balance_matic_client.toString(), owner);
+  await(await this.branch.depositRequest(FTM, toTokenAmount(500), LZO, 0, {value: fees})).wait();
   console.log("complete");
 }
 

@@ -11,12 +11,12 @@ const toTokenAmount = (amount, decimals = 18) => {
 }
 
 async function main() {
-    this.server = await hre.ethers.getContractAt("Pool", deployed.server);
+    this.pool = await hre.ethers.getContractAt("Pool", deployed.pool);
     this.route = await hre.ethers.getContractAt("LzRoutePool", deployed.route);
-    let fees = await this.route.estimateFees(FTM);
+    let fees = await this.route.estimateFees(FTM,1);
     console.log(fees);
     
-    await this.server.borrow(FTM, FTM, toTokenAmount(1), ethers.utils.hexZeroPad(ethers.utils.getAddress( owner ), 32), LZO, {value: fees});
+    await this.pool.borrow(FTM, FTM, toTokenAmount(100), ethers.utils.hexZeroPad(ethers.utils.getAddress( owner ), 32), LZO, 0, {value: fees});
 
 }
 
