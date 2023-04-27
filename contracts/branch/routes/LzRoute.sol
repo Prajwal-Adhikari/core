@@ -5,6 +5,9 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "../../layerZero/lzApp/LzApp.sol";
 import "../interfaces/IAdapter.sol";
+import "../interfaces/IRoleManager.sol";
+
+string constant TAG = "LzRouteBranch";
 
 /**
  * Title LzRouteBranch
@@ -14,32 +17,25 @@ contract LzRouteBranch is Initializable, LzApp {
     using SafeMath for uint256;
 
     address public adapter;
-    uint16 public serverChainId;
+    address public roleManager;
+    uint16 public rootChainId;
 
     uint8 internal constant TYPE_DEPOSIT = 1;
     uint8 internal constant TYPE_REPAY = 2;
+    uint8 internal constant TYPE_SWAP = 3;
 
-    uint public gasUsage;
-
-    uint public constant BASE = 10 ** 18;
+    uint256 public gasUsage;
 
     /**
-     * @dev only adapter can use functions affected by this modifier
+     * @dev Modifier that checks if caller has a specific role.
      **/
-    modifier onlyAdapter() {
-        require(adapter == msg.sender, "The caller must be a pool contract");
+    modifier onlyRole(bytes32 role) {
+        IRoleManager(roleManager).checkRole(role, _msgSender());
         _;
     }
 
-    function initialize(
-        address _lzEndpoint,
-        uint16 _localChainId,
-        uint16 _serverChainId,
-        uint _gasUsage
-    ) public initializer {
-        __LzApp_init(_lzEndpoint, _localChainId);
-        serverChainId = _serverChainId;
-        gasUsage = _gasUsage;
+    function setRoleManager(address roleManagerAddress) external onlyOwner {
+        roleManager = roleManagerAddress;
     }
 
     /**
@@ -47,19 +43,43 @@ contract LzRouteBranch is Initializable, LzApp {
      * This function can only be accessed by the contract owner.
      * @param adapterAddress address of the adapter contract.
      **/
-    function setAdapter(address adapterAddress) external onlyOwner {
+    function setAdapter(
+        address adapterAddress
+    ) external onlyRole(IRoleManager(roleManager).SET_ROUTE_METHOD()) {
         adapter = adapterAddress;
+    }
+
+    function initialize(
+        address _lzEndpoint,
+        uint16 _localChainId,
+        uint16 _rootChainId,
+        uint256 _gasUsage
+    ) public initializer {
+        __LzApp_init(_lzEndpoint, _localChainId);
+        rootChainId = _rootChainId;
+        gasUsage = _gasUsage;
+    }
+
+    /**
+     * @dev Configures gas value.
+     * This function can only be accessed by the contract owner.
+     * @param _gasUsage value of the gas
+     **/
+    function setGasUsage(
+        uint256 _gasUsage
+    ) external onlyRole(IRoleManager(roleManager).SET_ROUTE_METHOD()) {
+        gasUsage = _gasUsage;
     }
 
     // LayerZero functions
     function send(
         bytes memory payload,
         address sender,
-        uint airdropAmount
-    ) external payable onlyAdapter {
+        uint256 airdropAmount
+    ) external payable onlyRole(IRoleManager(roleManager).ADAPTER()) {
         if (airdropAmount > 0) {
             _lzSend(
-                serverChainId,
+                rootChainId,
                 payload,
                 payable(sender),
                 address(this),
@@ -68,7 +88,7 @@ contract LzRouteBranch is Initializable, LzApp {
             );
         } else {
             _lzSend(
-                serverChainId,
+                rootChainId,
                 payload,
                 payable(sender),
                 address(this),
@@ -88,19 +108,8 @@ contract LzRouteBranch is Initializable, LzApp {
         uint64,
         bytes memory _payload
     ) internal override {
-        require(serverChainId == _srcId, "Invalid chainId");
-        bytes32 id;
-        bytes32 to;
-        uint64 amountpx;
-        uint64 amountsx;
-        assembly {
-            id := mload(add(_payload, 32))
-            to := mload(add(_payload, 64))
-            amountpx := mload(add(_payload, 72))
-            amountsx := mload(add(_payload, 80))
-        }
-        uint amount = uint(amountpx) * BASE + uint(amountsx);
-        IAdapter(adapter).get(id, amount, address(uint160(uint256(to))));
+        require(rootChainId == _srcId, string.concat(TAG, "Invalid chainId"));
+        IAdapter(adapter).execute(_payload);
     }
 
     /*
@@ -109,32 +118,34 @@ contract LzRouteBranch is Initializable, LzApp {
      **/
     function estimateFees(
         uint8 functionType,
-        uint airdropAmount
-    ) public view returns (uint) {
+        uint256 airdropAmount
+    ) public view returns (uint256) {
         bytes memory payload = "";
         if (functionType == TYPE_DEPOSIT) {
             payload = abi.encode(TYPE_DEPOSIT, 1, msg.sender, 1, 1);
         } else if (functionType == TYPE_REPAY) {
             payload = abi.encode(TYPE_REPAY, 1, msg.sender, 1, 1);
+        } else if (functionType == TYPE_SWAP) {
+            payload = abi.encode(TYPE_SWAP, 1, msg.sender, 1, 1);
         } else {
-            revert("Unsupport functionType");
+            revert(string.concat(TAG, "Unsupport functionType"));
         }
-        uint fees;
+        uint256 fees;
         if (airdropAmount > 0) {
             (fees, ) = lzEndpoint.estimateFees(
-                serverChainId,
-                address(this),
-                payload,
-                false,
-                abi.encodePacked(uint16(1), gasUsage)
-            );
-        } else {
-            (fees, ) = lzEndpoint.estimateFees(
-                serverChainId,
+                rootChainId,
                 address(this),
                 payload,
                 false,
                 abi.encodePacked(uint16(2), gasUsage, airdropAmount, address(0))
+            );
+        } else {
+            (fees, ) = lzEndpoint.estimateFees(
+                rootChainId,
+                address(this),
+                payload,
+                false,
+                abi.encodePacked(uint16(1), gasUsage)
             );
         }
         return fees;

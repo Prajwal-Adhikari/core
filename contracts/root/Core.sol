@@ -8,7 +8,10 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "./interfaces/ICEToken.sol";
 import "./interfaces/IDebtToken.sol";
 import "./interfaces/IOracle.sol";
+import "./interfaces/IRoleManager.sol";
 import "./libraries/Data.sol";
+
+string constant TAG = "Core";
 
 /**
  * Title Core
@@ -20,59 +23,33 @@ contract Core is Initializable, OwnableUpgradeable {
 
     IOracle public oracle;
     address public treasury;
-    address public pool;
-    address public liquidationManager;
+    address public roleManager;
 
-    uint public constant MAX_HEALTH_FACTOR = 1e18;
-    uint public constant YEAR = 365 * 86400;
+    uint256 public constant MAX_HEALTH_FACTOR = 1e18;
+    uint256 public constant YEAR = 365 * 86400;
     mapping(bytes32 => Data.ReserveData) public reserves;
     mapping(bytes32 => Data.ConfigData) public configs;
-    mapping(bytes32 => mapping(bytes32 => uint)) public chains;
-    mapping(bytes32 => uint) public totalLiquidity;
+    mapping(bytes32 => mapping(bytes32 => uint256)) public chains;
+    mapping(bytes32 => uint256) public totalLiquidity;
     mapping(address => bytes32[]) public users;
 
     /**
-     * @dev only pool can use functions affected by this modifier
+     * @dev Modifier that checks if caller has a specific role.
      **/
-    modifier onlyPool() {
-        require(pool == msg.sender, "The caller must be a pool contract");
+    modifier onlyRole(bytes32 role) {
+        IRoleManager(roleManager).checkRole(role, _msgSender());
         _;
     }
-
-    /**
-     * @dev only liquidation manager can use functions affected by this modifier
-     **/
-    modifier onlyLiquidationManager() {
-        require(
-            liquidationManager == msg.sender,
-            "The caller must be a liquidation manager contract"
-        );
-        _;
-    }
+    
 
     function initialize(address _treasury) public initializer {
         treasury = _treasury;
         __Ownable_init();
     }
+    
 
-    /**
-     * @dev Configures pool contract.
-     * This function can only be accessed by the contract owner.
-     * @param _poolAddress address of the pool contract.
-     **/
-    function setPool(address _poolAddress) external onlyOwner {
-        pool = _poolAddress;
-    }
-
-    /**
-     * @dev Configures liquidation manager contract.
-     * This function can only be accessed by the contract owner.
-     * @param _liquidationManagerAddress address of the liquidation manager contract.
-     **/
-    function setLiquidationManager(
-        address _liquidationManagerAddress
-    ) external onlyOwner {
-        liquidationManager = _liquidationManagerAddress;
+    function setRoleManager(address roleManagerAddress) external onlyOwner {
+        roleManager = roleManagerAddress;
     }
 
     /**
@@ -88,7 +65,7 @@ contract Core is Initializable, OwnableUpgradeable {
         Data.ConfigData memory config,
         address _ceToken,
         address _debtToken
-    ) external onlyOwner {
+    ) external onlyRole(IRoleManager(roleManager).INIT_POOL()) {
         updateInterestRate(id);
         configs[id] = config;
         Data.ReserveData storage reserve = reserves[id];
@@ -104,7 +81,7 @@ contract Core is Initializable, OwnableUpgradeable {
      * @param id id of the pool to freeze/unfreeze
      * @param enable bool to freeze/unfreeze
      **/
-    function changePoolStatus(bytes32 id, bool enable) external onlyOwner {
+    function changePoolStatus(bytes32 id, bool enable) external onlyRole(IRoleManager(roleManager).POOL_STATUS()) {
         reserves[id].enable = enable;
         emit Data.ChangePoolStatus(id, enable);
     }
@@ -113,13 +90,13 @@ contract Core is Initializable, OwnableUpgradeable {
         Data.ReserveData storage reserve = reserves[id];
         Data.ConfigData memory config = configs[id];
         if (reserve.debtSupply > 0) {
-            uint totalDeposit = reserve.ceSupply.mul(reserve.ceScaled).div(
+            uint256 totalDeposit = reserve.ceSupply.mul(reserve.ceScaled).div(
                 1e18
             );
-            uint totalBorrow = reserve.debtSupply.mul(reserve.dtScaled).div(
+            uint256 totalBorrow = reserve.debtSupply.mul(reserve.dtScaled).div(
                 1e18
             );
-            uint currentRatio = totalBorrow.mul(1e18).div(totalDeposit);
+            uint256 currentRatio = totalBorrow.mul(1e18).div(totalDeposit);
 
             if (currentRatio <= config.bestRatio) {
                 //Rt = R0 + (Ut / Ub) * Rslope1
@@ -127,7 +104,7 @@ contract Core is Initializable, OwnableUpgradeable {
                     currentRatio.mul(config.slope1).div(config.bestRatio)
                 );
             } else {
-                uint one = 1e18;
+                uint256 one = 1e18;
                 //Rt = R0 + Rslope1 + (Ut - Ub) / (1 - Ub) * Rslope2
                 reserve.interestRate = config.baseRate.add(config.slope1).add(
                     currentRatio.sub(config.bestRatio).mul(config.slope2).div(
@@ -142,15 +119,15 @@ contract Core is Initializable, OwnableUpgradeable {
     function refresh(bytes32 id) public {
         Data.ReserveData storage reserve = reserves[id];
         if (reserve.ceSupply > 0) {
-            uint increasedDebt = block
+            uint256 increasedDebt = block
                 .timestamp
                 .sub(reserve.lastUpdateTime)
                 .mul(reserve.interestRate)
                 .div(YEAR);
             reserve.dtScaled = reserve.dtScaled.add(increasedDebt);
 
-            uint increasedAPY = increasedDebt.mul(reserve.debtSupply).div(1e18);
-            uint tokenAmountTreasury = increasedAPY
+            uint256 increasedAPY = increasedDebt.mul(reserve.debtSupply).div(1e18);
+            uint256 tokenAmountTreasury = increasedAPY
                 .mul(configs[id].tsuPercent)
                 .div(1e18);
             reserve.ceScaled = reserve.ceScaled.add(
@@ -159,7 +136,7 @@ contract Core is Initializable, OwnableUpgradeable {
                 )
             );
 
-            uint ceAmountTreasury = tokenAmountTreasury.mul(1e18).div(
+            uint256 ceAmountTreasury = tokenAmountTreasury.mul(1e18).div(
                 reserve.ceScaled
             );
             ICEToken(reserve.ceToken).mint(treasury, ceAmountTreasury);
@@ -171,22 +148,19 @@ contract Core is Initializable, OwnableUpgradeable {
         // _;
     }
 
-    function setOracle(IOracle _oracle) external onlyOwner {
+    function setOracle(IOracle _oracle) external onlyRole(IRoleManager(roleManager).SET_CORE_METHOD()) {
         oracle = _oracle;
     }
 
-    /**
-     * @dev returns the health factor of the address `user`.
-     * @param user wallet address for which the health factor is calculated.
-     **/
+    
     function healthFactor(
         address user
     ) public view returns (Data.HealthData memory health) {
         bytes32[] memory ids = users[user];
         if (ids.length > 0) {
-            uint[] memory prices = oracle.getPrices(ids);
-            for (uint i = 0; i < ids.length; i++) {
-                (uint collateralValue, uint debtValue) = _getValues(
+            uint256[] memory prices = oracle.getPrices(ids);
+            for (uint256 i = 0; i < ids.length; i++) {
+                (uint256 collateralValue, uint256 debtValue) = _getValues(
                     user,
                     prices[i],
                     ids[i]
@@ -206,26 +180,17 @@ contract Core is Initializable, OwnableUpgradeable {
         }
     }
 
-    /**
-     * @dev updates the global protocol states after receiving deposit information
-     * of amount `tokenAmount` from address `user` for pool with pool id 'id' from
-     * chain with chain id `chainId`.
-     * @param id pool id of pool where amount was deposited to
-     * @param chainId chain id of chain deposited to
-     * @param tokenAmount amount deposited
-     * @param user deposit address
-     **/
     function deposit(
         bytes32 id,
         bytes32 chainId,
         address user,
-        uint tokenAmount
-    ) external onlyPool returns (uint) {
+        uint256 tokenAmount
+    ) external onlyRole(IRoleManager(roleManager).POOL()) returns (uint256) {
         refresh(id);
         Data.ReserveData storage reserve = reserves[id];
-        require(reserve.enable, "Not enable now");
+        require(reserve.enable, string.concat(TAG,": Not enable now"));
 
-        uint ceAmount = tokenAmount.mul(1e18).div(reserve.ceScaled);
+        uint256 ceAmount = tokenAmount.mul(1e18).div(reserve.ceScaled);
         ICEToken(reserve.ceToken).mint(user, ceAmount);
         reserve.ceSupply = reserve.ceSupply.add(ceAmount);
         chains[chainId][id] += tokenAmount;
@@ -237,25 +202,19 @@ contract Core is Initializable, OwnableUpgradeable {
         return ceAmount;
     }
 
-    /**
-     * @dev sends a withdraw request of amount `ceAmount` to address `to` from pool with pool id `id`
-     * in chain with chain id `chainId`.
-     * @param id pool id of pool to withdraw from
-     * @param chainId chain id of chain to withdraw from
-     * @param ceAmount amount to withdraw
-     **/
+ 
     function withdraw(
         bytes32 id,
         bytes32 chainId,
-        uint ceAmount,
+        uint256 ceAmount,
         address user
-    ) external onlyPool returns (uint) {
+    ) external onlyRole(IRoleManager(roleManager).POOL()) returns (uint256) {
         refresh(id);
         Data.ReserveData storage reserve = reserves[id];
-        require(reserve.enable, "Not enable now");
+        require(reserve.enable, string.concat(TAG,": Not enable now"));
 
-        uint tokenAmount = reserve.ceScaled.mul(ceAmount).div(1e18);
-        require(chains[chainId][id] >= tokenAmount, "No enough liquidity");
+        uint256 tokenAmount = reserve.ceScaled.mul(ceAmount).div(1e18);
+        require(chains[chainId][id] >= tokenAmount, string.concat(TAG,": No enough liquidity"));
         ICEToken(reserve.ceToken).burn(user, ceAmount);
         reserve.ceSupply = reserve.ceSupply.sub(ceAmount);
         chains[chainId][id] -= tokenAmount;
@@ -269,7 +228,7 @@ contract Core is Initializable, OwnableUpgradeable {
     function _buildBorrowParams(
         bytes32 id,
         bytes32 chainId,
-        uint tokenAmount
+        uint256 tokenAmount
     ) internal view returns (Data.BorrowParams memory params) {
         Data.ReserveData memory reserve = reserves[id];
         Data.ConfigData memory config = configs[id];
@@ -283,9 +242,9 @@ contract Core is Initializable, OwnableUpgradeable {
     function borrow(
         bytes32 id,
         bytes32 chainId,
-        uint tokenAmount,
+        uint256 tokenAmount,
         address user
-    ) external onlyPool returns (uint) {
+    ) external onlyRole(IRoleManager(roleManager).POOL()) returns (uint256) {
         refresh(id);
         Data.BorrowParams memory params = _buildBorrowParams(
             id,
@@ -294,7 +253,7 @@ contract Core is Initializable, OwnableUpgradeable {
         );
         addToken(user, id);
 
-        require(params.liquidity >= tokenAmount, "No enough liquidity");
+        require(params.liquidity >= tokenAmount, string.concat(TAG,": No enough liquidity"));
         IDebtToken(params.debtToken).mint(user, params.debtAmount);
         reserves[id].debtSupply += params.debtAmount;
         updateInterestRate(id);
@@ -316,7 +275,7 @@ contract Core is Initializable, OwnableUpgradeable {
     function _buildRepayParams(
         Data.ReserveData memory reserve,
         address user,
-        uint tokenAmount
+        uint256 tokenAmount
     ) internal view returns (Data.RepayParams memory params) {
         params.ceToken = reserve.ceToken;
         params.debtToken = reserve.debtToken;
@@ -328,21 +287,13 @@ contract Core is Initializable, OwnableUpgradeable {
         params.user = user;
     }
 
-    /**
-     * @dev updates the global protocol states after receiving repay information
-     * of amount `tokenAmount` from address `user` for pool with pool id 'id' from
-     * chain with chain id `chainId`.
-     * @param id pool id of pool where amount was repaid to
-     * @param chainId chain id of chain repaid from
-     * @param tokenAmount amount repaid
-     * @param user repay address
-     **/
+  
     function repay(
         bytes32 id,
         bytes32 chainId,
         address user,
-        uint tokenAmount
-    ) external onlyPool returns (uint, uint, uint) {
+        uint256 tokenAmount
+    ) external onlyRole(IRoleManager(roleManager).POOL()) returns (uint256, uint256, uint256) {
         refresh(id);
         Data.RepayParams memory params = _buildRepayParams(
             reserves[id],
@@ -350,7 +301,7 @@ contract Core is Initializable, OwnableUpgradeable {
             tokenAmount
         );
         Data.ReserveData storage reserve = reserves[id];
-        uint ceAmount = 0;
+        uint256 ceAmount = 0;
         if (params.tokenAmount >= params.repayAmount) {
             ceAmount = params.tokenAmount.sub(params.repayAmount).mul(1e18).div(
                 params.ceScaled
@@ -376,24 +327,24 @@ contract Core is Initializable, OwnableUpgradeable {
 
     function updateCeAndDebtSupply(
         bytes32 id,
-        uint ceAmount,
-        uint debtAmount
-    ) external onlyLiquidationManager {
+        uint256 ceAmount,
+        uint256 debtAmount
+    ) external onlyRole(IRoleManager(roleManager).LIQUIDATION_MANAGER()) {
         reserves[id].ceSupply = ceAmount;
         reserves[id].debtSupply = debtAmount;
     }
 
-     function swap(bytes32 id, bytes32 srcChainId, bytes32 destChainId, uint tokenAmount) external onlyPool {
+     function swap(bytes32 id, bytes32 srcChainId, bytes32 destChainId, uint256 tokenAmount) external onlyRole(IRoleManager(roleManager).POOL()) {
         chains[srcChainId][id] -= tokenAmount;
         chains[destChainId][id] += tokenAmount;
     }
 
     function checkHealth(address user) public view {
-        require(healthFactor(user).factor < MAX_HEALTH_FACTOR, "Health failed");
+        require(healthFactor(user).factor < MAX_HEALTH_FACTOR, string.concat(TAG,": Health failed"));
     }
 
     function addToken(address user, bytes32 id) internal {
-        for (uint i = 0; i < users[user].length; i++) {
+        for (uint256 i = 0; i < users[user].length; i++) {
             if (users[user][i] == id) {
                 return;
             }
@@ -403,19 +354,19 @@ contract Core is Initializable, OwnableUpgradeable {
 
     function _getValues(
         address user,
-        uint price,
+        uint256 price,
         bytes32 id
-    ) internal view returns (uint collateralValue, uint debtValue) {
+    ) internal view returns (uint256 collateralValue, uint256 debtValue) {
         Data.ReserveData memory reserve = reserves[id];
         address _user = user;
 
-        uint increasedDebt = block
+        uint256 increasedDebt = block
             .timestamp
             .sub(reserve.lastUpdateTime)
             .mul(reserve.interestRate)
             .div(YEAR);
-        uint dtScaled = reserve.dtScaled.add(increasedDebt);
-        uint ceScaled = reserve.ceScaled.add(
+        uint256 dtScaled = reserve.dtScaled.add(increasedDebt);
+        uint256 ceScaled = reserve.ceScaled.add(
             increasedDebt
                 .mul(reserve.currentRatio)
                 .div(1e18)
@@ -436,15 +387,11 @@ contract Core is Initializable, OwnableUpgradeable {
             .div(1e18);
     }
 
-    /**
-     * @dev Returns liquidity of an asset for a chain
-     * @param _chainId id of the chain.
-     * @param _poolId id of the pool.
-     **/
+    
     function getLiquidity(
         bytes32 _chainId,
         bytes32 _poolId
-    ) public view returns (uint) {
+    ) public view returns (uint256) {
         return chains[_chainId][_poolId];
     }
 }

@@ -1,63 +1,59 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.9;
 
-// Uncomment this line to use console.log
-// import "hardhat/console.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "../interfaces/ICore.sol";
+import "../interfaces/IRoleManager.sol";
+
+string constant TAG = "CEToken";
 
 contract CEToken is ERC20, Ownable {
     address public core;
-    address public liquidationManager;
-    address public controller;
-    uint public transferBlockWait; //Amount of blocks to wait before user can transfer minted ceToken
-    uint public lockupTriggerAmt; //amount where lockup will kick in after cross-chain transfer
-    mapping(address => uint) public transferBlockRelease; //Block number
+    address public roleManager;
+    uint256 public transferBlockWait; //amount of blocks to wait before user can transfer minted ceToken
+    uint256 public lockupTriggerAmt; //amount where lockup will kick in after cross-chain transfer
+    mapping(address => uint256) public transferBlockRelease; //Block number
 
     constructor(
         string memory name_,
         string memory symbol_
     ) ERC20(name_, symbol_) {}
 
-    modifier onlyCoreAndLiquidation() {
-        require(
-            msg.sender == core || msg.sender == liquidationManager,
-            "Permission denied"
-        );
+    /**
+     * @dev Modifier that checks if caller has a specific role.
+     **/
+    modifier onlyRole(bytes32 role) {
+        IRoleManager(roleManager).checkRole(role, _msgSender());
         _;
     }
 
-    modifier onlyController() {
-        require(msg.sender == controller, "Permission denied");
-        _;
+    
+
+    function setRoleManager(address roleManagerAddress) external onlyOwner {
+        roleManager = roleManagerAddress;
     }
 
-    function initialize(
-        address _core,
-        address _liquidationManager
-    ) external onlyOwner {
-        core = _core;
-        liquidationManager = _liquidationManager;
+    function setCore(
+        address coreAddress
+    ) external onlyRole(IRoleManager(roleManager).SET_CE_TOKEN_METHOD()) {
+        core = coreAddress;
     }
 
-    function setController(address _controller) external onlyOwner {
-        controller = _controller;
-    }
 
-    function setTransferBlockWait(uint num) external onlyOwner {
+    function setTransferBlockWait(uint256 num) external onlyRole(IRoleManager(roleManager).SET_CE_TOKEN_METHOD()) {
         transferBlockWait = num;
     }
 
     function setTransferBlockRelease(
         address user,
-        uint blockNumber
-    ) external onlyController {
+        uint256 blockNumber
+    ) external onlyRole(IRoleManager(roleManager).CONTROLLER()) {
         transferBlockRelease[user] = blockNumber;
     }
 
-    function setLockupTriggerAmount(uint256 amount) external onlyOwner {
+    function setLockupTriggerAmount(uint256 amount) external onlyRole(IRoleManager(roleManager).SET_CE_TOKEN_METHOD()) {
         lockupTriggerAmt = amount;
     }
 
@@ -68,24 +64,25 @@ contract CEToken is ERC20, Ownable {
     ) internal override {
         require(
             block.number > transferBlockRelease[from],
-            "transfer too soon after cross-chain mint"
+            string.concat(TAG,": transfer too soon after cross-chain mint")
         );
         super._transfer(from, to, amount);
         ICore(core).checkHealth(from);
     }
 
-    function mint(address to, uint amount) external onlyCoreAndLiquidation {
+    function mint(address to, uint256 amount) external onlyRole(IRoleManager(roleManager).MINT_BURN_CE_DEBT_TOKEN()) {
         if (amount > lockupTriggerAmt) {
             transferBlockRelease[to] = block.number + transferBlockWait;
         }
         _mint(to, amount);
     }
 
-    function burn(address from, uint amount) external onlyCoreAndLiquidation {
+    function burn(address from, uint256 amount) external onlyRole(IRoleManager(roleManager).MINT_BURN_CE_DEBT_TOKEN()) {
         require(
             block.number > transferBlockRelease[from],
-            "burn too soon after cross-chain mint"
+            string.concat(TAG,": burn too soon after cross-chain mint")
         );
         _burn(from, amount);
     }
+
 }

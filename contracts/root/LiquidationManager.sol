@@ -9,7 +9,10 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "./interfaces/IDebtToken.sol";
 import "./interfaces/IOracle.sol";
 import "./interfaces/ICore.sol";
+import "./interfaces/IRoleManager.sol";
 import "./libraries/Data.sol";
+
+string constant TAG = "LiquidationManager";
 
 /** 
 * Title LiquidationManager
@@ -24,8 +27,9 @@ contract LiquidationManager is
 {
     using SafeMath for uint256;
 
-    uint public constant MAX_HEALTH_FACTOR = 1e18;
+    uint256 public constant MAX_HEALTH_FACTOR = 1e18;
 
+    address public roleManager;
     address public core;
     IOracle public oracle;
 
@@ -35,29 +39,31 @@ contract LiquidationManager is
     }
 
     /**
-     * @dev Configures Core contract.
-     * This function can only be accessed by the contract owner.
-     * @param _coreAddress address of the core contract.
+     * @dev Modifier that checks if caller has a specific role.
      **/
-    function setCore(address _coreAddress) external onlyOwner {
-        core = _coreAddress;
+    modifier onlyRole(bytes32 role) {
+        IRoleManager(roleManager).checkRole(role, _msgSender());
+        _;
     }
 
-    /**
-     * @dev Configures Oracle contract.
-     * This function can only be accessed by the contract owner.
-     * @param _oracle address of the oracle contract.
-     **/
-    function setOracle(IOracle _oracle) external onlyOwner {
-        oracle = _oracle;
+    function setRoleManager(address roleManagerAddress) external onlyOwner {
+        roleManager = roleManagerAddress;
+    }
+    
+    function setCore(address coreAddress) external onlyRole(IRoleManager(roleManager).SET_LIQUIDATION_METHOD()) {
+        core = coreAddress;
+    }
+
+    function setOracle(IOracle oracleAddress) external onlyRole(IRoleManager(roleManager).SET_LIQUIDATION_METHOD()) {
+        oracle = oracleAddress;
     }
 
     // calculate liquidate info and avoid stack too deep error
     function _buildLiquidateParams(
         bytes32 collateralId,
         bytes32 debtId,
-        uint collateralAmount,
-        uint discount
+        uint256 collateralAmount,
+        uint256 discount
     ) internal view returns (Data.LiquidateParams memory params) {
         Data.ReserveData memory collateralReserve = ICore(core).reserves(
             collateralId
@@ -70,10 +76,10 @@ contract LiquidationManager is
             .mul(oracle.getSinglePrice(collateralId))
             .div(1e18);
 
-        uint burnValue = params.liqValue.sub(
-            params.liqValue.mul(discount).div(1e18)
-        );
-        uint burnTokenAmount = burnValue.mul(1e18).div(
+        uint256 burnValue = params.liqValue.sub(
+            params.liqValue.mul(discount).div(1e18)   
+        ); // bonus
+        uint256 burnTokenAmount = burnValue.mul(1e18).div(
             oracle.getSinglePrice(debtId)
         );
         params.burnDebtAmount = burnTokenAmount.mul(1e18).div(
@@ -95,26 +101,27 @@ contract LiquidationManager is
         address user,
         bytes32 collateralId,
         bytes32 debtId,
-        uint collateralAmount
+        uint256 collateralAmount // naming
     ) external nonReentrant {
         ICore(core).refresh(collateralId);
         ICore(core).refresh(debtId);
         Data.HealthData memory healthData = ICore(core).healthFactor(user);
         Data.ConfigData memory config = ICore(core).configs(collateralId);
-        require(healthData.factor >= MAX_HEALTH_FACTOR, "Cannot liquidate now");
+        require(healthData.factor >= MAX_HEALTH_FACTOR, string.concat(TAG,": Cannot liquidate now"));
 
-        uint currentLTV = healthData.debtValue.mul(1e18).div(
+        uint256 currentLTV = healthData.debtValue.mul(1e18).div(
             healthData.collateralValue
         );
-        uint discount;
-        uint liqPercent = 1e18;
+
+        uint256 discount;
+        uint256 liqPercent = 1e18;
         if (currentLTV < 1e18) {
             discount = 1e36 / currentLTV - 999000000000000000;
             if (discount > config.liqMaxDiscount) {
                 discount = config.liqMaxDiscount;
             }
 
-            uint p1 = config.liqClosingFac.mul(1e18 - currentLTV).div(
+            uint256 p1 = config.liqClosingFac.mul(1e18 - currentLTV).div(
                 1e18 - config.liqThreshold
             );
             if (currentLTV > config.liqThreshold) {
@@ -153,10 +160,12 @@ contract LiquidationManager is
         );
 
         IDebtToken(debtReserve.debtToken).burn(user, params.burnDebtAmount);
+        //change to ICEToken
         IDebtToken(debtReserve.ceToken).burn(
             msg.sender,
             params.repayDebtAmount
         );
+        
         ICore(core).updateCeAndDebtSupply(
             debtId,
             debtReserve.ceSupply,

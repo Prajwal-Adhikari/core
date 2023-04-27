@@ -4,6 +4,9 @@ import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "./interfaces/ICore.sol";
+import "./interfaces/IRoleManager.sol";
+
+string constant TAG = "FeeProvider";
 
 /**
  * Title FeeProvider
@@ -12,24 +15,32 @@ import "./interfaces/ICore.sol";
 contract FeeProvider is Initializable, OwnableUpgradeable {
     using SafeMath for uint256;
 
-    mapping(bytes32 => mapping(bytes32 => uint))
+    mapping(bytes32 => mapping(bytes32 => uint256))
         public OPTIMAL_GLOBAL_LIQUIDITY_FACTOR;
-    mapping(bytes32 => mapping(bytes32 => uint)) public BASE_FEE;
-    mapping(bytes32 => mapping(bytes32 => uint)) public MAX_FEE;
+    mapping(bytes32 => mapping(bytes32 => uint256)) public BASE_FEE;
+    mapping(bytes32 => mapping(bytes32 => uint256)) public MAX_FEE;
 
     address public core;
+    address public roleManager;
+
+    /**
+     * @dev Modifier that checks if caller has a specific role.
+     **/
+    modifier onlyRole(bytes32 role) {
+        IRoleManager(roleManager).checkRole(role, _msgSender());
+        _;
+    }
 
     function initialize() public initializer {
         __Ownable_init();
     }
 
-    /**
-     * @dev Sets core contract.
-     * This function can only be accessed by the contract owner.
-     * @param _coreAddress address of the core.
-     **/
-    function setCore(address _coreAddress) external onlyOwner {
-        core = _coreAddress;
+    function setRoleManager(address roleManagerAddress) external onlyOwner {
+        roleManager = roleManagerAddress;
+    }
+
+    function setCore(address coreAddress) external onlyRole(IRoleManager(roleManager).SET_FEEPROVIDER_METHOD()) {
+        core = coreAddress;
     }
 
     /**
@@ -42,12 +53,12 @@ contract FeeProvider is Initializable, OwnableUpgradeable {
     function configureOptimalGlobalLiquidityFactor(
         bytes32[] memory _chainId,
         bytes32[] memory _poolId,
-        uint[] memory _liquidityFactor
-    ) external onlyOwner {
+        uint256[] memory _liquidityFactor
+    ) external onlyRole(IRoleManager(roleManager).SET_FEEPROVIDER_METHOD()) {
         require(
             _chainId.length == _poolId.length &&
                 _poolId.length == _liquidityFactor.length,
-            "Arguments number mismatched"
+            string.concat(TAG,": Arguments number mismatched")
         );
         for (uint256 i = 0; i < _poolId.length; i++) {
             OPTIMAL_GLOBAL_LIQUIDITY_FACTOR[_chainId[i]][
@@ -56,68 +67,49 @@ contract FeeProvider is Initializable, OwnableUpgradeable {
         }
     }
 
-    /**
-     * @dev Configures Base Global Liquidity Factor.
-     * This function can only be accessed by the contract owner.
-     * @param _chainId ids of the chain.
-     * @param _poolId ids of the pool.
-     * @param _baseFee base fee for each pool in diff chain.
-     **/
+
     function configureBaseFee(
         bytes32[] memory _chainId,
         bytes32[] memory _poolId,
-        uint[] memory _baseFee
-    ) external onlyOwner {
+        uint256[] memory _baseFee
+    ) external onlyRole(IRoleManager(roleManager).SET_FEEPROVIDER_METHOD()) {
         require(
             _chainId.length == _poolId.length &&
                 _poolId.length == _baseFee.length,
-            "Arguments number mismatched"
+            string.concat(TAG, ": Arguments number mismatched")
         );
         for (uint256 i = 0; i < _poolId.length; i++) {
             BASE_FEE[_chainId[i]][_poolId[i]] = _baseFee[i];
         }
     }
 
-    /**
-    * @dev Configures upper limit of the fee for withdraw. 
-    * This function can only be accessed by the contract owner.
-    * @param _chainId ids of the chain.
-    * @param _poolId ids of the pool.
-    * @param _maxFee upper limit of fee for each pool in diff chain.
-    
-    **/
     function configureMaxFee(
         bytes32[] memory _chainId,
         bytes32[] memory _poolId,
-        uint[] memory _maxFee
-    ) external onlyOwner {
+        uint256[] memory _maxFee
+    ) external onlyRole(IRoleManager(roleManager).SET_FEEPROVIDER_METHOD()) {
         require(
             _chainId.length == _poolId.length &&
                 _poolId.length == _maxFee.length,
-            "Arguments number mismatched"
+            string.concat(TAG,": Arguments number mismatched")
         );
         for (uint256 i = 0; i < _poolId.length; i++) {
             MAX_FEE[_chainId[i]][_poolId[i]] = _maxFee[i];
         }
     }
 
-    /**
-     * @dev Returns the amount of fee or reward.
-     * @param _chainId id of the chain.
-     * @param _poolId id of the pool.
-     **/
     function getFeeAmount(
         bytes32 _chainId,
         bytes32 _poolId
-    ) public view returns (uint) {
-        uint globalLiquidityFactor = _getGlobalLiquidityFactor(
+    ) public view returns (uint256) {
+        uint256 globalLiquidityFactor = _getGlobalLiquidityFactor(
             _chainId,
             _poolId
         );
-        uint optimalGlobalLiquidityFactor = OPTIMAL_GLOBAL_LIQUIDITY_FACTOR[
+        uint256 optimalGlobalLiquidityFactor = OPTIMAL_GLOBAL_LIQUIDITY_FACTOR[
             _chainId
         ][_poolId];
-        uint initialFee;
+        uint256 initialFee;
         if (globalLiquidityFactor > 0) {
             initialFee = BASE_FEE[_chainId][_poolId].add(
                 (optimalGlobalLiquidityFactor.sub(globalLiquidityFactor))
@@ -128,7 +120,7 @@ contract FeeProvider is Initializable, OwnableUpgradeable {
         if (initialFee < 0) {
             initialFee = 0;
         }
-        uint maxFee = MAX_FEE[_chainId][_poolId];
+        uint256 maxFee = MAX_FEE[_chainId][_poolId];
         return maxFee <= initialFee ? maxFee : initialFee;
     }
 
@@ -140,8 +132,8 @@ contract FeeProvider is Initializable, OwnableUpgradeable {
     function _getGlobalLiquidityFactor(
         bytes32 _chainId,
         bytes32 _poolId
-    ) internal view returns (uint) {
-        uint totalLiquidity = ICore(core).totalLiquidity(_poolId);
+    ) internal view returns (uint256) {
+        uint256 totalLiquidity = ICore(core).totalLiquidity(_poolId);
         return
             totalLiquidity > 0
                 ? ICore(core).getLiquidity(_chainId, _poolId).div(

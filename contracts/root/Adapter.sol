@@ -5,7 +5,9 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "./interfaces/IRoute.sol";
 import "./interfaces/IPool.sol";
-import "hardhat/console.sol";
+import "./interfaces/IRoleManager.sol";
+
+string constant TAG = "AdapterPool";
 
 /**
  * Title AdapterPool
@@ -16,28 +18,26 @@ contract AdapterPool is Initializable, OwnableUpgradeable {
     using SafeMath for uint256;
 
     address public pool;
+    address public roleManager;
 
     mapping(bytes32 => address) public router;
     mapping(address => bool) public routeExist;
 
     /**
-     * @dev only pool can use functions affected by this modifier
+     * @dev Modifier that checks if caller has a specific role.
      **/
-    modifier onlyPool() {
-        require(pool == msg.sender, "The caller must be a pool contract");
+    modifier onlyRole(bytes32 role) {
+        IRoleManager(roleManager).checkRole(role, _msgSender());
         _;
     }
-
-    /**
-     * @dev only routes configured can use functions affected by this modifier
-     **/
-    modifier onlyRoutes() {
-        require(routeExist[msg.sender], "The caller must be one of the routes");
-        _;
-    }
+    
 
     function initialize() public initializer {
         __Ownable_init();
+    }
+
+    function setRoleManager(address roleManagerAddress) external onlyOwner {
+        roleManager = roleManagerAddress;
     }
 
     /**
@@ -45,7 +45,7 @@ contract AdapterPool is Initializable, OwnableUpgradeable {
      * This function can only be accessed by the contract owner.
      * @param _poolAddress address of the pool contract.
      **/
-    function setPool(address _poolAddress) external onlyOwner {
+    function setPool(address _poolAddress) external onlyRole(IRoleManager(roleManager).SET_ADAPTER_METHOD()) {
         pool = _poolAddress;
     }
 
@@ -55,55 +55,33 @@ contract AdapterPool is Initializable, OwnableUpgradeable {
      * @param route name of the route
      * @param routeAddress address of the route contract.
      **/
-    function setRoute(bytes32 route, address routeAddress) external onlyOwner {
+    function setRoute(bytes32 route, address routeAddress) external onlyRole(IRoleManager(roleManager).SET_ADAPTER_METHOD()) {
         routeExist[routeAddress] = true;
         router[route] = routeAddress;
     }
 
-    function sendToken(
-        bytes32 id,
+    function send(
+        bytes memory payload,
         bytes32 chainId,
-        bytes32 user,
         address sender,
-        uint amount,
-        uint airdropAmount,
+        uint256 airdropAmount,
         bytes32 route
-    ) external payable onlyPool {
-        require(routeExist[router[route]], "No route exists");
-        IRoute(router[route]).sendToken{value: msg.value}(
-            id,
+    ) external payable onlyRole(IRoleManager(roleManager).POOL()) {
+        require(routeExist[router[route]], string.concat(TAG,": No route exists"));
+        IRoute(router[route]).send{value: msg.value}(
+            payload,
             chainId,
-            user,
             sender,
-            amount,
             airdropAmount
         );
     }
 
-    function deposit(
-        bytes32 id,
-        bytes32 chainId,
-        address user,
-        uint tokenAmount
-    ) external onlyRoutes {
-        IPool(pool).deposit(id, chainId, user, tokenAmount);
-    }
+    function execute(
+        bytes memory payload,
+        bytes32 chainId
+       
+    ) external onlyRole(IRoleManager(roleManager).ROUTE()){
+         IPool(pool).execute(payload, chainId);
 
-    function repay(
-        bytes32 id,
-        bytes32 chainId,
-        address user,
-        uint tokenAmount
-    ) external onlyRoutes {
-        IPool(pool).repay(id, chainId, user, tokenAmount);
-    }
-
-    function swap(
-        bytes32 id,
-        bytes32 srcChainId,
-        bytes32 destChainId,
-        uint tokenAmount
-    ) external onlyRoutes {
-        IPool(pool).swap(id, srcChainId, destChainId, tokenAmount);
     }
 }

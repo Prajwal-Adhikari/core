@@ -12,7 +12,11 @@ import "./interfaces/IOracle.sol";
 import "./interfaces/ICore.sol";
 import "./interfaces/IFeeProvider.sol";
 import "./interfaces/IAdapter.sol";
+import "./interfaces/IRoleManager.sol";
 import "./libraries/Data.sol";
+
+
+string constant TAG = "Pool";
 
 /**
  * Title Pool
@@ -24,10 +28,14 @@ import "./libraries/Data.sol";
 contract Pool is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
     using SafeMath for uint256;
 
+    uint8 internal constant TYPE_DEPOSIT = 1;
+    uint8 internal constant TYPE_REPAY = 2;
+    uint8 internal constant TYPE_SWAP = 3;
+
     address public feeProvider;
-    address public liquidationManager;
     address public core;
     address public adapter;
+    address public roleManager;
 
     bool public feeEnable;
 
@@ -35,7 +43,7 @@ contract Pool is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
     mapping(bytes32 => mapping(bytes32 => bool)) public borrowPause;
     bool public protocolPause;
 
-    uint public constant BASE = 10 ** 18;
+    uint256 public constant BASE = 10 ** 18;
 
     function initialize() public initializer {
         __Ownable_init();
@@ -43,59 +51,30 @@ contract Pool is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
     }
 
     /**
-     * @dev only adapter can use functions affected by this modifier
+     * @dev Modifier that checks if caller has a specific role.
      **/
-    modifier onlyAdapter() {
-        require(
-            adapter == msg.sender,
-            "Pool: The caller must be a pool contract"
-        );
+    modifier onlyRole(bytes32 role) {
+        IRoleManager(roleManager).checkRole(role, _msgSender());
         _;
     }
 
-    /**
-     * @dev Configures fee provider contract.
-     * This function can only be accessed by the contract owner.
-     * @param _feeProviderAddress address of the fee provider contract.
-     **/
-    function setFeeProvider(address _feeProviderAddress) external onlyOwner {
-        feeProvider = _feeProviderAddress;
+    function setRoleManager(address roleManagerAddress) external onlyOwner {
+        roleManager = roleManagerAddress;
     }
 
-    /**
-     * @dev Configures core contract.
-     * This function can only be accessed by the contract owner.
-     * @param _coreAddress address of the fee provider contract.
-     **/
-    function setCore(address _coreAddress) external onlyOwner {
-        core = _coreAddress;
+    function setFeeProvider(address feeProviderAddress) external onlyRole(IRoleManager(roleManager).SET_POOL_METHOD()) {
+        feeProvider = feeProviderAddress;
     }
 
-    /**
-     * @dev Configures liquidation manager contract.
-     * This function can only be accessed by the contract owner.
-     * @param _liquidationManagerAddress address of the fee provider contract.
-     **/
-    function setLiquidationManager(
-        address _liquidationManagerAddress
-    ) external onlyOwner {
-        liquidationManager = _liquidationManagerAddress;
+    function setCore(address coreAddress) external onlyRole(IRoleManager(roleManager).SET_POOL_METHOD()) {
+        core = coreAddress;
     }
 
-    /**
-     * @dev Configures pool contract.
-     * This function can only be accessed by the contract owner.
-     * @param adapterAddress address of the pool contract.
-     **/
-    function setAdapter(address adapterAddress) external onlyOwner {
+    function setAdapter(address adapterAddress) external onlyRole(IRoleManager(roleManager).SET_POOL_METHOD()) {
         adapter = adapterAddress;
     }
 
-    /**
-     * @dev Configures fee and reward status.
-     * This function can only be accessed by the contract owner.
-     **/
-    function toggleFeeEnable() external onlyOwner {
+    function toggleFeeEnable() external onlyRole(IRoleManager(roleManager).SET_POOL_METHOD()) {
         feeEnable = !feeEnable;
     }
 
@@ -103,7 +82,7 @@ contract Pool is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
         bytes32 id,
         bytes32 chainId,
         bool status
-    ) external onlyOwner {
+    ) external onlyRole(IRoleManager(roleManager).PROTOCOL_PAUSE()) {
         withdrawPause[id][chainId] = status;
     }
 
@@ -111,11 +90,11 @@ contract Pool is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
         bytes32 id,
         bytes32 chainId,
         bool status
-    ) external onlyOwner {
+    ) external onlyRole(IRoleManager(roleManager).PROTOCOL_PAUSE()) {
         borrowPause[id][chainId] = status;
     }
 
-    function toggleProtocolStatus() external onlyOwner {
+    function toggleProtocolStatus() external onlyRole(IRoleManager(roleManager).PROTOCOL_PAUSE()) {
         protocolPause = !protocolPause;
     }
 
@@ -123,42 +102,40 @@ contract Pool is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
         return address(uint160(uint256(bys)));
     }
 
-    /**
-     * @dev sends a withdraw request of amount `ceAmount` to address `to` from pool with pool id `id`
-     * in chain with chain id `chainId`.
-     * @param id pool id of pool to withdraw from
-     * @param chainId chain id of chain to withdraw from
-     * @param ceAmount amount to withdraw
-     * @param to withdraw address
-     **/
     function withdraw(
         bytes32 id,
         bytes32 chainId,
-        uint ceAmount,
+        uint256 ceAmount,
         bytes32 to,
         bytes32 route,
-        uint airdropAmount
+        uint256 airdropAmount
     ) external payable nonReentrant {
         require(
             !(withdrawPause[id][chainId] || protocolPause),
-            "Pool: Withdraw paused"
+            string.concat(TAG, ": Withdraw paused")
         );
-        uint tokenAmount = ICore(core).withdraw(
+        uint256 tokenAmount = ICore(core).withdraw(
             id,
             chainId,
             ceAmount,
             msg.sender
         );
         if (feeEnable) {
-            uint fee = IFeeProvider(feeProvider).getFeeAmount(chainId, id);
+            uint256 fee = IFeeProvider(feeProvider).getFeeAmount(chainId, id);
             tokenAmount -= fee;
         }
-        IAdapter(adapter).sendToken{value: msg.value}(
+
+        bytes memory payload = abi.encodePacked(
             id,
-            chainId,
             to,
+            uint64(tokenAmount / BASE),
+            uint64(tokenAmount % BASE)
+        );
+        require(payload.length == 80, string.concat(TAG, "Bad payload"));
+        IAdapter(adapter).send{value: msg.value}(
+            payload,
+            chainId,
             msg.sender,
-            tokenAmount,
             airdropAmount,
             route
         );
@@ -171,43 +148,40 @@ contract Pool is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
             ceAmount
         );
     }
-
-    /**
-     * sends a borrow request of amount `tokenAmount` to address `to` from pool with pool id `id`
-     * in chain with chain id `chainId`.
-     * @param id pool id of pool to borrow from
-     * @param chainId chain id of chain to borrow from
-     * @param tokenAmount amount to borrow
-     * @param to borrow address
-     **/
+    
     function borrow(
         bytes32 id,
         bytes32 chainId,
-        uint tokenAmount,
+        uint256 tokenAmount,
         bytes32 to,
         bytes32 route,
-        uint airdropAmount
+        uint256 airdropAmount
     ) external payable nonReentrant {
         require(
             !(borrowPause[id][chainId] || protocolPause),
-            "Pool: Borrow paused"
+            string.concat(TAG, ": Borrow paused")
         );
-        uint debtAmount = ICore(core).borrow(
+        uint256 debtAmount = ICore(core).borrow(
             id,
             chainId,
             tokenAmount,
             msg.sender
         );
         if (feeEnable) {
-            uint fee = IFeeProvider(feeProvider).getFeeAmount(chainId, id);
+            uint256 fee = IFeeProvider(feeProvider).getFeeAmount(chainId, id);
             tokenAmount -= fee;
         }
-        IAdapter(adapter).sendToken{value: msg.value}(
+
+        bytes memory payload = abi.encodePacked(
             id,
-            chainId,
             to,
+            uint64(tokenAmount / BASE),
+            uint64(tokenAmount % BASE)
+        );
+        IAdapter(adapter).send{value: msg.value}(
+            payload,
+            chainId,
             msg.sender,
-            tokenAmount,
             airdropAmount,
             route
         );
@@ -221,56 +195,63 @@ contract Pool is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
         );
     }
 
-    /**
-     * @dev updates the global protocol states after receiving repay information
-     * of amount `tokenAmount` from address `user` for pool with pool id 'id' from
-     * chain with chain id `chainId`.
-     * @param id pool id of pool where amount was repaid to
-     * @param chainId chain id of chain repaid from
-     * @param tokenAmount amount repaid
-     * @param user repay address
-     **/
-    function repay(
+    function _repay(
         bytes32 id,
         bytes32 chainId,
         address user,
-        uint tokenAmount
-    ) external onlyAdapter {
-        (uint repayAmount, uint debtAmount, uint ceAmount) = ICore(core).repay(
-            id,
-            chainId,
-            user,
-            tokenAmount
-        );
+        uint256 tokenAmount
+    ) internal {
+        (uint256 repayAmount, uint256 debtAmount, uint256 ceAmount) = ICore(
+            core
+        ).repay(id, chainId, user, tokenAmount);
         emit Data.Repay(user, id, chainId, repayAmount, debtAmount, ceAmount);
     }
 
-    /**
-     * @dev updates the global protocol states after receiving deposit information
-     * of amount `tokenAmount` from address `user` for pool with pool id 'id' from
-     * chain with chain id `chainId`.
-     * @param id pool id of pool where amount was deposited to
-     * @param chainId chain id of chain deposited to
-     * @param tokenAmount amount deposited
-     * @param user deposit address
-     **/
-    function deposit(
+    function _deposit(
         bytes32 id,
         bytes32 chainId,
         address user,
-        uint tokenAmount
-    ) external onlyAdapter {
-        uint ceAmount = ICore(core).deposit(id, chainId, user, tokenAmount);
+        uint256 tokenAmount
+    ) internal {
+        uint256 ceAmount = ICore(core).deposit(id, chainId, user, tokenAmount);
         emit Data.Deposit(user, id, chainId, tokenAmount, ceAmount);
     }
 
-    function swap(
+    function _swap(
         bytes32 id,
         bytes32 srcChainId,
         bytes32 destChainId,
-        uint tokenAmount
-    ) external onlyAdapter {
+        uint256 tokenAmount
+    ) internal {
         ICore(core).swap(id, srcChainId, destChainId, tokenAmount);
         emit Data.Swap(id, srcChainId, destChainId, tokenAmount);
+    }
+
+    function execute(
+        bytes memory _payload,
+        bytes32 chainName
+    ) external onlyRole(IRoleManager(roleManager).ADAPTER()) {
+        bytes32 tokenId;
+        bytes32 data;
+        uint64 amountpx;
+        uint64 amountsx;
+        uint8 functionType = uint8(_payload[0]);
+        assembly {
+            tokenId := mload(add(_payload, 33))
+            data := mload(add(_payload, 65))
+            amountpx := mload(add(_payload, 73))
+            amountsx := mload(add(_payload, 81))
+        }
+        // (, bytes32 tokenId, bytes memory user, uint64 amountpx, uint64 amountsx) = abi.decode(_payload, (uint8, bytes32, bytes, uint64, uint64));
+        uint256 amount = uint256(amountpx) * BASE + uint256(amountsx);
+        if (functionType == TYPE_DEPOSIT) {
+            _deposit(tokenId, chainName, _bytesToAddress(data), amount);
+        } else if (functionType == TYPE_REPAY) {
+            _repay(tokenId, chainName, _bytesToAddress(data), amount);
+        } else if (functionType == TYPE_SWAP) {
+            _swap(tokenId, chainName, data, amount);
+        } else {
+            revert(string.concat(TAG, "Unsupport functionType"));
+        }
     }
 }

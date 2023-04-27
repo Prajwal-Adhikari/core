@@ -1,38 +1,36 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.9;
 
-// Uncomment this line to use console.log
-// import "hardhat/console.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "../interfaces/IRoleManager.sol";
+
+string constant TAG = "DebtToken";
 
 contract DebtToken is ERC20, Ownable {
-    address public core;
-    address public liquidationManager;
-    uint public balanceScale = 1e18;
-    uint public constant MAG = 1e18;
+    address public roleManager;
+    uint256 public balanceScale = 1e18;
+    uint256 public constant MAG = 1e18;
 
     constructor(
         string memory name_,
         string memory symbol_
     ) ERC20(name_, symbol_) {}
 
-    modifier onlyCoreAndLiquidation() {
-        require(
-            msg.sender == core || msg.sender == liquidationManager,
-            "Permission denied"
-        );
+    /**
+     * @dev Modifier that checks if caller has a specific role.
+     **/
+    modifier onlyRole(bytes32 role) {
+        IRoleManager(roleManager).checkRole(role, _msgSender());
         _;
     }
 
-    function initialize(
-        address _core,
-        address _liquidationManager
-    ) external onlyOwner {
-        core = _core;
-        liquidationManager = _liquidationManager;
+    function setRoleManager(address roleManagerAddress) external onlyOwner {
+        roleManager = roleManagerAddress;
     }
+
+
 
     function _transfer(
         address from,
@@ -40,14 +38,14 @@ contract DebtToken is ERC20, Ownable {
         uint256 amount
     ) internal pure override {
         (from, to, amount);
-        require(false, "Cannot transfer debt token");
+        require(false, string.concat(TAG,": Cannot transfer debt token"));
     }
 
-    function mint(address to, uint amount) external onlyCoreAndLiquidation {
+    function mint(address to, uint256 amount) external onlyRole(IRoleManager(roleManager).MINT_BURN_CE_DEBT_TOKEN()) {
         _mint(to, amount);
     }
 
-    function burn(address from, uint amount) external onlyCoreAndLiquidation {
+    function burn(address from, uint256 amount) external onlyRole(IRoleManager(roleManager).MINT_BURN_CE_DEBT_TOKEN()) {
         _burn(from, amount);
     }
 }

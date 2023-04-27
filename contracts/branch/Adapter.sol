@@ -5,6 +5,9 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "./interfaces/IRoute.sol";
 import "./interfaces/IBranch.sol";
+import "./interfaces/IRoleManager.sol";
+
+string constant TAG = "Adapter";
 
 /**
  * Title AdapterBranch
@@ -14,24 +17,17 @@ import "./interfaces/IBranch.sol";
 contract AdapterBranch is Initializable, OwnableUpgradeable {
     using SafeMath for uint256;
 
+    address public roleManager;
     address public branch;
 
     mapping(bytes32 => address) public router;
     mapping(address => bool) public routeExist;
 
     /**
-     * @dev only branch can use functions affected by this modifier
+     * @dev Modifier that checks if caller has a specific role.
      **/
-    modifier onlyBranch() {
-        require(branch == msg.sender, "The caller must be a branch contract");
-        _;
-    }
-
-    /**
-     * @dev only routes configured can use functions affected by this modifier
-     **/
-    modifier onlyRoutes() {
-        require(routeExist[msg.sender], "The caller must be one of the routes");
+    modifier onlyRole(bytes32 role) {
+        IRoleManager(roleManager).checkRole(role, _msgSender());
         _;
     }
 
@@ -39,22 +35,20 @@ contract AdapterBranch is Initializable, OwnableUpgradeable {
         __Ownable_init();
     }
 
-    /**
-     * @dev Configures branch contract.
-     * This function can only be accessed by the contract owner.
-     * @param _branchAddress address of the branch contract.
-     **/
-    function setBranch(address _branchAddress) external onlyOwner {
-        branch = _branchAddress;
+    function setRoleManager(address roleManagerAddress) external onlyOwner {
+        roleManager = roleManagerAddress;
     }
 
-    /**
-     * @dev Configures route.
-     * This function can only be accessed by the contract owner.
-     * @param route name of the route
-     * @param routeAddress address of the route contract.
-     **/
-    function setRoute(bytes32 route, address routeAddress) external onlyOwner {
+    function setBranch(
+        address branchAddress
+    ) external onlyRole(IRoleManager(roleManager).SET_ADAPTER_METHOD()) {
+        branch = branchAddress;
+    }
+
+    function setRoute(
+        bytes32 route,
+        address routeAddress
+    ) external onlyRole(IRoleManager(roleManager).SET_ADAPTER_METHOD()) {
         routeExist[routeAddress] = true;
         router[route] = routeAddress;
     }
@@ -62,10 +56,13 @@ contract AdapterBranch is Initializable, OwnableUpgradeable {
     function send(
         bytes memory payload,
         address sender,
-        uint airdropAmount,
+        uint256 airdropAmount,
         bytes32 route
-    ) external payable onlyBranch {
-        require(routeExist[router[route]], "No route exists");
+    ) external payable onlyRole(IRoleManager(roleManager).BRANCH()) {
+        require(
+            routeExist[router[route]],
+            string.concat(TAG, "No route exists")
+        );
         IRoute(router[route]).send{value: msg.value}(
             payload,
             sender,
@@ -73,7 +70,9 @@ contract AdapterBranch is Initializable, OwnableUpgradeable {
         );
     }
 
-    function get(bytes32 id, uint amount, address to) external onlyRoutes {
-        IBranch(branch).get(id, amount, to);
+    function execute(
+        bytes memory payload
+    ) external onlyRole(IRoleManager(roleManager).ROUTE()) {
+        IBranch(branch).transferToken(payload);
     }
 }

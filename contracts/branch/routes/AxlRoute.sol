@@ -7,14 +7,17 @@ import {AxelarExecutable} from "../../axelar/executable/AxelarExecutable.sol";
 import {IAxelarGateway} from "../../axelar/interfaces/IAxelarGateway.sol";
 import {IAxelarGasService} from "../../axelar/interfaces/IAxelarGasService.sol";
 import "../interfaces/IAdapter.sol";
+import "../interfaces/IRoleManager.sol";
+
+string constant TAG = "AxlRouteBranch";
 
 contract AxlRouteBranch is Initializable, OwnableUpgradeable, AxelarExecutable {
-    string public destinationChain;
-    string public destinationAddress;
+    string public rootChain;
+    string public rootAddress;
 
     address public adapter;
+    address public roleManager;
 
-    uint public constant BASE = 10 ** 18;
     IAxelarGasService gasService;
 
     function initialize(
@@ -29,51 +32,46 @@ contract AxlRouteBranch is Initializable, OwnableUpgradeable, AxelarExecutable {
     event Executed();
 
     /**
-     * @dev only adapter can use functions affected by this modifier
+     * @dev Modifier that checks if caller has a specific role.
      **/
-    modifier onlyAdapter() {
-        require(adapter == msg.sender, "The caller must be a pool contract");
+    modifier onlyRole(bytes32 role) {
+        IRoleManager(roleManager).checkRole(role, _msgSender());
         _;
     }
 
-    /**
-     * @dev Configures adapter contract.
-     * This function can only be accessed by the contract owner.
-     * @param adapterAddress address of the adapter contract.
-     **/
-    function setAdapter(address adapterAddress) external onlyOwner {
+    function setRoleManager(address roleManagerAddress) external onlyOwner {
+        roleManager = roleManagerAddress;
+    }
+
+
+    function setAdapter(address adapterAddress) external onlyRole(IRoleManager(roleManager).SET_ROUTE_METHOD()) {
         adapter = adapterAddress;
     }
 
-    /**
-     * @dev Configures adapter contract.
-     * This function can only be accessed by the contract owner.
-     * @param name name of the destination chain.
-     * @param addr address of the destination contract.
-     **/
-    function setDestChainNameAddress(
+
+    function setRootChainNameAddress(
         string calldata name,
         string calldata addr
-    ) external onlyOwner {
-        destinationChain = name;
-        destinationAddress = addr;
+    ) external onlyRole(IRoleManager(roleManager).SET_ROUTE_METHOD()) {
+        rootChain = name;
+        rootAddress = addr;
     }
 
     function send(
         bytes memory payload,
         address sender,
-        uint
-    ) external payable onlyAdapter {
+        uint256
+    ) external payable onlyRole(IRoleManager(roleManager).ADAPTER()) {
         if (msg.value > 0) {
             gasService.payNativeGasForContractCall{value: msg.value}(
                 address(this),
-                destinationChain,
-                destinationAddress,
+                rootChain,
+                rootAddress,
                 payload,
                 sender
             );
         }
-        gateway.callContract(destinationChain, destinationAddress, payload);
+        gateway.callContract(rootChain, rootAddress, payload);
     }
 
     function _execute(
@@ -82,25 +80,13 @@ contract AxlRouteBranch is Initializable, OwnableUpgradeable, AxelarExecutable {
         bytes calldata payload_
     ) internal override {
         require(
-            keccak256(abi.encodePacked(destinationChain)) ==
+            keccak256(abi.encodePacked(rootChain)) ==
                 keccak256(abi.encodePacked(sourceChain_)) &&
-                keccak256(abi.encodePacked(destinationAddress)) ==
+                keccak256(abi.encodePacked(rootAddress)) ==
                 keccak256(abi.encodePacked(sourceAddress_)),
-            "Invalid source"
+            string.concat(TAG,"Invalid source")
         );
-        bytes32 id;
-        bytes32 to;
-        uint64 amountpx;
-        uint64 amountsx;
-        bytes memory _payload = payload_;
-        assembly {
-            id := mload(add(_payload, 32))
-            to := mload(add(_payload, 64))
-            amountpx := mload(add(_payload, 72))
-            amountsx := mload(add(_payload, 80))
-        }
-        uint amount = uint(amountpx) * BASE + uint(amountsx);
-        IAdapter(adapter).get(id, amount, address(uint160(uint256(to))));
+        IAdapter(adapter).execute(payload_);
 
         emit Executed();
     }
