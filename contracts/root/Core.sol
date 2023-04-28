@@ -281,7 +281,7 @@ contract Core is Initializable, OwnableUpgradeable {
         params.debtToken = reserve.debtToken;
         params.dtScaled = reserve.dtScaled;
         params.ceScaled = reserve.ceScaled;
-        params.debtAmount = IDebtToken(params.debtToken).balanceOf(user);
+        params.debtAmount = IDebtToken(params.debtToken).balanceBeforeScaled(user);
         params.repayAmount = params.debtAmount.mul(params.dtScaled).div(1e18);
         params.tokenAmount = tokenAmount;
         params.user = user;
@@ -373,20 +373,45 @@ contract Core is Initializable, OwnableUpgradeable {
                 .mul(1e18 - configs[id].tsuPercent)
                 .div(1e18)
         );
-        collateralValue = IERC20(reserve.ceToken)
-            .balanceOf(_user)
+        collateralValue = ICEToken(reserve.ceToken)
+            .balanceBeforeScaled(_user)
             .mul(ceScaled)
             .div(1e18)
             .mul(price)
             .div(1e18);
-        debtValue = IERC20(reserve.debtToken)
-            .balanceOf(_user)
+        debtValue = IDebtToken(reserve.debtToken)
+            .balanceBeforeScaled(_user)
             .mul(dtScaled)
             .div(1e18)
             .mul(price)
             .div(1e18);
     }
 
+    function getCEScaled(bytes32 _poolId) public view returns (uint256)  {
+        Data.ReserveData memory reserve = reserves[_poolId];
+        uint256 increasedDebt = block
+            .timestamp
+            .sub(reserve.lastUpdateTime)
+            .mul(reserve.interestRate)
+            .div(YEAR);
+        return reserve.dtScaled.add(increasedDebt);
+    }
+
+    function getDTScaled(bytes32 _poolId) public view returns (uint256) {
+        Data.ReserveData memory reserve = reserves[_poolId];
+        uint256 increasedDebt = block
+            .timestamp
+            .sub(reserve.lastUpdateTime)
+            .mul(reserve.interestRate)
+            .div(YEAR);
+        return reserve.ceScaled.add(
+            increasedDebt
+                .mul(reserve.currentRatio)
+                .div(1e18)
+                .mul(1e18 - configs[_poolId].tsuPercent)
+                .div(1e18)
+        );
+    }
     
     function getLiquidity(
         bytes32 _chainId,

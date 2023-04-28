@@ -61,4 +61,10 @@ interface ICEToken is IERC20 {
      * @param amount - amount of the token.
      **/
     function burn(address from, uint256 amount) external;
+
+    /**
+     * @notice Get the balance from address `user` before scaled.
+     * @param user - address of the user
+     **/
+    function balanceBeforeScaled(address user) external view returns (uint256);
 }

@@ -187,4 +187,9 @@ interface ICore {
     function configs(
         bytes32 _poolId
     ) external view returns (Data.ConfigData memory config);
+
+
+    function getDTScaled(bytes32 _poolId) external view returns (uint256);
+
+    function getCEScaled(bytes32 _poolId) external view returns (uint256);
 }

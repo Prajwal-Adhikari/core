@@ -7,11 +7,15 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "../interfaces/ICore.sol";
 import "../interfaces/IRoleManager.sol";
 
+// import "hardhat/console.sol";
+
 string constant TAG = "CEToken";
 
 contract CEToken is ERC20, Ownable {
+    using SafeMath for uint256;
     address public core;
     address public roleManager;
+    bytes32 public poolId;
     uint256 public transferBlockWait; //amount of blocks to wait before user can transfer minted ceToken
     uint256 public lockupTriggerAmt; //amount where lockup will kick in after cross-chain transfer
     mapping(address => uint256) public transferBlockRelease; //Block number
@@ -30,15 +34,16 @@ contract CEToken is ERC20, Ownable {
     }
 
     
-
     function setRoleManager(address roleManagerAddress) external onlyOwner {
         roleManager = roleManagerAddress;
     }
 
     function setCore(
-        address coreAddress
+        address coreAddress,
+        bytes32 id
     ) external onlyRole(IRoleManager(roleManager).SET_CE_TOKEN_METHOD()) {
         core = coreAddress;
+        poolId = id;
     }
 
 
@@ -66,8 +71,18 @@ contract CEToken is ERC20, Ownable {
             block.number > transferBlockRelease[from],
             string.concat(TAG,": transfer too soon after cross-chain mint")
         );
-        super._transfer(from, to, amount);
+        uint ceScaled = ICore(core).getCEScaled(poolId);
+        super._transfer(from, to, amount.mul(1e18).div(ceScaled));
         ICore(core).checkHealth(from);
+    }
+
+    function balanceBeforeScaled(address user) external view returns (uint256) {
+        return super.balanceOf(user);
+    }
+
+    function balanceOf(address user) public view override returns (uint256) {
+        uint ceScaled = ICore(core).getCEScaled(poolId);
+        return super.balanceOf(user) * ceScaled / 1e18;
     }
 
     function mint(address to, uint256 amount) external onlyRole(IRoleManager(roleManager).MINT_BURN_CE_DEBT_TOKEN()) {

@@ -158,9 +158,13 @@ describe("Ready", function () {
         await pool.setAdapter(adapterS.address);
 
 
-        await ceMATIC.setCore(core.address);
-        await ceFTM.setCore(core.address);
-        await ceBNB.setCore(core.address);
+        await ceMATIC.setCore(core.address, MATIC);
+        await ceFTM.setCore(core.address, FTM);
+        await ceBNB.setCore(core.address, BNB);
+
+        await debtMATIC.setCore(core.address, MATIC);
+        await debtFTM.setCore(core.address, FTM);
+        await debtBNB.setCore(core.address, BNB);
 
         await core.setOracle(this.oracle.address);
         await pool.setCore(core.address);
@@ -339,12 +343,49 @@ describe("Ready", function () {
         console.log(`bob health factor collateral:${factor[0]} debt:${factor[1]} factor:${factor[2]} lts:${factor[3]}`)
     }
 
+    async function printCEBalance() {
+        console.log("print ceToken balance")
+        let alice_balance = await ceFTM.balanceOf(alice.address);
+        let bob_balance = await ceFTM.balanceOf(bob.address);
+        console.log(`ceToken alice: ${alice_balance} bob: ${bob_balance}`);
+
+        console.log("print debtToken balance")
+        alice_balance = await debtFTM.balanceOf(alice.address);
+        bob_balance = await debtFTM.balanceOf(bob.address);
+        console.log(`debtToken alice: ${alice_balance} bob: ${bob_balance}`);
+    }
+
+    it("test ceToken transfer", async function() {
+        let fees = await routeA.connect(alice).estimateFees(1, 1000000);
+
+        console.log("alice deposit matic");
+        await clientA.connect(alice).depositRequest(MATIC, toTokenAmount(500000), LZO, 0, { value: fees })
+
+        console.log("bob deposit ftm");
+        await clientB.connect(bob).depositRequest(FTM, toTokenAmount(5e5), LZO, 0, { value: fees })
+
+        console.log("alice borrow ftm and after one year");
+        await pool.connect(alice).borrow(FTM, BNB, toTokenAmount(1e5), ethers.utils.hexZeroPad(alice.address, 32), LZO, 0, { value: fees });
+        await network.provider.send("evm_increaseTime", [365 * 86400])
+
+        console.log("alice repay ftm")
+        // await expect(pool.connect(alice).withdraw(MATIC, FTM, toTokenAmount(263550), {value: fees})).to.be.revertedWith("Health check failed");
+        await clientB.connect(alice).repayRequest(FTM, toTokenAmount(50000), LZO, 0, { value: fees })
+        await printCEBalance();
+
+        console.log("bob transfer ceToken to alice")
+        await ceFTM.connect(bob).transfer(alice.address, toTokenAmount(100000))
+        await printCEBalance();
+
+        console.log("alice repay the remain ftm");
+        await clientB.connect(alice).repayRequest(FTM, toTokenAmount(50000), LZO, 0, { value: fees })
+        await printCEBalance();
+    })
+
     it("Simple test", async function () {
         console.log("here");
         let fees = await routeA.connect(alice).estimateFees(1, 1000000);
         console.log(fees);
-
-
 
         console.log("alice deposit matic");
         await clientA.connect(alice).depositRequest(MATIC, toTokenAmount(500000), LZO, 0, { value: fees })
