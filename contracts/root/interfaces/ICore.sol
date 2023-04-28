@@ -129,14 +129,14 @@ interface ICore {
     ) external;
 
     /**
-     * @notice Refreshes the parameters of the reserve.
+     * @notice Refreshes the parameters of the pool.
      * This function is public.
      * @param id - pool id
      **/
     function refresh(bytes32 id) external;
 
     /**
-     * @notice Updates the interest rate and utilization ratio of the reserve.
+     * @notice Updates the interest rate and utilization ratio of the pool.
      * This function is public.
      * @param id - pool id
      **/
@@ -173,12 +173,12 @@ interface ICore {
     function totalLiquidity(bytes32 _poolId) external view returns (uint256);
 
     /**
-     * @notice Returns reserve parametes for an asset
+     * @notice Returns pool parametes for an asset
      * @param _poolId - id of the pool.
      **/
-    function reserves(
+    function pools(
         bytes32 _poolId
-    ) external view returns (Data.ReserveData memory reserve);
+    ) external view returns (Data.PoolData memory pool);
 
     /**
      * @notice Returns config parametes for an asset

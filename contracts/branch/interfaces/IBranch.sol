@@ -71,10 +71,10 @@ interface IBranch {
     /**
      * @notice Configures name of the chain corresponding to chain id.
      * This function can only be accessed by account with role SET_BRANCH_METHOD.
-     * @param chain - name of the chain.
-     * @param id - chain id of the chain.
+     * @param chainID - Cedro's chain id
+     * @param id - LayerZero's chain id
      **/
-    function setChainName(bytes32 chain, uint16 id) external;
+    function setChainId(bytes32 chainID, uint16 id) external;
 
     /**
      * @notice Sends deposit information message to the Root.
@@ -130,7 +130,7 @@ interface IBranch {
     ) external payable;
 
     /**
-     * @notice emergency function to withdraw liquidity
+     * @notice Emergency function to withdraw liquidity if case of any exploit
      * This function can only be accessed by account with role EMERGENCY_WITHDRAW.
      * @param id - token address to withdraw
      * @param amount - amount of token to withdraw

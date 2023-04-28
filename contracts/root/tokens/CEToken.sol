@@ -7,7 +7,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "../interfaces/ICore.sol";
 import "../interfaces/IRoleManager.sol";
 
-// import "hardhat/console.sol";
+import "hardhat/console.sol";
 
 string constant TAG = "CEToken";
 

@@ -27,11 +27,19 @@ contract Core is Initializable, OwnableUpgradeable {
 
     uint256 public constant MAX_HEALTH_FACTOR = 1e18;
     uint256 public constant YEAR = 365 * 86400;
-    mapping(bytes32 => Data.ReserveData) public reserves;
+
+    // key: poolId
+    // Example poolId = keccak256("USDC")
+    mapping(bytes32 => Data.PoolData) public pools;
     mapping(bytes32 => Data.ConfigData) public configs;
-    mapping(bytes32 => mapping(bytes32 => uint256)) public chains;
-    mapping(bytes32 => uint256) public totalLiquidity;
-    mapping(address => bytes32[]) public users;
+    mapping(bytes32 => uint256) public totalLiquidity; // Stores total liquidity within pool
+
+    // key : [chainId][poolId]
+    // chainId = keccak256("FTM")
+    // poolId = keccak256("USDC")
+    mapping(bytes32 => mapping(bytes32 => uint256)) public chainLiquidity; // Stores liquidity of pool across chain
+
+    mapping(address => bytes32[]) public users; // Stores poolIds of collateral or borrowed assets by a user
 
     /**
      * @dev Modifier that checks if caller has a specific role.
@@ -40,26 +48,23 @@ contract Core is Initializable, OwnableUpgradeable {
         IRoleManager(roleManager).checkRole(role, _msgSender());
         _;
     }
-    
 
     function initialize(address _treasury) public initializer {
         treasury = _treasury;
         __Ownable_init();
     }
-    
 
+    // Set contract addresses
     function setRoleManager(address roleManagerAddress) external onlyOwner {
         roleManager = roleManagerAddress;
     }
 
-    /**
-     * @dev Registers a new pool in the protocol.
-     * This function can only be accessed by the contract owner.
-     * @param id id of the pool to be created
-     * @param config a ConfigData struct containing the interest rate and liqudation variables.
-     * @param _ceToken address to the ceToken smart contract for this pool.
-     * @param _debtToken address to the debtToken smart contract for this pool.
-     **/
+    function setOracle(
+        IOracle _oracle
+    ) external onlyRole(IRoleManager(roleManager).SET_CORE_METHOD()) {
+        oracle = _oracle;
+    }
+
     function initPool(
         bytes32 id,
         Data.ConfigData memory config,
@@ -68,91 +73,84 @@ contract Core is Initializable, OwnableUpgradeable {
     ) external onlyRole(IRoleManager(roleManager).INIT_POOL()) {
         updateInterestRate(id);
         configs[id] = config;
-        Data.ReserveData storage reserve = reserves[id];
-        reserve.ceToken = _ceToken;
-        reserve.debtToken = _debtToken;
-        reserve.ceScaled = 1e18;
-        reserve.dtScaled = 1e18;
+        Data.PoolData storage pool = pools[id];
+        pool.ceToken = _ceToken;
+        pool.debtToken = _debtToken;
+        pool.ceScaled = 1e18;
+        pool.dtScaled = 1e18;
     }
 
-    /**
-     * @dev Freezes/Unfreezes a pool with pool id `id`.
-     * This function is only accessible by the contract owner and can be used in extreme cases.
-     * @param id id of the pool to freeze/unfreeze
-     * @param enable bool to freeze/unfreeze
-     **/
-    function changePoolStatus(bytes32 id, bool enable) external onlyRole(IRoleManager(roleManager).POOL_STATUS()) {
-        reserves[id].enable = enable;
+    function changePoolStatus(
+        bytes32 id,
+        bool enable
+    ) external onlyRole(IRoleManager(roleManager).POOL_STATUS()) {
+        pools[id].enable = enable;
         emit Data.ChangePoolStatus(id, enable);
     }
 
     function updateInterestRate(bytes32 id) public {
-        Data.ReserveData storage reserve = reserves[id];
+        Data.PoolData storage pool = pools[id];
         Data.ConfigData memory config = configs[id];
-        if (reserve.debtSupply > 0) {
-            uint256 totalDeposit = reserve.ceSupply.mul(reserve.ceScaled).div(
-                1e18
-            );
-            uint256 totalBorrow = reserve.debtSupply.mul(reserve.dtScaled).div(
-                1e18
-            );
-            uint256 currentRatio = totalBorrow.mul(1e18).div(totalDeposit);
+        if (pool.debtSupply > 0) {
+            uint256 totalDeposit = pool.ceSupply.mul(pool.ceScaled).div(1e18); // Total deposit amount in real time
+            uint256 totalBorrow = pool.debtSupply.mul(pool.dtScaled).div(1e18); // Total borrow amount in real time
+            uint256 utilizationRatio = totalBorrow.mul(1e18).div(totalDeposit); // Utilization ratio = Borrow/Deposit
 
-            if (currentRatio <= config.bestRatio) {
+            if (utilizationRatio <= config.optimalUtilizationRatio) {
                 //Rt = R0 + (Ut / Ub) * Rslope1
-                reserve.interestRate = config.baseRate.add(
-                    currentRatio.mul(config.slope1).div(config.bestRatio)
+                pool.borrowInterestRate = config.baseRate.add(
+                    utilizationRatio.mul(config.slope1).div(
+                        config.optimalUtilizationRatio
+                    )
                 );
             } else {
                 uint256 one = 1e18;
                 //Rt = R0 + Rslope1 + (Ut - Ub) / (1 - Ub) * Rslope2
-                reserve.interestRate = config.baseRate.add(config.slope1).add(
-                    currentRatio.sub(config.bestRatio).mul(config.slope2).div(
-                        one.sub(config.bestRatio)
-                    )
+                pool.borrowInterestRate = config.baseRate.add(config.slope1).add(
+                    utilizationRatio
+                        .sub(config.optimalUtilizationRatio)
+                        .mul(config.slope2)
+                        .div(one.sub(config.optimalUtilizationRatio))
                 );
             }
-            reserve.currentRatio = currentRatio;
+            pool.utilizationRatio = utilizationRatio;
         }
     }
 
     function refresh(bytes32 id) public {
-        Data.ReserveData storage reserve = reserves[id];
-        if (reserve.ceSupply > 0) {
-            uint256 increasedDebt = block
+        Data.PoolData storage pool = pools[id];
+        if (pool.ceSupply > 0) {
+            // Calculating increased Debt factor from previous transaction till now
+            uint256 increasedDebtFactor = block
                 .timestamp
-                .sub(reserve.lastUpdateTime)
-                .mul(reserve.interestRate)
+                .sub(pool.lastUpdateTime)
+                .mul(pool.borrowInterestRate)
                 .div(YEAR);
-            reserve.dtScaled = reserve.dtScaled.add(increasedDebt);
+            pool.dtScaled = pool.dtScaled.add(increasedDebtFactor);
 
-            uint256 increasedAPY = increasedDebt.mul(reserve.debtSupply).div(1e18);
-            uint256 tokenAmountTreasury = increasedAPY
-                .mul(configs[id].tsuPercent)
+            uint256 increasedDebtAmount = increasedDebtFactor.mul(pool.debtSupply).div(1e18);
+            
+            uint256 tokenAmountTreasury = increasedDebtAmount
+                .mul(configs[id].treasuryPercent)
                 .div(1e18);
-            reserve.ceScaled = reserve.ceScaled.add(
-                increasedAPY.sub(tokenAmountTreasury).mul(1e18).div(
-                    reserve.ceSupply
+            pool.ceScaled = pool.ceScaled.add(
+                increasedDebtAmount.sub(tokenAmountTreasury).mul(1e18).div(
+                    pool.ceSupply
                 )
             );
 
             uint256 ceAmountTreasury = tokenAmountTreasury.mul(1e18).div(
-                reserve.ceScaled
+                pool.ceScaled
             );
-            ICEToken(reserve.ceToken).mint(treasury, ceAmountTreasury);
-            reserve.ceSupply = reserve.ceSupply.add(ceAmountTreasury);
+            ICEToken(pool.ceToken).mint(treasury, ceAmountTreasury);
+            pool.ceSupply = pool.ceSupply.add(ceAmountTreasury);
             emit Data.MintToTreasury(id, tokenAmountTreasury, ceAmountTreasury);
         }
-        reserve.lastUpdateTime = block.timestamp;
+        pool.lastUpdateTime = block.timestamp;
 
         // _;
     }
 
-    function setOracle(IOracle _oracle) external onlyRole(IRoleManager(roleManager).SET_CORE_METHOD()) {
-        oracle = _oracle;
-    }
-
-    
     function healthFactor(
         address user
     ) public view returns (Data.HealthData memory health) {
@@ -187,13 +185,13 @@ contract Core is Initializable, OwnableUpgradeable {
         uint256 tokenAmount
     ) external onlyRole(IRoleManager(roleManager).POOL()) returns (uint256) {
         refresh(id);
-        Data.ReserveData storage reserve = reserves[id];
-        require(reserve.enable, string.concat(TAG,": Not enable now"));
+        Data.PoolData storage pool = pools[id];
+        require(pool.enable, string.concat(TAG, ": Not enable now"));
 
-        uint256 ceAmount = tokenAmount.mul(1e18).div(reserve.ceScaled);
-        ICEToken(reserve.ceToken).mint(user, ceAmount);
-        reserve.ceSupply = reserve.ceSupply.add(ceAmount);
-        chains[chainId][id] += tokenAmount;
+        uint256 ceAmount = tokenAmount.mul(1e18).div(pool.ceScaled);
+        ICEToken(pool.ceToken).mint(user, ceAmount);
+        pool.ceSupply = pool.ceSupply.add(ceAmount);
+        chainLiquidity[chainId][id] += tokenAmount;
         totalLiquidity[id] += tokenAmount;
         updateInterestRate(id);
         addToken(user, id);
@@ -202,7 +200,6 @@ contract Core is Initializable, OwnableUpgradeable {
         return ceAmount;
     }
 
- 
     function withdraw(
         bytes32 id,
         bytes32 chainId,
@@ -210,14 +207,17 @@ contract Core is Initializable, OwnableUpgradeable {
         address user
     ) external onlyRole(IRoleManager(roleManager).POOL()) returns (uint256) {
         refresh(id);
-        Data.ReserveData storage reserve = reserves[id];
-        require(reserve.enable, string.concat(TAG,": Not enable now"));
+        Data.PoolData storage pool = pools[id];
+        require(pool.enable, string.concat(TAG, ": Not enable now"));
 
-        uint256 tokenAmount = reserve.ceScaled.mul(ceAmount).div(1e18);
-        require(chains[chainId][id] >= tokenAmount, string.concat(TAG,": No enough liquidity"));
-        ICEToken(reserve.ceToken).burn(user, ceAmount);
-        reserve.ceSupply = reserve.ceSupply.sub(ceAmount);
-        chains[chainId][id] -= tokenAmount;
+        uint256 tokenAmount = pool.ceScaled.mul(ceAmount).div(1e18);
+        require(
+            chainLiquidity[chainId][id] >= tokenAmount,
+            string.concat(TAG, ": No enough liquidity")
+        );
+        ICEToken(pool.ceToken).burn(user, ceAmount);
+        pool.ceSupply = pool.ceSupply.sub(ceAmount);
+        chainLiquidity[chainId][id] -= tokenAmount;
         totalLiquidity[id] -= tokenAmount;
         updateInterestRate(id);
         checkHealth(user);
@@ -230,13 +230,13 @@ contract Core is Initializable, OwnableUpgradeable {
         bytes32 chainId,
         uint256 tokenAmount
     ) internal view returns (Data.BorrowParams memory params) {
-        Data.ReserveData memory reserve = reserves[id];
+        Data.PoolData memory pool = pools[id];
         Data.ConfigData memory config = configs[id];
-        params.liquidity = chains[chainId][id];
-        params.debtAmount = tokenAmount.mul(1e18).div(reserve.dtScaled);
+        params.liquidity = chainLiquidity[chainId][id];
+        params.debtAmount = tokenAmount.mul(1e18).div(pool.dtScaled);
         params.price = oracle.getSinglePrice(id).div(1e18);
         params.ltv = config.ltv;
-        params.debtToken = reserve.debtToken;
+        params.debtToken = pool.debtToken;
     }
 
     function borrow(
@@ -253,11 +253,14 @@ contract Core is Initializable, OwnableUpgradeable {
         );
         addToken(user, id);
 
-        require(params.liquidity >= tokenAmount, string.concat(TAG,": No enough liquidity"));
+        require(
+            params.liquidity >= tokenAmount,
+            string.concat(TAG, ": No enough liquidity")
+        );
         IDebtToken(params.debtToken).mint(user, params.debtAmount);
-        reserves[id].debtSupply += params.debtAmount;
+        pools[id].debtSupply += params.debtAmount;
         updateInterestRate(id);
-        chains[chainId][id] -= tokenAmount;
+        chainLiquidity[chainId][id] -= tokenAmount;
         totalLiquidity[id] -= tokenAmount;
 
         Data.HealthData memory healthData = healthFactor(user);
@@ -273,34 +276,37 @@ contract Core is Initializable, OwnableUpgradeable {
 
     // calculate repay info and avoid stack too deep error
     function _buildRepayParams(
-        Data.ReserveData memory reserve,
+        Data.PoolData memory pool,
         address user,
         uint256 tokenAmount
     ) internal view returns (Data.RepayParams memory params) {
-        params.ceToken = reserve.ceToken;
-        params.debtToken = reserve.debtToken;
-        params.dtScaled = reserve.dtScaled;
-        params.ceScaled = reserve.ceScaled;
+        params.ceToken = pool.ceToken;
+        params.debtToken = pool.debtToken;
+        params.dtScaled = pool.dtScaled;
+        params.ceScaled = pool.ceScaled;
         params.debtAmount = IDebtToken(params.debtToken).balanceBeforeScaled(user);
         params.repayAmount = params.debtAmount.mul(params.dtScaled).div(1e18);
         params.tokenAmount = tokenAmount;
         params.user = user;
     }
 
-  
     function repay(
         bytes32 id,
         bytes32 chainId,
         address user,
         uint256 tokenAmount
-    ) external onlyRole(IRoleManager(roleManager).POOL()) returns (uint256, uint256, uint256) {
+    )
+        external
+        onlyRole(IRoleManager(roleManager).POOL())
+        returns (uint256, uint256, uint256)
+    {
         refresh(id);
         Data.RepayParams memory params = _buildRepayParams(
-            reserves[id],
+            pools[id],
             user,
             tokenAmount
         );
-        Data.ReserveData storage reserve = reserves[id];
+        Data.PoolData storage pool = pools[id];
         uint256 ceAmount = 0;
         if (params.tokenAmount >= params.repayAmount) {
             ceAmount = params.tokenAmount.sub(params.repayAmount).mul(1e18).div(
@@ -308,7 +314,7 @@ contract Core is Initializable, OwnableUpgradeable {
             );
             if (ceAmount > 0) {
                 ICEToken(params.ceToken).mint(params.user, ceAmount);
-                reserve.ceSupply = reserve.ceSupply.add(ceAmount);
+                pool.ceSupply = pool.ceSupply.add(ceAmount);
             }
         } else {
             params.repayAmount = params.tokenAmount;
@@ -316,10 +322,10 @@ contract Core is Initializable, OwnableUpgradeable {
                 params.dtScaled
             );
         }
-        chains[chainId][id] += tokenAmount;
+        chainLiquidity[chainId][id] += tokenAmount;
         totalLiquidity[id] += tokenAmount;
         IDebtToken(params.debtToken).burn(params.user, params.debtAmount);
-        reserve.debtSupply -= params.debtAmount;
+        pool.debtSupply -= params.debtAmount;
         updateInterestRate(id);
         emit Data.ReceiveToken(user, id, tokenAmount);
         return (params.repayAmount, params.debtAmount, ceAmount);
@@ -330,17 +336,25 @@ contract Core is Initializable, OwnableUpgradeable {
         uint256 ceAmount,
         uint256 debtAmount
     ) external onlyRole(IRoleManager(roleManager).LIQUIDATION_MANAGER()) {
-        reserves[id].ceSupply = ceAmount;
-        reserves[id].debtSupply = debtAmount;
+        pools[id].ceSupply = ceAmount;
+        pools[id].debtSupply = debtAmount;
     }
 
-     function swap(bytes32 id, bytes32 srcChainId, bytes32 destChainId, uint256 tokenAmount) external onlyRole(IRoleManager(roleManager).POOL()) {
-        chains[srcChainId][id] -= tokenAmount;
-        chains[destChainId][id] += tokenAmount;
+    function swap(
+        bytes32 id,
+        bytes32 srcChainId,
+        bytes32 destChainId,
+        uint256 tokenAmount
+    ) external onlyRole(IRoleManager(roleManager).POOL()) {
+        chainLiquidity[srcChainId][id] -= tokenAmount;
+        chainLiquidity[destChainId][id] += tokenAmount;
     }
 
     function checkHealth(address user) public view {
-        require(healthFactor(user).factor < MAX_HEALTH_FACTOR, string.concat(TAG,": Health failed"));
+        require(
+            healthFactor(user).factor < MAX_HEALTH_FACTOR,
+            string.concat(TAG, ": Health failed")
+        );
     }
 
     function addToken(address user, bytes32 id) internal {
@@ -357,29 +371,31 @@ contract Core is Initializable, OwnableUpgradeable {
         uint256 price,
         bytes32 id
     ) internal view returns (uint256 collateralValue, uint256 debtValue) {
-        Data.ReserveData memory reserve = reserves[id];
+        Data.PoolData memory pool = pools[id];
         address _user = user;
 
-        uint256 increasedDebt = block
+        uint256 increasedDebtFactor = block
             .timestamp
-            .sub(reserve.lastUpdateTime)
-            .mul(reserve.interestRate)
+            .sub(pool.lastUpdateTime)
+            .mul(pool.borrowInterestRate)
             .div(YEAR);
-        uint256 dtScaled = reserve.dtScaled.add(increasedDebt);
-        uint256 ceScaled = reserve.ceScaled.add(
-            increasedDebt
-                .mul(reserve.currentRatio)
+        uint256 dtScaled = pool.dtScaled.add(increasedDebtFactor);
+        uint256 ceScaled = pool.ceScaled.add(
+            increasedDebtFactor
+                .mul(pool.utilizationRatio)
                 .div(1e18)
-                .mul(1e18 - configs[id].tsuPercent)
+                .mul(1e18 - configs[id].treasuryPercent)
                 .div(1e18)
         );
-        collateralValue = ICEToken(reserve.ceToken)
+
+        collateralValue = ICEToken(pool.ceToken)
             .balanceBeforeScaled(_user)
             .mul(ceScaled)
             .div(1e18)
             .mul(price)
             .div(1e18);
-        debtValue = IDebtToken(reserve.debtToken)
+
+        debtValue = IDebtToken(pool.debtToken)
             .balanceBeforeScaled(_user)
             .mul(dtScaled)
             .div(1e18)
@@ -388,35 +404,35 @@ contract Core is Initializable, OwnableUpgradeable {
     }
 
     function getCEScaled(bytes32 _poolId) public view returns (uint256)  {
-        Data.ReserveData memory reserve = reserves[_poolId];
+        Data.PoolData memory pool = pools[_poolId];
         uint256 increasedDebt = block
             .timestamp
-            .sub(reserve.lastUpdateTime)
-            .mul(reserve.interestRate)
+            .sub(pool.lastUpdateTime)
+            .mul(pool.borrowInterestRate)
             .div(YEAR);
-        return reserve.dtScaled.add(increasedDebt);
+        return pool.ceScaled.add(
+            increasedDebt
+                .mul(pool.utilizationRatio)
+                .div(1e18)
+                .mul(1e18 - configs[_poolId].treasuryPercent)
+                .div(1e18)
+        );
     }
 
     function getDTScaled(bytes32 _poolId) public view returns (uint256) {
-        Data.ReserveData memory reserve = reserves[_poolId];
+        Data.PoolData memory pool = pools[_poolId];
         uint256 increasedDebt = block
             .timestamp
-            .sub(reserve.lastUpdateTime)
-            .mul(reserve.interestRate)
+            .sub(pool.lastUpdateTime)
+            .mul(pool.borrowInterestRate)
             .div(YEAR);
-        return reserve.ceScaled.add(
-            increasedDebt
-                .mul(reserve.currentRatio)
-                .div(1e18)
-                .mul(1e18 - configs[_poolId].tsuPercent)
-                .div(1e18)
-        );
+        return pool.dtScaled.add(increasedDebt);
     }
     
     function getLiquidity(
         bytes32 _chainId,
         bytes32 _poolId
     ) public view returns (uint256) {
-        return chains[_chainId][_poolId];
+        return chainLiquidity[_chainId][_poolId];
     }
 }
