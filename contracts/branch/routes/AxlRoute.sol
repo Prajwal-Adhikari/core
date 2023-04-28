@@ -12,7 +12,10 @@ import "../interfaces/IRoleManager.sol";
 string constant TAG = "AxlRouteBranch";
 
 contract AxlRouteBranch is Initializable, OwnableUpgradeable, AxelarExecutable {
-    string public rootChain;
+
+    //Axelar's chain id of the chain where root is deployed
+    string public rootChainId;
+    // Destination contract address
     string public rootAddress;
 
     address public adapter;
@@ -43,17 +46,15 @@ contract AxlRouteBranch is Initializable, OwnableUpgradeable, AxelarExecutable {
         roleManager = roleManagerAddress;
     }
 
-
     function setAdapter(address adapterAddress) external onlyRole(IRoleManager(roleManager).SET_ROUTE_METHOD()) {
         adapter = adapterAddress;
     }
-
 
     function setRootChainNameAddress(
         string calldata name,
         string calldata addr
     ) external onlyRole(IRoleManager(roleManager).SET_ROUTE_METHOD()) {
-        rootChain = name;
+        rootChainId = name;
         rootAddress = addr;
     }
 
@@ -65,13 +66,13 @@ contract AxlRouteBranch is Initializable, OwnableUpgradeable, AxelarExecutable {
         if (msg.value > 0) {
             gasService.payNativeGasForContractCall{value: msg.value}(
                 address(this),
-                rootChain,
+                rootChainId,
                 rootAddress,
                 payload,
                 sender
             );
         }
-        gateway.callContract(rootChain, rootAddress, payload);
+        gateway.callContract(rootChainId, rootAddress, payload);
     }
 
     function _execute(
@@ -80,7 +81,7 @@ contract AxlRouteBranch is Initializable, OwnableUpgradeable, AxelarExecutable {
         bytes calldata payload_
     ) internal override {
         require(
-            keccak256(abi.encodePacked(rootChain)) ==
+            keccak256(abi.encodePacked(rootChainId)) ==
                 keccak256(abi.encodePacked(sourceChain_)) &&
                 keccak256(abi.encodePacked(rootAddress)) ==
                 keccak256(abi.encodePacked(sourceAddress_)),

@@ -29,6 +29,7 @@ contract Branch is
     OwnableUpgradeable,
     ReentrancyGuardUpgradeable
 {
+    // Request types
     uint8 internal constant TYPE_DEPOSIT = 1;
     uint8 internal constant TYPE_REPAY = 2;
     uint8 internal constant TYPE_SWAP = 3;
@@ -39,23 +40,39 @@ contract Branch is
     using SafeERC20 for IERC20;
     using SafeMath for uint256;
 
+
     address public roleManager;
     address public adapter;
+
+    //Addresses to be set before performing a Stargate swap
     address public stargateRouter;
     address public stargateEthVault;
-    bool public swapDisable;
-
-    mapping(uint16 => bytes32) public chainName;
-    mapping(bytes32 => bool) public depositPause;
-    mapping(bytes32 => bool) public repayPause;
-    bool public protocolPause;
-
+    
     struct PoolInfo {
         bool enable;
         address token;
     }
 
+    // key: poolId
+    // Example poolId = keccak256("USDC") for USDC pool
     mapping(bytes32 => PoolInfo) public pools;
+
+    // key: poolId
+    // Pool level pause
+    mapping(bytes32 => bool) public depositPause;
+    mapping(bytes32 => bool) public repayPause;
+
+    // Protocol level pause for all pools
+    bool public protocolPause;
+
+    // Toggle to enable swap for Stargate cross chain liquidity transfer
+    bool public swapDisable;
+
+    /**
+     * Mapping LayerZero's chain id to Cedro's chain id for a chain
+     * Example: 10112 ->  keccak256("FTM")
+     **/
+    mapping(uint16 => bytes32) public chainId;
 
     event SendToken(address user, bytes32 id, uint256 tokenAmount);
 
@@ -72,18 +89,9 @@ contract Branch is
         _;
     }
 
+    // Set contract addresses
     function setRoleManager(address roleManagerAddress) external onlyOwner {
         roleManager = roleManagerAddress;
-    }
-
-    function setPool(
-        bytes32 id,
-        address token,
-        bool enable
-    ) external onlyRole(IRoleManager(roleManager).SET_POOL()) {
-        PoolInfo storage pool = pools[id];
-        pool.enable = enable;
-        pool.token = token;
     }
 
     function setAdapter(
@@ -100,6 +108,17 @@ contract Branch is
         stargateEthVault = vaultAddress;
     }
 
+    function setPool(
+        bytes32 id,
+        address token,
+        bool enable
+    ) external onlyRole(IRoleManager(roleManager).SET_POOL()) {
+        PoolInfo storage pool = pools[id];
+        pool.enable = enable;
+        pool.token = token;
+    }
+
+    // Methods to set pause
     function setDepositPause(
         bytes32 id,
         bool status
@@ -128,25 +147,13 @@ contract Branch is
         swapDisable = !swapDisable;
     }
 
-    /**
-     * @dev Links chainId with chain name.
-     * This function can only be accessed by the contract owner.
-     * @param chain name of the chain.
-     * @param id chain id of the chain.
-     **/
-    function setChainName(
-        bytes32 chain,
-        uint16 id
+    function setChainId(
+        bytes32 chainID, // Cedro's chain id
+        uint16 id // LayerZero chain id
     ) external onlyRole(IRoleManager(roleManager).SET_BRANCH_METHOD()) {
-        chainName[id] = chain;
+        chainId[id] = chainID;
     }
 
-    /**
-     * @dev sends a deposit information message to the Root.
-     * @param id pool id of the pool of the deposited amount
-     * @param amount amount deposited in the pool
-     * @param route communication protocol
-     **/
     function depositRequest(
         bytes32 id,
         uint256 amount,
@@ -161,11 +168,6 @@ contract Branch is
         _pay(pools[id].token, amount, id, TYPE_DEPOSIT, route, airdropAmount);
     }
 
-    /**
-     * @dev sends a repay information message to the Root.
-     * @param id pool id of the pool of the repaid amount
-     * @param amount amount repaid in the pool
-     **/
     function repayRequest(
         bytes32 id,
         uint256 amount,
@@ -201,6 +203,12 @@ contract Branch is
             qty > 0,
             string.concat(TAG, ": error: swap() requires qty > 0")
         );
+
+        /**
+         * Disable swap is done in case of a Stargate swap failure tx
+         * only to update core contract values without doing actual swap through Stargate 
+         * to reverse the previous liquidity change made in case of swap failure through Adapter
+         **/
         if (!swapDisable) {
             uint256 messageFee;
             if (pools[id].token == address(0)) {
@@ -233,25 +241,20 @@ contract Branch is
         }
 
         (uint64 amountpx, uint64 amountsx) = _buildRemoteAmount(qty, id);
+
+        // Creating payload with required info to perform swap
         bytes memory payload = abi.encodePacked(
             TYPE_SWAP,
             id,
-            chainName[dstChainId],
+            chainId[dstChainId],
             amountpx,
             amountsx
         );
-
+        
+        // Sending `payload` to destination chain through chosen `route`
         IAdapter(adapter).send{value: fee}(payload, msg.sender, 0, route);
     }
 
-    
-
-    /**
-     * @dev emergency function to withdraw liquidity
-     * @param id token address to withdraw
-     * @param amount amount of token to withdraw
-     * @param to receiver address
-     **/
     function emergencyWithdraw(
         bytes32 id,
         uint256 amount,
@@ -264,8 +267,6 @@ contract Branch is
             IERC20(token).safeTransfer(to, amount);
         }
     }
-
-    
 
     function transferToken(
         bytes memory payload

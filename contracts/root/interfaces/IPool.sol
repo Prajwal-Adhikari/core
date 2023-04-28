@@ -73,7 +73,7 @@ interface IPool {
     ) external;
 
     /**
-     * @notice Sends swap information to core contract
+     * @notice Executes the function according to the request type in the payload
      * This function can only be accessed by the account with role ADAPTER
      * @param payload - information of pool id, user and token amount
      * @param chainId - chain id of the source chain

@@ -306,17 +306,17 @@ describe("Ready", function () {
     }
 
     async function printInfo() {
-        let matic_reserve = await core.reserves(MATIC);
+        let matic_reserve = await core.pools(MATIC);
         console.log("MATIC");
         console.log(`interest rate: ${matic_reserve[0]} currentRatio: ${matic_reserve[1]} ceScaled: ${matic_reserve[4]}`)
         console.log(`dtScaled: ${matic_reserve[5]} ceSupply: ${matic_reserve[7]} debtSupply: ${matic_reserve[8]}`)
 
-        let ftm_reserve = await core.reserves(FTM);
+        let ftm_reserve = await core.pools(FTM);
         console.log("FTM");
         console.log(`interest rate: ${ftm_reserve[0]} currentRatio: ${ftm_reserve[1]} ceScaled: ${ftm_reserve[4]}`)
         console.log(`dtScaled: ${ftm_reserve[5]} ceSupply: ${ftm_reserve[7]} debtSupply: ${ftm_reserve[8]}`)
 
-        let bnb_reserve = await core.reserves(BNB);
+        let bnb_reserve = await core.pools(BNB);
         console.log("BNB");
         console.log(`interest rate: ${bnb_reserve[0]} currentRatio: ${bnb_reserve[1]} ceScaled: ${bnb_reserve[4]}`)
         console.log(`dtScaled: ${bnb_reserve[5]} ceSupply: ${bnb_reserve[7]} debtSupply: ${bnb_reserve[8]}`)

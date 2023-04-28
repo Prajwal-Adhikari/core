@@ -20,6 +20,9 @@ contract AdapterBranch is Initializable, OwnableUpgradeable {
     address public roleManager;
     address public branch;
 
+    // key: routeId
+    // Example routeId = keccak256("LZO") for LayerZero
+    // Example routeId = keccak256("AXL") for Axelar
     mapping(bytes32 => address) public router;
     mapping(address => bool) public routeExist;
 

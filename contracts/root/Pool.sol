@@ -15,7 +15,6 @@ import "./interfaces/IAdapter.sol";
 import "./interfaces/IRoleManager.sol";
 import "./libraries/Data.sol";
 
-
 string constant TAG = "Pool";
 
 /**
@@ -28,22 +27,29 @@ string constant TAG = "Pool";
 contract Pool is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
     using SafeMath for uint256;
 
+    // Request Types
     uint8 internal constant TYPE_DEPOSIT = 1;
     uint8 internal constant TYPE_REPAY = 2;
     uint8 internal constant TYPE_SWAP = 3;
+
+    uint256 public constant BASE = 10 ** 18;
 
     address public feeProvider;
     address public core;
     address public adapter;
     address public roleManager;
 
-    bool public feeEnable;
-
+    // key: [poolId][chainId]
+    // poolId = keccak256("USDC")
+    // chainId = keccak256("FTM")
+    // Pool and chain level pause
     mapping(bytes32 => mapping(bytes32 => bool)) public withdrawPause;
     mapping(bytes32 => mapping(bytes32 => bool)) public borrowPause;
+
+    // Protocol level pause for all pools and chains
     bool public protocolPause;
 
-    uint256 public constant BASE = 10 ** 18;
+    bool public feeEnable;
 
     function initialize() public initializer {
         __Ownable_init();
@@ -58,26 +64,30 @@ contract Pool is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
         _;
     }
 
+    // Set contract addresses
     function setRoleManager(address roleManagerAddress) external onlyOwner {
         roleManager = roleManagerAddress;
     }
 
-    function setFeeProvider(address feeProviderAddress) external onlyRole(IRoleManager(roleManager).SET_POOL_METHOD()) {
+    function setFeeProvider(
+        address feeProviderAddress
+    ) external onlyRole(IRoleManager(roleManager).SET_POOL_METHOD()) {
         feeProvider = feeProviderAddress;
     }
 
-    function setCore(address coreAddress) external onlyRole(IRoleManager(roleManager).SET_POOL_METHOD()) {
+    function setCore(
+        address coreAddress
+    ) external onlyRole(IRoleManager(roleManager).SET_POOL_METHOD()) {
         core = coreAddress;
     }
 
-    function setAdapter(address adapterAddress) external onlyRole(IRoleManager(roleManager).SET_POOL_METHOD()) {
+    function setAdapter(
+        address adapterAddress
+    ) external onlyRole(IRoleManager(roleManager).SET_POOL_METHOD()) {
         adapter = adapterAddress;
     }
 
-    function toggleFeeEnable() external onlyRole(IRoleManager(roleManager).SET_POOL_METHOD()) {
-        feeEnable = !feeEnable;
-    }
-
+    // Pausing methods
     function setWithdrawPause(
         bytes32 id,
         bytes32 chainId,
@@ -94,12 +104,19 @@ contract Pool is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
         borrowPause[id][chainId] = status;
     }
 
-    function toggleProtocolStatus() external onlyRole(IRoleManager(roleManager).PROTOCOL_PAUSE()) {
+    function toggleProtocolStatus()
+        external
+        onlyRole(IRoleManager(roleManager).PROTOCOL_PAUSE())
+    {
         protocolPause = !protocolPause;
     }
 
-    function _bytesToAddress(bytes32 bys) private pure returns (address addr) {
-        return address(uint160(uint256(bys)));
+    // Enable fee for borrow and withdraw tx
+    function toggleFeeEnable()
+        external
+        onlyRole(IRoleManager(roleManager).SET_POOL_METHOD())
+    {
+        feeEnable = !feeEnable;
     }
 
     function withdraw(
@@ -148,7 +165,7 @@ contract Pool is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
             ceAmount
         );
     }
-    
+
     function borrow(
         bytes32 id,
         bytes32 chainId,
@@ -229,29 +246,33 @@ contract Pool is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
 
     function execute(
         bytes memory _payload,
-        bytes32 chainName
+        bytes32 chainId
     ) external onlyRole(IRoleManager(roleManager).ADAPTER()) {
         bytes32 tokenId;
         bytes32 data;
         uint64 amountpx;
         uint64 amountsx;
-        uint8 functionType = uint8(_payload[0]);
+        uint8 functionType = uint8(_payload[0]); // _payload received is encoded in format (uint8, bytes32, bytes32, uint64, uint64)
         assembly {
             tokenId := mload(add(_payload, 33))
             data := mload(add(_payload, 65))
             amountpx := mload(add(_payload, 73))
             amountsx := mload(add(_payload, 81))
         }
-        // (, bytes32 tokenId, bytes memory user, uint64 amountpx, uint64 amountsx) = abi.decode(_payload, (uint8, bytes32, bytes, uint64, uint64));
+
         uint256 amount = uint256(amountpx) * BASE + uint256(amountsx);
         if (functionType == TYPE_DEPOSIT) {
-            _deposit(tokenId, chainName, _bytesToAddress(data), amount);
+            _deposit(tokenId, chainId, _bytesToAddress(data), amount);
         } else if (functionType == TYPE_REPAY) {
-            _repay(tokenId, chainName, _bytesToAddress(data), amount);
+            _repay(tokenId, chainId, _bytesToAddress(data), amount);
         } else if (functionType == TYPE_SWAP) {
-            _swap(tokenId, chainName, data, amount);
+            _swap(tokenId, chainId, data, amount);
         } else {
             revert(string.concat(TAG, "Unsupport functionType"));
         }
+    }
+
+    function _bytesToAddress(bytes32 bys) private pure returns (address addr) {
+        return address(uint160(uint256(bys)));
     }
 }

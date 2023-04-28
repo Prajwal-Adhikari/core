@@ -35,110 +35,106 @@ contract FeeProvider is Initializable, OwnableUpgradeable {
         __Ownable_init();
     }
 
+    // Set contract addresses
     function setRoleManager(address roleManagerAddress) external onlyOwner {
         roleManager = roleManagerAddress;
     }
 
-    function setCore(address coreAddress) external onlyRole(IRoleManager(roleManager).SET_FEEPROVIDER_METHOD()) {
+    function setCore(
+        address coreAddress
+    ) external onlyRole(IRoleManager(roleManager).SET_FEEPROVIDER_METHOD()) {
         core = coreAddress;
     }
 
-    /**
-     * @dev Configures Optimal Global Liquidity Factor.
-     * This function can only be accessed by the contract owner.
-     * @param _chainId ids of the chain.
-     * @param _poolId ids of the pool.
-     * @param _liquidityFactor optimal global liquidity factor for each pool in diff chain.
-     **/
+    // Set different factors
     function configureOptimalGlobalLiquidityFactor(
-        bytes32[] memory _chainId,
-        bytes32[] memory _poolId,
-        uint256[] memory _liquidityFactor
+        bytes32[] memory chainId,
+        bytes32[] memory poolId,
+        uint256[] memory liquidityFactor
     ) external onlyRole(IRoleManager(roleManager).SET_FEEPROVIDER_METHOD()) {
         require(
-            _chainId.length == _poolId.length &&
-                _poolId.length == _liquidityFactor.length,
-            string.concat(TAG,": Arguments number mismatched")
+            chainId.length == poolId.length &&
+                poolId.length == liquidityFactor.length,
+            string.concat(TAG, ": Arguments number mismatched")
         );
-        for (uint256 i = 0; i < _poolId.length; i++) {
-            OPTIMAL_GLOBAL_LIQUIDITY_FACTOR[_chainId[i]][
-                _poolId[i]
-            ] = _liquidityFactor[i];
+        for (uint256 i = 0; i < poolId.length; i++) {
+            OPTIMAL_GLOBAL_LIQUIDITY_FACTOR[chainId[i]][
+                poolId[i]
+            ] = liquidityFactor[i];
         }
     }
 
-
     function configureBaseFee(
-        bytes32[] memory _chainId,
-        bytes32[] memory _poolId,
-        uint256[] memory _baseFee
+        bytes32[] memory chainId,
+        bytes32[] memory poolId,
+        uint256[] memory baseFee
     ) external onlyRole(IRoleManager(roleManager).SET_FEEPROVIDER_METHOD()) {
         require(
-            _chainId.length == _poolId.length &&
-                _poolId.length == _baseFee.length,
+            chainId.length == poolId.length && poolId.length == baseFee.length,
             string.concat(TAG, ": Arguments number mismatched")
         );
-        for (uint256 i = 0; i < _poolId.length; i++) {
-            BASE_FEE[_chainId[i]][_poolId[i]] = _baseFee[i];
+        for (uint256 i = 0; i < poolId.length; i++) {
+            BASE_FEE[chainId[i]][poolId[i]] = baseFee[i];
         }
     }
 
     function configureMaxFee(
-        bytes32[] memory _chainId,
-        bytes32[] memory _poolId,
-        uint256[] memory _maxFee
+        bytes32[] memory chainId,
+        bytes32[] memory poolId,
+        uint256[] memory maxFee
     ) external onlyRole(IRoleManager(roleManager).SET_FEEPROVIDER_METHOD()) {
         require(
-            _chainId.length == _poolId.length &&
-                _poolId.length == _maxFee.length,
-            string.concat(TAG,": Arguments number mismatched")
+            chainId.length == poolId.length && poolId.length == maxFee.length,
+            string.concat(TAG, ": Arguments number mismatched")
         );
-        for (uint256 i = 0; i < _poolId.length; i++) {
-            MAX_FEE[_chainId[i]][_poolId[i]] = _maxFee[i];
+        for (uint256 i = 0; i < poolId.length; i++) {
+            MAX_FEE[chainId[i]][poolId[i]] = maxFee[i];
         }
     }
 
     function getFeeAmount(
-        bytes32 _chainId,
-        bytes32 _poolId
+        bytes32 chainId,
+        bytes32 poolId
     ) public view returns (uint256) {
         uint256 globalLiquidityFactor = _getGlobalLiquidityFactor(
-            _chainId,
-            _poolId
+            chainId,
+            poolId
         );
+
         uint256 optimalGlobalLiquidityFactor = OPTIMAL_GLOBAL_LIQUIDITY_FACTOR[
-            _chainId
-        ][_poolId];
+            chainId
+        ][poolId];
+
         uint256 initialFee;
         if (globalLiquidityFactor > 0) {
-            initialFee = BASE_FEE[_chainId][_poolId].add(
+            initialFee = BASE_FEE[chainId][poolId].add(
                 (optimalGlobalLiquidityFactor.sub(globalLiquidityFactor))
                     .mul(optimalGlobalLiquidityFactor)
                     .div(globalLiquidityFactor)
             );
         }
+
         if (initialFee < 0) {
             initialFee = 0;
         }
-        uint256 maxFee = MAX_FEE[_chainId][_poolId];
+
+        uint256 maxFee = MAX_FEE[chainId][poolId];
         return maxFee <= initialFee ? maxFee : initialFee;
     }
 
     /**
      * @dev Computes the global liquidity factor of an asset for a chain
-     * @param _chainId id of the chain.
-     * @param _poolId id of the pool.
+     * @param chainId id of the chain.
+     * @param poolId id of the pool.
      **/
     function _getGlobalLiquidityFactor(
-        bytes32 _chainId,
-        bytes32 _poolId
+        bytes32 chainId,
+        bytes32 poolId
     ) internal view returns (uint256) {
-        uint256 totalLiquidity = ICore(core).totalLiquidity(_poolId);
+        uint256 totalLiquidity = ICore(core).totalLiquidity(poolId);
         return
             totalLiquidity > 0
-                ? ICore(core).getLiquidity(_chainId, _poolId).div(
-                    totalLiquidity
-                )
+                ? ICore(core).getLiquidity(chainId, poolId).div(totalLiquidity)
                 : 0;
     }
 }

@@ -18,8 +18,11 @@ contract LzRouteBranch is Initializable, LzApp {
 
     address public adapter;
     address public roleManager;
+
+    //LayerZero's chain id of the chain where root is deployed
     uint16 public rootChainId;
 
+    //Request Types
     uint8 internal constant TYPE_DEPOSIT = 1;
     uint8 internal constant TYPE_REPAY = 2;
     uint8 internal constant TYPE_SWAP = 3;
