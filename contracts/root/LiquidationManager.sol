@@ -51,12 +51,16 @@ contract LiquidationManager is
     function setRoleManager(address roleManagerAddress) external onlyOwner {
         roleManager = roleManagerAddress;
     }
-    
-    function setCore(address coreAddress) external onlyRole(IRoleManager(roleManager).SET_LIQUIDATION_METHOD()) {
+
+    function setCore(
+        address coreAddress
+    ) external onlyRole(IRoleManager(roleManager).SET_LIQUIDATION_METHOD()) {
         core = coreAddress;
     }
 
-    function setOracle(IOracle oracleAddress) external onlyRole(IRoleManager(roleManager).SET_LIQUIDATION_METHOD()) {
+    function setOracle(
+        IOracle oracleAddress
+    ) external onlyRole(IRoleManager(roleManager).SET_LIQUIDATION_METHOD()) {
         oracle = oracleAddress;
     }
 
@@ -65,16 +69,14 @@ contract LiquidationManager is
      * 1. calculate liqudate CEToken(A) amount from the underlying amount liquidator want to liquidate
      * 2. calculate DebtToken(B) amount from CEToken(A) borrower burn
      * 3. calculate CEToken(B) amount liquidator need to repay from DebtToken(B)
-    **/
+     **/
     function _buildLiquidateParams(
         bytes32 collateralId,
         bytes32 debtId,
         uint256 borrowerCollateral, // Amount of collateral of borrower that liquidator wants to liquidate
         uint256 discount
     ) internal view returns (Data.LiquidateParams memory params) {
-        Data.PoolData memory collateralPool = ICore(core).pools(
-            collateralId
-        );
+        Data.PoolData memory collateralPool = ICore(core).pools(collateralId);
         Data.PoolData memory debtPool = ICore(core).pools(debtId);
         // CE token amount of borrower
         params.liqBorrowerCEAmount = borrowerCollateral.mul(1e18).div(
@@ -86,18 +88,18 @@ contract LiquidationManager is
             .div(1e18);
         // Price after discount
         uint256 liqValueAfterDiscount = params.liqValue.sub(
-            params.liqValue.mul(discount).div(1e18)   
+            params.liqValue.mul(discount).div(1e18)
         );
         // Amount after discount
-        uint256 liqValueAfterDiscountAmount = liqValueAfterDiscount.mul(1e18).div(
+        uint256 liqAmountAfterDiscount = liqValueAfterDiscount.mul(1e18).div(
             oracle.getSinglePrice(debtId)
         );
         // Repay debt amount of borrower
-        params.burnBorrowerDebtAmount = liqValueAfterDiscountAmount.mul(1e18).div(
+        params.burnBorrowerDebtAmount = liqAmountAfterDiscount.mul(1e18).div(
             debtPool.dtScaled
         );
         // Deduct equivalent collateral of liquidator
-        params.burnLiquidatorCEAmount = liqValueAfterDiscountAmount.mul(1e18).div(
+        params.burnLiquidatorCEAmount = liqAmountAfterDiscount.mul(1e18).div(
             debtPool.ceScaled
         );
     }
@@ -117,7 +119,10 @@ contract LiquidationManager is
         Data.ConfigData memory config = ICore(core).configs(collateralId);
 
         // whether borrower can be liquidated
-        require(healthData.factor >= MAX_HEALTH_FACTOR, string.concat(TAG,": Cannot liquidate now"));
+        require(
+            healthData.factor >= MAX_HEALTH_FACTOR,
+            string.concat(TAG, ": Cannot liquidate now")
+        );
 
         // calculate LTV, and using formula to calculate liquidate discount and closing factor
         uint256 currentLTV = healthData.debtValue.mul(1e18).div(
@@ -132,17 +137,18 @@ contract LiquidationManager is
                 discount = config.liqMaxDiscount;
             }
 
-            uint256 firstExp = config.liqClosingFac.mul(1e18 - currentLTV).div(
-                1e18 - config.liqThreshold
-            );
+            uint256 initialLiqPercent = config
+                .liqClosingFac
+                .mul(1e18 - currentLTV)
+                .div(1e18 - config.liqThreshold);
             if (currentLTV > config.liqThreshold) {
-                liqPercent = firstExp.add(
+                liqPercent = initialLiqPercent.add(
                     currentLTV.sub(config.liqThreshold).mul(1e18).div(
                         1e18 - config.liqThreshold
                     )
                 );
             } else {
-                liqPercent = firstExp.add(
+                liqPercent = initialLiqPercent.add(
                     config.liqThreshold.sub(currentLTV).mul(1e18).div(
                         1e18 - config.liqThreshold
                     )
@@ -155,9 +161,7 @@ contract LiquidationManager is
         }
 
         Data.PoolData memory debtPool = ICore(core).pools(debtId);
-        Data.PoolData memory collateralPool = ICore(core).pools(
-            collateralId
-        );
+        Data.PoolData memory collateralPool = ICore(core).pools(collateralId);
 
         Data.LiquidateParams memory params = _buildLiquidateParams(
             collateralId,
@@ -172,16 +176,19 @@ contract LiquidationManager is
         );
 
         // mint and burn CEToken and DebtToken then update supply
-        IDebtToken(debtPool.debtToken).burn(user, params.burnBorrowerDebtAmount);
+        IDebtToken(debtPool.debtToken).burn(
+            user,
+            params.burnBorrowerDebtAmount
+        );
         ICEToken(debtPool.ceToken).burn(
             msg.sender,
             params.burnLiquidatorCEAmount
         );
-        
+
         ICore(core).updateCeAndDebtSupply(
             debtId,
-            debtPool.ceSupply,
-            debtPool.debtSupply
+            debtPool.ceSupply.sub(params.burnLiquidatorCEAmount),
+            debtPool.debtSupply.sub(params.burnBorrowerDebtAmount)
         );
 
         ICEToken(collateralPool.ceToken).burn(user, params.liqBorrowerCEAmount);
