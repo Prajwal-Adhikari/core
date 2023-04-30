@@ -5,11 +5,14 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "../interfaces/IRoleManager.sol";
+import "../interfaces/ICore.sol";
 
 string constant TAG = "DebtToken";
 
 contract DebtToken is ERC20, Ownable {
+    address public core;
     address public roleManager;
+    bytes32 public poolId;
     uint256 public balanceScale = 1e18;
     uint256 public constant MAG = 1e18;
 
@@ -26,11 +29,26 @@ contract DebtToken is ERC20, Ownable {
         _;
     }
 
+    function setCore(
+        address coreAddress,
+        bytes32 id
+    ) external onlyRole(IRoleManager(roleManager).SET_CE_TOKEN_METHOD()) {
+        core = coreAddress;
+        poolId = id;
+    }
+
     function setRoleManager(address roleManagerAddress) external onlyOwner {
         roleManager = roleManagerAddress;
     }
 
+    function balanceBeforeScaled(address user) external view returns (uint256) {
+        return super.balanceOf(user);
+    }
 
+    function balanceOf(address user) public view override returns (uint256) {
+        uint dtScaled = ICore(core).getDTScaled(poolId);
+        return super.balanceOf(user) * dtScaled / 1e18;
+    }
 
     function _transfer(
         address from,

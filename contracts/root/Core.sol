@@ -284,7 +284,7 @@ contract Core is Initializable, OwnableUpgradeable {
         params.debtToken = pool.debtToken;
         params.dtScaled = pool.dtScaled;
         params.ceScaled = pool.ceScaled;
-        params.debtAmount = IDebtToken(params.debtToken).balanceOf(user);
+        params.debtAmount = IDebtToken(params.debtToken).balanceBeforeScaled(user);
         params.repayAmount = params.debtAmount.mul(params.dtScaled).div(1e18);
         params.tokenAmount = tokenAmount;
         params.user = user;
@@ -387,20 +387,48 @@ contract Core is Initializable, OwnableUpgradeable {
                 .mul(1e18 - configs[id].treasuryPercent)
                 .div(1e18)
         );
-        collateralValue = IERC20(pool.ceToken)
-            .balanceOf(_user)
+
+        collateralValue = ICEToken(pool.ceToken)
+            .balanceBeforeScaled(_user)
             .mul(ceScaled)
             .div(1e18)
             .mul(price)
             .div(1e18);
-        debtValue = IERC20(pool.debtToken)
-            .balanceOf(_user)
+
+        debtValue = IDebtToken(pool.debtToken)
+            .balanceBeforeScaled(_user)
             .mul(dtScaled)
             .div(1e18)
             .mul(price)
             .div(1e18);
     }
 
+    function getCEScaled(bytes32 _poolId) public view returns (uint256)  {
+        Data.PoolData memory pool = pools[_poolId];
+        uint256 increasedDebt = block
+            .timestamp
+            .sub(pool.lastUpdateTime)
+            .mul(pool.borrowInterestRate)
+            .div(YEAR);
+        return pool.ceScaled.add(
+            increasedDebt
+                .mul(pool.utilizationRatio)
+                .div(1e18)
+                .mul(1e18 - configs[_poolId].treasuryPercent)
+                .div(1e18)
+        );
+    }
+
+    function getDTScaled(bytes32 _poolId) public view returns (uint256) {
+        Data.PoolData memory pool = pools[_poolId];
+        uint256 increasedDebt = block
+            .timestamp
+            .sub(pool.lastUpdateTime)
+            .mul(pool.borrowInterestRate)
+            .div(YEAR);
+        return pool.dtScaled.add(increasedDebt);
+    }
+    
     function getLiquidity(
         bytes32 _chainId,
         bytes32 _poolId
