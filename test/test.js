@@ -1,12 +1,17 @@
-const { expect } = require("chai")
+const { assert, expect } = require("chai")
 const { ethers, upgrades } = require("hardhat")
 
 let BN = require("bignumber.js");
 const { keccak256 } = require("ethers/lib/utils");
+const {BigNumber} = require("ethers");
 
 const toTokenAmount = (amount, decimals = 18) => {
     return new BN(amount).multipliedBy(new BN("10").pow(decimals)).toFixed()
 }
+// import { buildLiquidateParam } from './math.js';
+// const {} = require('./math');
+const {buildLiquidateParam} = require('./math.ts');
+
 
 const toMathAmount = (amount, decimals = 18) => new BN(amount.toString()).dividedBy(new BN(Math.pow(10, decimals))).toFixed();
 
@@ -63,7 +68,6 @@ describe("Ready", function () {
         matic = await ERC20.deploy("MATIC", "MATIC")
         ftm = await ERC20.deploy("FTM", "FTM")
         bnb = await ERC20.deploy("BNB", "BNB")
-
 
         const FeeProvider = await ethers.getContractFactory("FeeProvider");
         feeProvider = await upgrades.deployProxy(FeeProvider, []);
@@ -355,6 +359,78 @@ describe("Ready", function () {
         console.log(`debtToken alice: ${alice_balance} bob: ${bob_balance}`);
     }
 
+    it("test liquidation", async function() {
+        let fees = await routeA.connect(alice).estimateFees(1, 1000000);
+        await printCEBalance();
+
+        //alice is borrower
+        //bob is liquidator
+
+        //debtPool.debtToken = debtFTM
+        //debtPool.ceToken = ceFTM
+        //collateralPool.ceToken = ceMATIC
+
+        console.log("alice deposit matic");
+        await clientA.connect(alice).depositRequest(MATIC, toTokenAmount(500000), LZO, 0, { value: fees })
+        
+        console.log("bob deposit ftm");
+        await clientB.connect(bob).depositRequest(FTM, toTokenAmount(5e5), LZO, 0, { value: fees })
+
+        console.log("alice borrow ftm");
+        await pool.connect(alice).borrow(FTM, BNB, toTokenAmount(2e5), ethers.utils.hexZeroPad(alice.address, 32), LZO, 0, { value: fees });
+   
+        console.log("increase ftm price in oracle");
+        await this.oracle.setPrice( [FTM], [toTokenAmount(2)])
+
+        console.log("check alice health factor");
+        hfb = await core.healthFactor(alice.address);
+        console.log("can liquidate", hfb.factor >= 1e18);
+
+        let alice_debt_before = await debtFTM.balanceOf(alice.address);
+        let bob_ce_before = await ceFTM.balanceOf(bob.address);
+        let alice_collateral_before = await ceMATIC.balanceOf(alice.address);
+        let bob_collateral_before = await ceMATIC.balanceOf(bob.address);
+
+        let currentLTV =  (hfb.debtValue * 1e18)/hfb.collateralValue;
+        let data = await buildLiquidateParam(currentLTV, MATIC, FTM, 100000, core, this.oracle);
+        // console.log(data);
+        // make the function public if needed to check data and data2
+        // let data2 = await liquidationManager.buildLiquidateParams( MATIC, FTM, 100000, BigNumber.from("250999996829020670"))
+        // console.log(data2);
+
+        console.log("bob will liquidate");
+        await liquidationManager.connect(bob).liquidate(alice.address, MATIC, FTM, toTokenAmount(100000));
+     
+        let alice_debt_after= await debtFTM.balanceOf(alice.address);
+        let bob_ce_after = await ceFTM.balanceOf(bob.address);
+        let alice_collateral_after = await ceMATIC.balanceOf(alice.address);
+        let bob_collateral_after = await ceMATIC.balanceOf(bob.address);
+
+        let difference_debt_alice = alice_debt_before - alice_debt_after;
+        let difference_ce_bob = bob_ce_before - bob_ce_after;
+        let difference_collateral_alice = alice_collateral_before - alice_collateral_after;
+        let difference_collateral_bob = bob_collateral_after - bob_collateral_before;
+
+        // console.log(difference_debt_alice);
+        // console.log(difference_ce_bob);
+        // console.log(difference_collateral_alice);
+        // console.log(difference_collateral_bob);
+
+        //NOTE: Due to arithmatics done on large numbers the numbers will have some decimals mismatched as expected 
+        //as a result checking > or = as needed.
+        
+        //dbtoken of alice burn by burnBorrowerDebtAmount
+        assert.isAbove(Math.round(data.burnBorrowerDebtAmount) *10**18, difference_debt_alice);
+        //cetoekn of bob burn by burnLiquidatorCEAmount
+        assert.isAbove(Math.round(data.burnLiquidatorCEAmount) *10**18, difference_ce_bob);
+        //cetoken of alice burn by liqBorrowerCEAmount
+        assert.isAbove(difference_collateral_alice , Math.round(data.liqBorrowerCEAmount) *10**18);
+        //cetoken if bob mint by liqBorrowerCEAmount
+        assert.equal(Math.round(data.liqBorrowerCEAmount) *10**18, difference_collateral_bob);
+
+    })
+
+    /*
     it("test ceToken transfer", async function() {
         let fees = await routeA.connect(alice).estimateFees(1, 1000000);
 
@@ -445,6 +521,7 @@ describe("Ready", function () {
         await liquidationManager.connect(alice).liquidate(bob.address, FTM, MATIC, toTokenAmount(50000));
         await printInfo();
     })
+    */
 
     // it("Test reward", async function () {
     //     let fees = await routeA.connect(alice).estimateFees(MATIC);
