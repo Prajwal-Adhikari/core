@@ -1,18 +1,17 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.9;
 
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "../interfaces/ICore.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
 import "../interfaces/IRoleManager.sol";
+import "../interfaces/ICore.sol";
 
 import "hardhat/console.sol";
 
 string constant TAG = "CEToken";
 
-contract CEToken is ERC20, Ownable {
-    using SafeMath for uint256;
+contract CEToken is ERC20Upgradeable {
+    using SafeMathUpgradeable for uint256;
     address public core;
     address public roleManager;
     bytes32 public poolId;
@@ -20,10 +19,14 @@ contract CEToken is ERC20, Ownable {
     uint256 public lockupTriggerAmt; //amount where lockup will kick in after cross-chain transfer
     mapping(address => uint256) public transferBlockRelease; //Block number
 
-    constructor(
+    function initialize(
         string memory name_,
-        string memory symbol_
-    ) ERC20(name_, symbol_) {}
+        string memory symbol_,
+        address roleManagerAddress
+    ) public initializer {
+        __ERC20_init( name_, symbol_);
+        roleManager = roleManagerAddress;
+    }
 
     /**
      * @dev Modifier that checks if caller has a specific role.
@@ -34,7 +37,7 @@ contract CEToken is ERC20, Ownable {
     }
 
     
-    function setRoleManager(address roleManagerAddress) external onlyOwner {
+    function setRoleManager(address roleManagerAddress) external onlyRole(IRoleManager(roleManager).DEFAULT_ADMIN_ROLE()) {
         roleManager = roleManagerAddress;
     }
 

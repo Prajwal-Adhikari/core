@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.9;
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
 import {AxelarExecutable} from "../../axelar/executable/AxelarExecutable.sol";
 import {IAxelarGateway} from "../../axelar/interfaces/IAxelarGateway.sol";
 import {IAxelarGasService} from "../../axelar/interfaces/IAxelarGasService.sol";
@@ -11,7 +11,7 @@ import "../interfaces/IRoleManager.sol";
 
 string constant TAG = "AxlRoutePool";
 
-contract AxlRoutePool is Initializable, OwnableUpgradeable, AxelarExecutable {
+contract AxlRoutePool is Initializable, AxelarExecutable, ContextUpgradeable {
     mapping(bytes32 => string) public destChain;
     mapping(bytes32 => string) public destAddress;
     mapping(bytes32 => bytes32) public chainKey;
@@ -33,15 +33,16 @@ contract AxlRoutePool is Initializable, OwnableUpgradeable, AxelarExecutable {
 
     function initialize(
         address _gateway,
-        address _gasReceiver
+        address _gasReceiver,
+        address roleManagerAddress
     ) public initializer {
         __AxelarExecutable_init(_gateway);
-        __Ownable_init();
         gasService = IAxelarGasService(_gasReceiver);
+        roleManager = roleManagerAddress;
     }
 
 
-    function setRoleManager(address roleManagerAddress) external onlyOwner {
+    function setRoleManager(address roleManagerAddress) external onlyRole(IRoleManager(roleManager).DEFAULT_ADMIN_ROLE()) {
         roleManager = roleManagerAddress;
     }
 

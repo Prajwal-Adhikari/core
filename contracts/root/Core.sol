@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.9;
 import "hardhat/console.sol";
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
 
 import "./interfaces/ICEToken.sol";
 import "./interfaces/IDebtToken.sol";
@@ -18,8 +18,8 @@ string constant TAG = "Core";
  * Core stores all the global data
  * Most of the lending and borrowing logic like interest rate calculation, checks, etc. is in Core.
  **/
-contract Core is Initializable, OwnableUpgradeable {
-    using SafeMath for uint256;
+contract Core is Initializable, ContextUpgradeable {
+    using SafeMathUpgradeable for uint256;
 
     IOracle public oracle;
     address public treasury;
@@ -49,13 +49,14 @@ contract Core is Initializable, OwnableUpgradeable {
         _;
     }
 
-    function initialize(address _treasury) public initializer {
-        treasury = _treasury;
-        __Ownable_init();
+    function initialize(address treasuryAddress, address roleManagerAddress) public initializer {
+        treasury = treasuryAddress;
+        roleManager = roleManagerAddress;
+        
     }
 
     // Set contract addresses
-    function setRoleManager(address roleManagerAddress) external onlyOwner {
+    function setRoleManager(address roleManagerAddress) external onlyRole(IRoleManager(roleManager).DEFAULT_ADMIN_ROLE()) {
         roleManager = roleManagerAddress;
     }
 
@@ -195,8 +196,7 @@ contract Core is Initializable, OwnableUpgradeable {
         totalLiquidity[id] += tokenAmount;
         updateInterestRate(id);
         addToken(user, id);
-        emit Data.ReceiveToken(user, id, tokenAmount);
-
+       
         return ceAmount;
     }
 
@@ -221,6 +221,7 @@ contract Core is Initializable, OwnableUpgradeable {
         totalLiquidity[id] -= tokenAmount;
         updateInterestRate(id);
         checkHealth(user);
+        
         return (tokenAmount);
     }
 
@@ -271,6 +272,7 @@ contract Core is Initializable, OwnableUpgradeable {
                 ),
             "LTV check failed"
         );
+
         return params.debtAmount;
     }
 
@@ -327,7 +329,7 @@ contract Core is Initializable, OwnableUpgradeable {
         IDebtToken(params.debtToken).burn(params.user, params.debtAmount);
         pool.debtSupply -= params.debtAmount;
         updateInterestRate(id);
-        emit Data.ReceiveToken(user, id, tokenAmount);
+
         return (params.repayAmount, params.debtAmount, ceAmount);
     }
 

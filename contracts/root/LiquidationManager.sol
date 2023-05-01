@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.9;
 import "hardhat/console.sol";
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
 
 import "./interfaces/IDebtToken.sol";
 import "./interfaces/ICEToken.sol";
@@ -23,10 +23,10 @@ string constant TAG = "LiquidationManager";
 
 contract LiquidationManager is
     Initializable,
-    OwnableUpgradeable,
-    ReentrancyGuardUpgradeable
+    ReentrancyGuardUpgradeable,
+    ContextUpgradeable
 {
-    using SafeMath for uint256;
+    using SafeMathUpgradeable for uint256;
 
     uint256 public constant MAX_HEALTH_FACTOR = 1e18;
 
@@ -34,9 +34,9 @@ contract LiquidationManager is
     address public core;
     IOracle public oracle;
 
-    function initialize() public initializer {
-        __Ownable_init();
+    function initialize(address roleManagerAddress) public initializer {
         __ReentrancyGuard_init();
+        roleManager = roleManagerAddress;
     }
 
     /**
@@ -48,7 +48,7 @@ contract LiquidationManager is
     }
 
     // Set contract addresses
-    function setRoleManager(address roleManagerAddress) external onlyOwner {
+    function setRoleManager(address roleManagerAddress) external onlyRole(IRoleManager(roleManager).DEFAULT_ADMIN_ROLE()) {
         roleManager = roleManagerAddress;
     }
 

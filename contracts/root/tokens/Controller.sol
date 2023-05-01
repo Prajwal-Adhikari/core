@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.9;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
 import "../interfaces/ICEToken.sol";
 import "../interfaces/IRoleManager.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
 
 string constant TAG = "Controller";
 
-contract Controller is Ownable {
+contract Controller is ContextUpgradeable {
     address public roleManager;
     address[] public ceTokens;
     mapping(address => bool) public ceTokenExist;
@@ -23,7 +23,14 @@ contract Controller is Ownable {
         _;
     }
 
-    function setRoleManager(address roleManagerAddress) external onlyOwner {
+    function initialize(
+        address roleManagerAddress
+    ) public initializer {
+    
+        roleManager = roleManagerAddress;
+    }
+
+    function setRoleManager(address roleManagerAddress) external onlyRole(IRoleManager(roleManager).DEFAULT_ADMIN_ROLE()) {
         roleManager = roleManagerAddress;
     }
 

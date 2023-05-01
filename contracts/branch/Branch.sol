@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.9;
 
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
 import "../layerZero/lzApp/LzApp.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import "./interfaces/IAdapter.sol";
 import "./interfaces/IStargateRouter.sol";
 import "./interfaces/IStargateEthVault.sol";
 import "./interfaces/IRoleManager.sol";
+import "../utils/ERC2771ContextUpgradeable.sol";
 
 string constant TAG = "Branch";
 
@@ -26,8 +26,8 @@ string constant TAG = "Branch";
 
 contract Branch is
     Initializable,
-    OwnableUpgradeable,
-    ReentrancyGuardUpgradeable
+    ReentrancyGuardUpgradeable,
+    ERC2771ContextUpgradeable
 {
     // Request types
     uint8 internal constant TYPE_DEPOSIT = 1;
@@ -37,9 +37,8 @@ contract Branch is
     uint256 public constant ROOT_DECIMALS = 18;
     uint256 public constant BASE = 10 ** ROOT_DECIMALS;
 
-    using SafeERC20 for IERC20;
-    using SafeMath for uint256;
-
+    using SafeERC20Upgradeable for IERC20Upgradeable;
+    using SafeMathUpgradeable for uint256;
 
     address public roleManager;
     address public adapter;
@@ -47,7 +46,7 @@ contract Branch is
     //Addresses to be set before performing a Stargate swap
     address public stargateRouter;
     address public stargateEthVault;
-    
+
     struct PoolInfo {
         bool enable;
         address token;
@@ -55,6 +54,7 @@ contract Branch is
 
     // key: poolId
     // Example poolId = keccak256("USDC") for USDC pool
+    // poolId for an asset must be same in all branch and root contracts
     mapping(bytes32 => PoolInfo) public pools;
 
     // key: poolId
@@ -75,10 +75,12 @@ contract Branch is
     mapping(uint16 => bytes32) public chainId;
 
     event SendToken(address user, bytes32 id, uint256 tokenAmount);
+    event ReceiveToken(address user, bytes32 id, uint256 tokenAmount);
 
-    function initialize() public initializer {
-        __Ownable_init();
+    function initialize(address forwarder, address roleManagerAddress) public initializer {
         __ReentrancyGuard_init();
+        __ERC2771Context_init(forwarder);
+        roleManager = roleManagerAddress;
     }
 
     /**
@@ -90,7 +92,9 @@ contract Branch is
     }
 
     // Set contract addresses
-    function setRoleManager(address roleManagerAddress) external onlyOwner {
+    function setRoleManager(
+        address roleManagerAddress
+    ) external onlyRole(IRoleManager(roleManager).DEFAULT_ADMIN_ROLE()) {
         roleManager = roleManagerAddress;
     }
 
@@ -166,6 +170,7 @@ contract Branch is
         );
         require(pools[id].enable, string.concat(TAG, ": Pool not enable"));
         _pay(pools[id].token, amount, id, TYPE_DEPOSIT, route, airdropAmount);
+        emit SendToken(msg.sender, id, amount);
     }
 
     function repayRequest(
@@ -180,6 +185,7 @@ contract Branch is
         );
         require(pools[id].enable, string.concat(TAG, ": Pool not enable"));
         _pay(pools[id].token, amount, id, TYPE_REPAY, route, airdropAmount);
+        emit SendToken(msg.sender, id, amount);
     }
 
     function swapRequest(
@@ -206,7 +212,7 @@ contract Branch is
 
         /**
          * Disable swap is done in case of a Stargate swap failure tx
-         * only to update core contract values without doing actual swap through Stargate 
+         * only to update core contract values without doing actual swap through Stargate
          * to reverse the previous liquidity change made in case of swap failure through Adapter
          **/
         if (!swapDisable) {
@@ -226,8 +232,8 @@ contract Branch is
 
                 messageFee = msg.value - qty - fee;
             } else {
-                IERC20(pools[id].token).approve(stargateRouter, qty);
-                messageFee = msg.value - fee;
+                IERC20Upgradeable(pools[id].token).approve(stargateRouter, qty);
+                messageFee = msg.value.sub(fee);
             }
 
             _swap(
@@ -250,7 +256,7 @@ contract Branch is
             amountpx,
             amountsx
         );
-        
+
         // Sending `payload` to destination chain through chosen `route`
         IAdapter(adapter).send{value: fee}(payload, msg.sender, 0, route);
     }
@@ -264,13 +270,17 @@ contract Branch is
         if (token == address(0)) {
             payable(to).transfer(amount);
         } else {
-            IERC20(token).safeTransfer(to, amount);
+            IERC20Upgradeable(token).safeTransfer(to, amount);
         }
     }
 
     function transferToken(
         bytes memory payload
     ) external onlyRole(IRoleManager(roleManager).ADAPTER()) {
+        require(
+            !protocolPause,
+            string.concat(TAG, ": Token transfer is halted")
+        );
         bytes32 id;
         bytes32 to;
         uint64 amountpx;
@@ -283,11 +293,13 @@ contract Branch is
         }
         uint256 amount = uint256(amountpx) * BASE + uint256(amountsx);
         address token = pools[id].token;
+        address receipient = address(uint160(uint256(to)));
         if (token == address(0)) {
-            payable(address(uint160(uint256(to)))).transfer(amount);
+            payable(receipient).transfer(amount);
         } else {
-            IERC20(token).safeTransfer(address(uint160(uint256(to))), amount);
+            IERC20Upgradeable(token).safeTransfer(receipient, amount);
         }
+        emit ReceiveToken(receipient, id, amount);
     }
 
     /**
@@ -323,7 +335,7 @@ contract Branch is
                 route
             );
         } else {
-            IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
+            IERC20Upgradeable(token).safeTransferFrom(msg.sender, address(this), amount);
             IAdapter(adapter).send{value: msg.value}(
                 payload,
                 msg.sender,
@@ -331,9 +343,8 @@ contract Branch is
                 route
             );
         }
-        emit SendToken(msg.sender, id, amount);
     }
-    
+
     /**
      * @dev Swaps liquidity across chain using Stargate Protocol
      * @param dstChainId - chain id of destination

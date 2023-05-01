@@ -1,7 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.9;
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "../../layerZero/lzApp/LzApp.sol";
 import "../interfaces/IAdapter.sol";
@@ -16,7 +14,6 @@ string constant TAG = "LzRoutePool";
  **/
 
 contract LzRoutePool is Initializable, LzApp {
-    using SafeMath for uint256;
 
     address public adapter;
     address public roleManager;
@@ -36,15 +33,17 @@ contract LzRoutePool is Initializable, LzApp {
     function initialize(
         address _lzEndpoint,
         uint16 _localChainId,
-        uint256 _gasUsage
+        uint256 _gasUsage,
+        address roleManagerAddress
     ) public initializer {
         __LzApp_init(_lzEndpoint, _localChainId);
         gasUsage = _gasUsage;
+        roleManager = roleManagerAddress;
     }
 
    
 
-    function setRoleManager(address roleManagerAddress) external onlyOwner {
+    function setRoleManager(address roleManagerAddress) external onlyRole(IRoleManager(roleManager).DEFAULT_ADMIN_ROLE()) {
         roleManager = roleManagerAddress;
     }
 

@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.9;
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "../../layerZero/lzApp/LzApp.sol";
@@ -14,8 +13,6 @@ string constant TAG = "LzRouteBranch";
  * Uses LayerZero functions for sending and receiving messages
  **/
 contract LzRouteBranch is Initializable, LzApp {
-    using SafeMath for uint256;
-
     address public adapter;
     address public roleManager;
 
@@ -37,7 +34,20 @@ contract LzRouteBranch is Initializable, LzApp {
         _;
     }
 
-    function setRoleManager(address roleManagerAddress) external onlyOwner {
+    function initialize(
+        address _lzEndpoint,
+        uint16 _localChainId,
+        uint16 _rootChainId,
+        uint256 _gasUsage,
+        address roleManagerAddress
+    ) public initializer {
+        __LzApp_init(_lzEndpoint, _localChainId);
+        rootChainId = _rootChainId;
+        gasUsage = _gasUsage;
+        roleManager = roleManagerAddress;
+    }
+
+    function setRoleManager(address roleManagerAddress) external onlyRole(IRoleManager(roleManager).DEFAULT_ADMIN_ROLE()) {
         roleManager = roleManagerAddress;
     }
 
@@ -52,16 +62,7 @@ contract LzRouteBranch is Initializable, LzApp {
         adapter = adapterAddress;
     }
 
-    function initialize(
-        address _lzEndpoint,
-        uint16 _localChainId,
-        uint16 _rootChainId,
-        uint256 _gasUsage
-    ) public initializer {
-        __LzApp_init(_lzEndpoint, _localChainId);
-        rootChainId = _rootChainId;
-        gasUsage = _gasUsage;
-    }
+    
 
     /**
      * @dev Configures gas value.

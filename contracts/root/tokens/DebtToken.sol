@@ -1,25 +1,28 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.9;
 
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
 import "../interfaces/IRoleManager.sol";
 import "../interfaces/ICore.sol";
 
 string constant TAG = "DebtToken";
 
-contract DebtToken is ERC20, Ownable {
+contract DebtToken is ERC20Upgradeable {
+    using SafeMathUpgradeable for uint256;
+
     address public core;
     address public roleManager;
     bytes32 public poolId;
-    uint256 public balanceScale = 1e18;
-    uint256 public constant MAG = 1e18;
-
-    constructor(
+    
+    function initialize(
         string memory name_,
-        string memory symbol_
-    ) ERC20(name_, symbol_) {}
+        string memory symbol_,
+        address roleManagerAddress
+    ) public initializer {
+        __ERC20_init( name_, symbol_);
+        roleManager = roleManagerAddress;
+    }
 
     /**
      * @dev Modifier that checks if caller has a specific role.
@@ -37,7 +40,7 @@ contract DebtToken is ERC20, Ownable {
         poolId = id;
     }
 
-    function setRoleManager(address roleManagerAddress) external onlyOwner {
+    function setRoleManager(address roleManagerAddress) external onlyRole(IRoleManager(roleManager).DEFAULT_ADMIN_ROLE()) {
         roleManager = roleManagerAddress;
     }
 
@@ -47,7 +50,7 @@ contract DebtToken is ERC20, Ownable {
 
     function balanceOf(address user) public view override returns (uint256) {
         uint dtScaled = ICore(core).getDTScaled(poolId);
-        return super.balanceOf(user) * dtScaled / 1e18;
+        return super.balanceOf(user).mul(dtScaled).div(1e18);
     }
 
     function _transfer(

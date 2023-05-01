@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.9;
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "./interfaces/ICore.sol";
 import "./interfaces/IRoleManager.sol";
@@ -12,8 +12,8 @@ string constant TAG = "FeeProvider";
  * Title FeeProvider
  * Pool interact with FeeProvider for getting fee and reward amount.
  **/
-contract FeeProvider is Initializable, OwnableUpgradeable {
-    using SafeMath for uint256;
+contract FeeProvider is Initializable, ContextUpgradeable {
+    using SafeMathUpgradeable for uint256;
 
     mapping(bytes32 => mapping(bytes32 => uint256))
         public OPTIMAL_GLOBAL_LIQUIDITY_FACTOR;
@@ -31,12 +31,12 @@ contract FeeProvider is Initializable, OwnableUpgradeable {
         _;
     }
 
-    function initialize() public initializer {
-        __Ownable_init();
+    function initialize(address roleManagerAddress) public initializer {
+        roleManager = roleManagerAddress;
     }
 
     // Set contract addresses
-    function setRoleManager(address roleManagerAddress) external onlyOwner {
+    function setRoleManager(address roleManagerAddress) external onlyRole(IRoleManager(roleManager).DEFAULT_ADMIN_ROLE()) {
         roleManager = roleManagerAddress;
     }
 

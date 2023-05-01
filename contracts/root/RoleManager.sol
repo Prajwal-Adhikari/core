@@ -20,6 +20,8 @@ contract RoleManagerPool is Initializable, AccessControlUpgradeable {
         keccak256("SET_CE_TOKEN_METHOD");
     bytes32 public constant SET_CONTROLLER_METHOD =
         keccak256("SET_CONTROLLER_METHOD");
+        bytes32 public constant SET_ORACLE_METHOD =
+        keccak256("SET_ORACLE_METHOD");
 
     bytes32 public constant INIT_POOL = keccak256("INIT_POOL");
     bytes32 public constant POOL_STATUS = keccak256("POOL_STATUS");

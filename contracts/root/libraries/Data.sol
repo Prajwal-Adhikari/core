@@ -92,6 +92,7 @@ library Data {
     event Liquidate(address user, address liquidator, bytes32 debtId, bytes32 collateralId, 
         uint256 collateralAmount, uint256 burnDebtAmount, uint256 repayAmount, uint256 discount);
     event ChangePoolStatus(bytes32 id, bool enable);
+    event SendToken(address user, bytes32 id, uint256 tokenAmount);
     event ReceiveToken(address user, bytes32 id, uint256 tokenAmount);
     event Swap(bytes32 id, bytes32 srcChainId, bytes32 destChainId, uint256 tokenAmount);
 }
