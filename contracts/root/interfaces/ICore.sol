@@ -5,7 +5,7 @@ import "../libraries/Data.sol";
 interface ICore {
     /**
      * @notice Configures role manager address
-     * This function can only be accessed by the owner.
+     * This function can only be accessed by the account with role DEFAULT_ADMIN_ROLE.
      * @param roleManagerAddress - address of the roleManager contract.
      **/
     function setRoleManager(address roleManagerAddress) external;

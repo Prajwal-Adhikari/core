@@ -20,6 +20,12 @@ interface IRoleManager {
      * @param account - address of user.
      **/
     function checkRole(bytes32 role, address account) external view ;
+
+     /**
+     * @notice Returns bytes32 value of the public variable DEFAULT_ADMIN_ROLE
+     **/
+    function DEFAULT_ADMIN_ROLE() external view returns (bytes32);
+
     /**
      * @notice Returns bytes32 value of the public variable SET_POOL_METHOD
      **/
@@ -49,6 +55,11 @@ interface IRoleManager {
      * @notice Returns bytes32 value of the public variable SET_FEEPROVIDER_METHOD
      **/
     function SET_FEEPROVIDER_METHOD() external view returns (bytes32);
+
+     /**
+     * @notice Returns bytes32 value of the public variable SET_ORACLE_METHOD
+     **/
+    function SET_ORACLE_METHOD() external view returns (bytes32);
 
     /**
      * @notice Returns bytes32 value of the public variable SET_CE_TOKEN_METHOD

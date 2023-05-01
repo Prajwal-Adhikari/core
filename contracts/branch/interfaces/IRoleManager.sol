@@ -24,6 +24,11 @@ interface IRoleManager {
     /**
      * @notice Returns bytes32 value of the public variable SET_BRANCH_METHOD
      **/
+    function DEFAULT_ADMIN_ROLE() external view returns (bytes32);
+
+    /**
+     * @notice Returns bytes32 value of the public variable SET_BRANCH_METHOD
+     **/
     function SET_BRANCH_METHOD() external view returns (bytes32);
 
     /**
@@ -35,6 +40,11 @@ interface IRoleManager {
      * @notice Returns bytes32 value of the public variable SET_ROUTE_METHOD
      **/
     function SET_ROUTE_METHOD() external view returns (bytes32);
+
+    /**
+     * @notice Returns bytes32 value of the public variable SET_CONTROLLER_METHOD
+     **/
+    function SET_CONTROLLER_METHOD() external view returns (bytes32);
 
     /**
      * @notice Returns bytes32 value of the public variable SET_POOL
@@ -70,4 +80,9 @@ interface IRoleManager {
      * @notice Returns bytes32 value of the public variable ROUTE
      **/
     function ROUTE() external view returns (bytes32);
+
+    /**
+     * @notice Returns bytes32 value of the public variable CONTROLLER
+     **/
+    function CONTROLLER() external view returns (bytes32);
 }

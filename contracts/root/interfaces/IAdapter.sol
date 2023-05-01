@@ -4,7 +4,7 @@ pragma solidity ^0.8.9;
 interface IAdapter {
     /**
      * @notice Configures role manager.
-     * This function can only be accessed by owner
+     * This function can only be accessed by account with role DEFAULT_ADMIN_ROLE
      * @param roleManagerAddress - address of the role manager contract
      **/
 
