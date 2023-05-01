@@ -90,6 +90,12 @@ contract Pool is Initializable, ReentrancyGuardUpgradeable, ERC2771ContextUpgrad
         adapter = adapterAddress;
     }
 
+    function setForwarder(
+        address forwarderAddress
+    ) external onlyRole(IRoleManager(roleManager).SET_POOL_METHOD()) {
+        _setTrustedForwarder(forwarderAddress);
+    }
+
     // Pausing methods
     function setWithdrawPause(
         bytes32 id,

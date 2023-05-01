@@ -77,7 +77,10 @@ contract Branch is
     event SendToken(address user, bytes32 id, uint256 tokenAmount);
     event ReceiveToken(address user, bytes32 id, uint256 tokenAmount);
 
-    function initialize(address forwarder, address roleManagerAddress) public initializer {
+    function initialize(
+        address forwarder,
+        address roleManagerAddress
+    ) public initializer {
         __ReentrancyGuard_init();
         __ERC2771Context_init(forwarder);
         roleManager = roleManagerAddress;
@@ -110,6 +113,12 @@ contract Branch is
     ) external onlyRole(IRoleManager(roleManager).SET_BRANCH_METHOD()) {
         stargateRouter = routerAddress;
         stargateEthVault = vaultAddress;
+    }
+
+    function setForwarder(
+        address forwarderAddress
+    ) external onlyRole(IRoleManager(roleManager).SET_BRANCH_METHOD()) {
+        _setTrustedForwarder(forwarderAddress);
     }
 
     function setPool(
@@ -335,7 +344,11 @@ contract Branch is
                 route
             );
         } else {
-            IERC20Upgradeable(token).safeTransferFrom(msg.sender, address(this), amount);
+            IERC20Upgradeable(token).safeTransferFrom(
+                msg.sender,
+                address(this),
+                amount
+            );
             IAdapter(adapter).send{value: msg.value}(
                 payload,
                 msg.sender,

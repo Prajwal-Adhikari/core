@@ -49,15 +49,26 @@ describe("Ready", function () {
         // this.lzEndpointMockClientA.setEstimatedFees(toTokenAmount(0.001), 0);
         // this.lzEndpointMockClientB.setEstimatedFees(toTokenAmount(0.001), 0);
 
+        const RoleManagerBranch = await ethers.getContractFactory("RoleManagerBranch");
+        roleManagerA = await upgrades.deployProxy(RoleManagerBranch, []);
+        roleManagerB = await upgrades.deployProxy(RoleManagerBranch, []);
+        roleManagerC = await upgrades.deployProxy(RoleManagerBranch, []);
+
+        const RoleManagerPool = await ethers.getContractFactory("RoleManagerPool");
+        roleManagerS = await upgrades.deployProxy(RoleManagerPool, []);
+
         const CEToken = await ethers.getContractFactory("CEToken");
-        ceMATIC = await CEToken.deploy("CEMATIC", "CEMATIC");
-        ceFTM = await CEToken.deploy("CEFTM", "CEFTM");
-        ceBNB = await CEToken.deploy("CEBNB", "CEBNB");
+        ceMATIC = await upgrades.deployProxy(CEToken,["CEMATIC", "CEMATIC", roleManagerS.address]);
+        ceFTM = await upgrades.deployProxy(CEToken,["CEFTM", "CEFTM", roleManagerS.address]);
+        ceBNB = await upgrades.deployProxy(CEToken,["CEBNB", "CEBNB", roleManagerS.address]);
 
         const DebtToken = await ethers.getContractFactory("DebtToken");
-        debtMATIC = await DebtToken.deploy("DebtMATIC", "DebtMATIC");
-        debtFTM = await DebtToken.deploy("DebtFTM", "DebtFTM");
-        debtBNB = await DebtToken.deploy("DebtBNB", "DebtBNB");
+        debtMATIC = await upgrades.deployProxy(DebtToken,["DebtMATIC", "DebtMATIC", roleManagerS.address]);
+        debtFTM = await upgrades.deployProxy(DebtToken,["DebtFTM", "DebtFTM", roleManagerS.address]);
+        debtBNB = await upgrades.deployProxy(DebtToken,["DebtBNB", "DebtBNB", roleManagerS.address]);
+    
+
+
 
         const ERC20 = await ethers.getContractFactory("ERC20Mock")
         matic = await ERC20.deploy("MATIC", "MATIC")
@@ -66,55 +77,49 @@ describe("Ready", function () {
 
 
         const FeeProvider = await ethers.getContractFactory("FeeProvider");
-        feeProvider = await upgrades.deployProxy(FeeProvider, []);
+        feeProvider = await upgrades.deployProxy(FeeProvider, [roleManagerS.address]);
 
-        const Oracle = await ethers.getContractFactory("Oracle");
+        const Oracle = await ethers.getContractFactory("OracleMock");
         this.oracle = await Oracle.deploy();
 
         const Client = await ethers.getContractFactory("Branch");
-        clientA = await upgrades.deployProxy(Client, []);
-        clientB = await upgrades.deployProxy(Client, []);
-        clientC = await upgrades.deployProxy(Client, []);
+        clientA = await upgrades.deployProxy(Client, [treasury.address, roleManagerA.address]);
+        clientB = await upgrades.deployProxy(Client, [treasury.address, roleManagerB.address]);
+        clientC = await upgrades.deployProxy(Client, [treasury.address, roleManagerC.address]);
 
         // Client Adapter
         const Adapter = await ethers.getContractFactory("AdapterBranch");
-        adapterA = await upgrades.deployProxy(Adapter, []);
-        adapterB = await upgrades.deployProxy(Adapter, []);
-        adapterC = await upgrades.deployProxy(Adapter, []);
+        adapterA = await upgrades.deployProxy(Adapter, [roleManagerA.address]);
+        adapterB = await upgrades.deployProxy(Adapter, [roleManagerB.address]);
+        adapterC = await upgrades.deployProxy(Adapter, [roleManagerC.address]);
 
         // Client Route 400000 gas for testing
         const Route = await ethers.getContractFactory("LzRouteBranch");
-        routeA = await upgrades.deployProxy(Route, [this.lzEndpointMockClientA.address, this.chainIdClientA, this.chainIdServer, 400000]);
-        routeB = await upgrades.deployProxy(Route, [this.lzEndpointMockClientB.address, this.chainIdClientB, this.chainIdServer, 400000]);
-        routeC = await upgrades.deployProxy(Route, [this.lzEndpointMockClientC.address, this.chainIdClientC, this.chainIdServer, 400000]);
-
-        const RoleManagerBranch = await ethers.getContractFactory("RoleManagerBranch");
-        roleManagerA = await upgrades.deployProxy(RoleManagerBranch, []);
-        roleManagerB = await upgrades.deployProxy(RoleManagerBranch, []);
-        roleManagerC = await upgrades.deployProxy(RoleManagerBranch, []);
+        routeA = await upgrades.deployProxy(Route, [this.lzEndpointMockClientA.address, this.chainIdClientA, this.chainIdServer, 400000, roleManagerA.address]);
+        routeB = await upgrades.deployProxy(Route, [this.lzEndpointMockClientB.address, this.chainIdClientB, this.chainIdServer, 400000, roleManagerB.address]);
+        routeC = await upgrades.deployProxy(Route, [this.lzEndpointMockClientC.address, this.chainIdClientC, this.chainIdServer, 400000, roleManagerC.address]);
 
         const Server = await ethers.getContractFactory("Pool");
-        pool = await upgrades.deployProxy(Server, []);
+        pool = await upgrades.deployProxy(Server, [treasury.address, roleManagerS.address]);
 
         // Server Adapter
         const AdapterPool = await ethers.getContractFactory("AdapterPool");
-        adapterS = await upgrades.deployProxy(AdapterPool, []);
+        adapterS = await upgrades.deployProxy(AdapterPool, [roleManagerS.address]);
 
-        const RoleManagerPool = await ethers.getContractFactory("RoleManagerPool");
-        roleManagerS = await upgrades.deployProxy(RoleManagerPool, []);
+        
 
         const Core = await ethers.getContractFactory("Core");
-        core = await upgrades.deployProxy(Core, [treasury.address]);
+        core = await upgrades.deployProxy(Core, [treasury.address, roleManagerS.address]);
 
         // Server Route
         const LzRoutePool = await ethers.getContractFactory("LzRoutePool");
-        routeS = await upgrades.deployProxy(LzRoutePool, [this.lzEndpointMockServer.address, this.chainIdServer, 200000]);
+        routeS = await upgrades.deployProxy(LzRoutePool, [this.lzEndpointMockServer.address, this.chainIdServer, 200000, roleManagerS.address]);
 
         const LiquidationManager = await ethers.getContractFactory("LiquidationManager");
-        liquidationManager = await upgrades.deployProxy(LiquidationManager, []);
+        liquidationManager = await upgrades.deployProxy(LiquidationManager, [roleManagerS.address]);
 
         const Controller = await ethers.getContractFactory("Controller");
-        controller = await Controller.deploy();
+        controller = await upgrades.deployProxy(Controller, [roleManagerS.address]);
 
         // Grant roles to accounts in roleManager contract
         await grantRole();
