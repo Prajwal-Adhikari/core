@@ -3,9 +3,9 @@ pragma solidity ^0.8.9;
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
-import {AxelarExecutable} from "../../axelar/executable/AxelarExecutable.sol";
-import {IAxelarGateway} from "../../axelar/interfaces/IAxelarGateway.sol";
-import {IAxelarGasService} from "../../axelar/interfaces/IAxelarGasService.sol";
+import {AxelarExecutable} from "../../communicationProtocol/axelar/executable/AxelarExecutable.sol";
+import {IAxelarGateway} from "../../communicationProtocol/axelar/interfaces/IAxelarGateway.sol";
+import {IAxelarGasService} from "../../communicationProtocol/axelar/interfaces/IAxelarGasService.sol";
 import "../interfaces/IAdapter.sol";
 import "../interfaces/IRoleManager.sol";
 
