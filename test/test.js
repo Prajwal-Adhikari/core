@@ -435,7 +435,7 @@ describe("Ready", function () {
 
     })
 
-    /*
+    
     it("test ceToken transfer", async function() {
         let fees = await routeA.connect(alice).estimateFees(1, 1000000);
 
@@ -462,6 +462,7 @@ describe("Ready", function () {
         await clientB.connect(alice).repayRequest(FTM, toTokenAmount(50000), LZO, 0, { value: fees })
         await printCEBalance();
     })
+
 
     it("Simple test", async function () {
         console.log("here");
@@ -526,7 +527,7 @@ describe("Ready", function () {
         await liquidationManager.connect(alice).liquidate(bob.address, FTM, MATIC, toTokenAmount(50000));
         await printInfo();
     })
-    */
+
 
     // it("Test reward", async function () {
     //     let fees = await routeA.connect(alice).estimateFees(MATIC);
