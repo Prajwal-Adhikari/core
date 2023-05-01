@@ -178,7 +178,7 @@ contract Branch is
         );
         require(pools[id].enable, string.concat(TAG, ": Pool not enable"));
         _pay(pools[id].token, amount, id, TYPE_DEPOSIT, route, airdropAmount);
-        emit SendToken(msg.sender, id, amount);
+        emit SendToken(_msgSender(), id, amount);
     }
 
     function repayRequest(
@@ -193,7 +193,7 @@ contract Branch is
         );
         require(pools[id].enable, string.concat(TAG, ": Pool not enable"));
         _pay(pools[id].token, amount, id, TYPE_REPAY, route, airdropAmount);
-        emit SendToken(msg.sender, id, amount);
+        emit SendToken(_msgSender(), id, amount);
     }
 
     function swapRequest(
@@ -330,7 +330,7 @@ contract Branch is
         bytes memory payload = abi.encodePacked(
             functionType,
             id,
-            addressToBytes32(msg.sender),
+            addressToBytes32(_msgSender()),
             amountpx,
             amountsx
         );
@@ -344,7 +344,7 @@ contract Branch is
             );
         } else {
             IERC20Upgradeable(token).safeTransferFrom(
-                msg.sender,
+                _msgSender(),
                 address(this),
                 amount
             );

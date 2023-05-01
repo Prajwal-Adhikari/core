@@ -161,7 +161,7 @@ contract Pool is Initializable, ReentrancyGuardUpgradeable, ERC2771ContextUpgrad
         IAdapter(adapter).send{value: msg.value}(
             payload,
             chainId,
-            _msgSender(),
+            msg.sender,
             airdropAmount,
             route
         );
@@ -208,7 +208,7 @@ contract Pool is Initializable, ReentrancyGuardUpgradeable, ERC2771ContextUpgrad
         IAdapter(adapter).send{value: msg.value}(
             payload,
             chainId,
-            _msgSender(),
+            msg.sender,
             airdropAmount,
             route
         );
