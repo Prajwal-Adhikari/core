@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.9;
 import "hardhat/console.sol";
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -14,6 +14,8 @@ import "./interfaces/IFeeProvider.sol";
 import "./interfaces/IAdapter.sol";
 import "./interfaces/IRoleManager.sol";
 import "./libraries/Data.sol";
+import "./libraries/Data.sol";
+import "../utils/ERC2771ContextUpgradeable.sol";
 
 string constant TAG = "Pool";
 
@@ -24,8 +26,8 @@ string constant TAG = "Pool";
  * to Pool
  * Users interact with Pool for Borrow, Withdraw, and Liquidate actions
  **/
-contract Pool is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
-    using SafeMath for uint256;
+contract Pool is Initializable, ReentrancyGuardUpgradeable, ERC2771ContextUpgradeable {
+    using SafeMathUpgradeable for uint256;
 
     // Request Types
     uint8 internal constant TYPE_DEPOSIT = 1;
@@ -51,9 +53,10 @@ contract Pool is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
 
     bool public feeEnable;
 
-    function initialize() public initializer {
-        __Ownable_init();
+    function initialize(address forwarder, address roleManagerAddress) public initializer {
         __ReentrancyGuard_init();
+        __ERC2771Context_init(forwarder);
+        roleManager = roleManagerAddress;
     }
 
     /**
@@ -65,7 +68,7 @@ contract Pool is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
     }
 
     // Set contract addresses
-    function setRoleManager(address roleManagerAddress) external onlyOwner {
+    function setRoleManager(address roleManagerAddress) external  {
         roleManager = roleManagerAddress;
     }
 
@@ -135,7 +138,7 @@ contract Pool is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
             id,
             chainId,
             ceAmount,
-            msg.sender
+            _msgSender()
         );
         if (feeEnable) {
             uint256 fee = IFeeProvider(feeProvider).getFeeAmount(chainId, id);
@@ -152,18 +155,19 @@ contract Pool is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
         IAdapter(adapter).send{value: msg.value}(
             payload,
             chainId,
-            msg.sender,
+            _msgSender(),
             airdropAmount,
             route
         );
         emit Data.Withdraw(
-            msg.sender,
+            _msgSender(),
             _bytesToAddress(to),
             id,
             chainId,
             tokenAmount,
             ceAmount
         );
+        emit Data.SendToken(_msgSender(), id, tokenAmount);
     }
 
     function borrow(
@@ -182,7 +186,7 @@ contract Pool is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
             id,
             chainId,
             tokenAmount,
-            msg.sender
+            _msgSender()
         );
         if (feeEnable) {
             uint256 fee = IFeeProvider(feeProvider).getFeeAmount(chainId, id);
@@ -198,18 +202,19 @@ contract Pool is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
         IAdapter(adapter).send{value: msg.value}(
             payload,
             chainId,
-            msg.sender,
+            _msgSender(),
             airdropAmount,
             route
         );
         emit Data.Borrow(
-            msg.sender,
+            _msgSender(),
             _bytesToAddress(to),
             id,
             chainId,
             tokenAmount,
             debtAmount
         );
+        emit Data.SendToken(_msgSender(), id, tokenAmount);
     }
 
     function _repay(
@@ -222,6 +227,7 @@ contract Pool is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
             core
         ).repay(id, chainId, user, tokenAmount);
         emit Data.Repay(user, id, chainId, repayAmount, debtAmount, ceAmount);
+        emit Data.ReceiveToken(user, id, tokenAmount);
     }
 
     function _deposit(
@@ -232,6 +238,7 @@ contract Pool is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
     ) internal {
         uint256 ceAmount = ICore(core).deposit(id, chainId, user, tokenAmount);
         emit Data.Deposit(user, id, chainId, tokenAmount, ceAmount);
+        emit Data.ReceiveToken(user, id, tokenAmount);
     }
 
     function _swap(
