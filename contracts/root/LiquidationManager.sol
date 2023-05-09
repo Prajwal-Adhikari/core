@@ -130,29 +130,21 @@ contract LiquidationManager is
         );
 
         uint256 discount;
-        uint256 liqPercent = 1e18;
+        uint256 liqPercent;
         if (currentLTV < 1e18) {
             discount = 1e36 / currentLTV - 999000000000000000;
             if (discount > config.liqMaxDiscount) {
                 discount = config.liqMaxDiscount;
             }
 
-            uint256 initialLiqPercent = config
+            uint256 numerator_a = config
                 .liqClosingFac
-                .mul(1e18 - currentLTV)
-                .div(1e18 - config.liqThreshold);
-            if (currentLTV > config.liqThreshold) {
-                liqPercent = initialLiqPercent.add(
-                    currentLTV.sub(config.liqThreshold).mul(1e18).div(
-                        1e18 - config.liqThreshold
-                    )
-                );
-            } else {
-                liqPercent = initialLiqPercent.add(
-                    config.liqThreshold.sub(currentLTV).mul(1e18).div(
-                        1e18 - config.liqThreshold
-                    )
-                );
+                .mul(1e18 + currentLTV);
+            uint256 numerator_b = config
+                .liqClosingFac
+                .mul(currentLTV).add(config.liqThreshold);
+            if(numerator_a > numerator_b) {
+                liqPercent = numerator_a.sub(numerator_b).div(1e18 - config.liqThreshold);
             }
 
             if (liqPercent > 1e18) {
