@@ -254,7 +254,7 @@ contract Branch is
             );
         }
 
-        (uint64 amountpx, uint64 amountsx) = _buildRemoteAmount(qty, id);
+        (uint64 amountpx, uint64 amountsx) = _buildRemoteAmount(qty, pools[id].token);
 
         // Creating payload with required info to perform swap
         bytes memory payload = abi.encodePacked(
@@ -326,7 +326,7 @@ contract Branch is
         bytes32 route,
         uint256 airdropAmount
     ) internal {
-        (uint64 amountpx, uint64 amountsx) = _buildRemoteAmount(amount, id);
+        (uint64 amountpx, uint64 amountsx) = _buildRemoteAmount(amount, token);
         bytes memory payload = abi.encodePacked(
             functionType,
             id,
@@ -400,19 +400,23 @@ contract Branch is
      * @dev split the amount into 2 uint64 number to fix other not evm branch like aptos witch not support uint256 and keep the message send to root chain in the same format
      * For example 123456789000000000987654321 = 123456789 * 1e18 + 987654321
      * @param _localAmount the amount in evm branch
-     * @param _id the pool id to get the token decimal
+     * @param _token the token to get the token decimals
      **/
     function _buildRemoteAmount(
         uint256 _localAmount,
-        bytes32 _id
+        address _token
     ) internal view returns (uint64 amountpx, uint64 amountsx) {
-        (, bytes memory data) = pools[_id].token.staticcall(
-            abi.encodeWithSignature("decimals()")
-        );
-        uint8 decimal = abi.decode(data, (uint8));
-        _localAmount = decimal > ROOT_DECIMALS
-            ? _localAmount / (10 ** (decimal - ROOT_DECIMALS))
-            : _localAmount * (10 ** (ROOT_DECIMALS - decimal));
+        uint8 decimals = 18;
+        if(_token != address(0)) {
+            (, bytes memory data) = _token.staticcall(
+                abi.encodeWithSignature("decimals()")
+            );
+            decimals = abi.decode(data, (uint8));
+        }
+
+        _localAmount = decimals > ROOT_DECIMALS
+            ? _localAmount / (10 ** (decimals - ROOT_DECIMALS))
+            : _localAmount * (10 ** (ROOT_DECIMALS - decimals));
         amountpx = uint64(_localAmount / BASE);
         amountsx = uint64(_localAmount % BASE);
     }
