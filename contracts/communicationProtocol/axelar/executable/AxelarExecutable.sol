@@ -2,18 +2,37 @@
 
 pragma solidity ^0.8.0;
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import { IAxelarGateway } from '../interfaces/IAxelarGateway.sol';
-import { IAxelarExecutable } from '../interfaces/IAxelarExecutable.sol';
+import "@openzeppelin/contracts-upgradeable/utils/StringsUpgradeable.sol";
+import {IAxelarGateway} from "../interfaces/IAxelarGateway.sol";
+import {IAxelarExecutable} from "../interfaces/IAxelarExecutable.sol";
+import "../../../root/libraries/Address.sol";
 
 contract AxelarExecutable is Initializable, IAxelarExecutable {
     IAxelarGateway public gateway;
+    string public localChainId;
 
-    function __AxelarExecutable_init(address gateway_) internal onlyInitializing {
+    function __AxelarExecutable_init(
+        address gateway_,
+        string calldata _localChainId
+    ) internal onlyInitializing {
         if (gateway_ == address(0)) revert InvalidAddress();
 
         gateway = IAxelarGateway(gateway_);
+        localChainId = _localChainId;
     }
 
+    function localReceive(
+        string calldata sourceChain_,
+        string calldata sourceAddress_,
+        bytes calldata payload_
+    ) external {
+        require(
+            Address.parseAddr(sourceAddress_) ==  msg.sender,
+            "AxelarExecutable: Caller is not a trusted contract"
+        );
+
+        _execute(sourceChain_, sourceAddress_, payload_);
+    }
 
     function execute(
         bytes32 commandId,
@@ -23,8 +42,14 @@ contract AxelarExecutable is Initializable, IAxelarExecutable {
     ) external {
         bytes32 payloadHash = keccak256(payload);
 
-        if (!gateway.validateContractCall(commandId, sourceChain, sourceAddress, payloadHash))
-            revert NotApprovedByGateway();
+        if (
+            !gateway.validateContractCall(
+                commandId,
+                sourceChain,
+                sourceAddress,
+                payloadHash
+            )
+        ) revert NotApprovedByGateway();
 
         _execute(sourceChain, sourceAddress, payload);
     }
@@ -50,7 +75,13 @@ contract AxelarExecutable is Initializable, IAxelarExecutable {
             )
         ) revert NotApprovedByGateway();
 
-        _executeWithToken(sourceChain, sourceAddress, payload, tokenSymbol, amount);
+        _executeWithToken(
+            sourceChain,
+            sourceAddress,
+            payload,
+            tokenSymbol,
+            amount
+        );
     }
 
     function _execute(

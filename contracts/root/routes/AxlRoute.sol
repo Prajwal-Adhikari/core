@@ -3,11 +3,13 @@ pragma solidity ^0.8.9;
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/StringsUpgradeable.sol";
 import {AxelarExecutable} from "../../communicationProtocol/axelar/executable/AxelarExecutable.sol";
 import {IAxelarGateway} from "../../communicationProtocol/axelar/interfaces/IAxelarGateway.sol";
 import {IAxelarGasService} from "../../communicationProtocol/axelar/interfaces/IAxelarGasService.sol";
 import "../interfaces/IAdapter.sol";
 import "../interfaces/IRoleManager.sol";
+import "../libraries/Address.sol";
 
 string constant TAG = "AxlRoutePool";
 
@@ -15,7 +17,7 @@ contract AxlRoutePool is Initializable, AxelarExecutable, ContextUpgradeable {
     mapping(bytes32 => string) public destChain;
     mapping(bytes32 => string) public destAddress;
     mapping(bytes32 => bytes32) public chainKey;
-    mapping(bytes32 => bytes32) public trustedContract;
+    mapping(bytes32 => address) public trustedContract;
 
     address public adapter;
     address public roleManager;
@@ -34,25 +36,26 @@ contract AxlRoutePool is Initializable, AxelarExecutable, ContextUpgradeable {
     function initialize(
         address _gateway,
         address _gasReceiver,
-        address roleManagerAddress
+        address roleManagerAddress,
+        string calldata _localChain
     ) public initializer {
-        __AxelarExecutable_init(_gateway);
+        __AxelarExecutable_init(_gateway, _localChain);
         gasService = IAxelarGasService(_gasReceiver);
         roleManager = roleManagerAddress;
     }
 
-
-    function setRoleManager(address roleManagerAddress) external onlyRole(IRoleManager(roleManager).DEFAULT_ADMIN_ROLE()) {
+    function setRoleManager(
+        address roleManagerAddress
+    ) external onlyRole(IRoleManager(roleManager).DEFAULT_ADMIN_ROLE()) {
         roleManager = roleManagerAddress;
     }
 
-
-
-    function setAdapter(address adapterAddress) external onlyRole(IRoleManager(roleManager).SET_ROUTE_METHOD()) {
+    function setAdapter(
+        address adapterAddress
+    ) external onlyRole(IRoleManager(roleManager).SET_ROUTE_METHOD()) {
         adapter = adapterAddress;
     }
 
-  
     function setDestChainIdNameAddress(
         bytes32 chainId,
         string calldata name,
@@ -61,9 +64,7 @@ contract AxlRoutePool is Initializable, AxelarExecutable, ContextUpgradeable {
         destChain[chainId] = name;
         destAddress[chainId] = addr;
         chainKey[keccak256(abi.encodePacked(name))] = chainId;
-        trustedContract[keccak256(abi.encodePacked(name))] = keccak256(
-            abi.encodePacked(addr)
-        );
+        trustedContract[keccak256(abi.encodePacked(name))] = Address.parseAddr(addr);
     }
 
     function send(
@@ -72,16 +73,27 @@ contract AxlRoutePool is Initializable, AxelarExecutable, ContextUpgradeable {
         address sender,
         uint256
     ) external payable onlyRole(IRoleManager(roleManager).ADAPTER()) {
-        if (msg.value > 0) {
-            gasService.payNativeGasForContractCall{value: msg.value}(
-                address(this),
-                destChain[chainId],
-                destAddress[chainId],
-                payload,
-                sender
-            );
+        if (
+            keccak256(abi.encodePacked(localChainId)) ==
+            keccak256(abi.encodePacked(destChain[chainId]))
+        ) {
+            IAxelarGateway(Address.parseAddr(destAddress[chainId]))
+                .localReceive(localChainId, StringsUpgradeable.toHexString(
+                            address(this))
+                        , payload);
+        } else {
+            if (msg.value > 0) {
+                gasService.payNativeGasForContractCall{value: msg.value}(
+                    address(this),
+                    destChain[chainId],
+                    destAddress[chainId],
+                    payload,
+                    sender
+                );
+            }
+            gateway.callContract(destChain[chainId], destAddress[chainId], payload);
         }
-        gateway.callContract(destChain[chainId], destAddress[chainId], payload);
+        
     }
 
     function _execute(
@@ -90,12 +102,12 @@ contract AxlRoutePool is Initializable, AxelarExecutable, ContextUpgradeable {
         bytes calldata payload_
     ) internal override {
         bytes32 chain = keccak256(abi.encodePacked(sourceChain_));
-        bytes32 addr = keccak256(abi.encodePacked(sourceAddress_));
+        address addr = Address.parseAddr(sourceAddress_);
         require(
             trustedContract[chain] == addr,
             string.concat(TAG, ": Invalid contract")
         );
-        bytes memory payload = payload_;
-        IAdapter(adapter).execute(payload, chainKey[chain]);
+        IAdapter(adapter).execute(payload_, chainKey[chain]);
+      
     }
 }

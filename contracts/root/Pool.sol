@@ -14,7 +14,6 @@ import "./interfaces/IFeeProvider.sol";
 import "./interfaces/IAdapter.sol";
 import "./interfaces/IRoleManager.sol";
 import "./libraries/Data.sol";
-import "./libraries/Data.sol";
 import "../utils/ERC2771ContextUpgradeable.sol";
 
 string constant TAG = "Pool";
@@ -26,7 +25,11 @@ string constant TAG = "Pool";
  * to Pool
  * Users interact with Pool for Borrow, Withdraw, and Liquidate actions
  **/
-contract Pool is Initializable, ReentrancyGuardUpgradeable, ERC2771ContextUpgradeable {
+contract Pool is
+    Initializable,
+    ReentrancyGuardUpgradeable,
+    ERC2771ContextUpgradeable
+{
     using SafeMathUpgradeable for uint256;
 
     // Request Types
@@ -53,7 +56,10 @@ contract Pool is Initializable, ReentrancyGuardUpgradeable, ERC2771ContextUpgrad
 
     bool public feeEnable;
 
-    function initialize(address forwarder, address roleManagerAddress) public initializer {
+    function initialize(
+        address forwarder,
+        address roleManagerAddress
+    ) public initializer {
         __ReentrancyGuard_init();
         __ERC2771Context_init(forwarder);
         roleManager = roleManagerAddress;
@@ -68,7 +74,9 @@ contract Pool is Initializable, ReentrancyGuardUpgradeable, ERC2771ContextUpgrad
     }
 
     // Set contract addresses
-    function setRoleManager(address roleManagerAddress) external  {
+    function setRoleManager(
+        address roleManagerAddress
+    ) external onlyRole(IRoleManager(roleManager).DEFAULT_ADMIN_ROLE()) {
         roleManager = roleManagerAddress;
     }
 

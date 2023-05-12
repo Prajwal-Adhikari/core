@@ -104,6 +104,12 @@ interface IAxelarGateway {
         bytes calldata payload
     ) external;
 
+    function localReceive(
+        string calldata sourceChain_,
+        string calldata sourceAddress_,
+        bytes calldata payload_
+    ) external;
+
     function callContractWithToken(
         string calldata destinationChain,
         string calldata contractAddress,
