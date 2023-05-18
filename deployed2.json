@@ -4,7 +4,7 @@
     "gasservice": "0xbE406F0189A0B4cf3A05C286473D23791Dd44Cc6",
     "treasury": "0x2D83750BDB3139eed1F76952dB472A512685E3e0",
     "endpoint": "0x6Fcb97553D41516Cb228ac03FdC8B9a0a9df04A1",
-    "serverId": 10102,
+    "chainId": 10102,
     "tokens": [
         "AVAX",
         "FTM",
@@ -15,45 +15,105 @@
     ],
     "branches": {
         "avax": {
+            "chainName": "AVAX",
+            "chain": "Avalanche",
+            "gateway": "0xC249632c2D40b9001FE907806902f63038B737Ab",
+            "gasservice": "0xbE406F0189A0B4cf3A05C286473D23791Dd44Cc6",
             "endpoint": "0x93f54D755A063cE7bB9e6Ac47Eccc8e33411d706",
-            "chainId": 10106
+            "chainId": 10106,
+            "AVAX": "0xBfBa3E3727430E639047F689d6C8c0Da9772D15E",
+            "USDC": "0x574f0FcDa94A90839469a0bC581F47b5110c7A15",
+            "branch": "0xF16FEbFdF5fB88e579D3B64288F30FE1b9ABD31E",
+            "adapter": "0xFB9178C55ce7230B13EeC132f3Da23934C02B3Fa",
+            "route": "0xe27A38c44a6c30c755892113Ce81Fa799710101c",
+            "axelar": "0x91BC8753E6657A68b34C78636Abc05E54ac21793",
+            "roleManager": "0xB8998f4b17dF02B3155DF1bf90Ba81ddbC5530D1"
         },
         "ftm": {
+            "chainName": "FTM",
             "chain": "Fantom",
             "gateway": "0x97837985Ec0494E7b9C71f5D3f9250188477ae14",
             "gasservice": "0xbE406F0189A0B4cf3A05C286473D23791Dd44Cc6",
             "endpoint": "0x7dcAD72640F835B0FA36EFD3D6d3ec902C7E5acf",
             "chainId": 10112,
-            "FTM": "0x13A0b289583511627c2408387AF7185d0E2D478B",
-            "USDC": "0xC987b4D6e7d55Cf322A33c185AbC06EF4A360448",
-            "branch": "0x89591C7eA617Eb13C18ED4117de4564c13fA9cbF",
-            "adapter": "0xe806285e5A236BbB6b0f2dBA4864677987430b94",
-            "route": "0x9EeE68B08c8218A872363723b8933b23F6Cad560",
-            "ceToken": "0x21367EF3c29C3917a071b57eA31B4595e0B8D0E5",
-            "debtToken": "0x7D330326Af7768B71ac4e5cB5d9F2613728ecE4B"
+            "FTM": "0x6c4EA8E3562A703D1ad0123c9ac5ca13ca2e4de5",
+            "USDC": "0x8f4aD75ca4BFf2AFA80B8dBF535d78744606269c",
+            "branch": "0x744CF3DCD3ae1f74907E070F3771dbF7786eE0f4",
+            "adapter": "0xe3DE9B7D169E9E50d45Bf6065dCB26cBE3695607",
+            "route": "0x842d02a11D5F00f5FC2004a2CD5E823b98EB4e34",
+            "axelar": "0xd972e075dd5091a2B6C4510ea2F611F2A9318a9E",
+            "roleManager": "0x6Bb91E50225A3cbBB99B7649E9E2cF20F5c2843c"
         },
         "bsc": {
+            "chainName": "BNB",
+            "chain": "binance",
+            "gateway": "0x4D147dCb984e6affEEC47e44293DA442580A3Ec0",
+            "gasservice": "0xbE406F0189A0B4cf3A05C286473D23791Dd44Cc6",
             "endpoint": "0x6Fcb97553D41516Cb228ac03FdC8B9a0a9df04A1",
-            "chainId": 10102
+            "chainId": 10102,
+            "BNB": "0xea070C4498d99E1438f4726a47CeFa4f1E429820",
+            "USDC": "0x6e518A6eAc87dEC2b5ec374100631348bfE739a6",
+            "branch": "0x59151d646A9aA10f0f8901200cC47f2DC4870594",
+            "adapter": "0xc0EFa38194635C3a9CEABF4AD9D6aFc80c667501",
+            "route": "0x7dcA326f42a9493D84e384dbFf703EA75a1077fe",
+            "axelar": "0x5a948682668B8cA26cA1B1cd7aE72070f962DD7D",
+            "roleManager": "0x99Eb62B0925b028b36283865989E3F05a19b425A"
         },
         "goerli": {
+            "chainName": "GRL",
+            "chain": "ethereum-2",
+            "gateway": "0xe432150cce91c13a887f7D836923d5597adD8E31",
+            "gasservice": "0xbE406F0189A0B4cf3A05C286473D23791Dd44Cc6",
             "endpoint": "0xbfD2135BFfbb0B5378b56643c2Df8a87552Bfa23",
-            "chainId": 10121
+            "chainId": 10121,
+            "ETH": "0x2f8AA9b0cFbd594f719CcEBFf85628cc04B4Cbd8",
+            "USDC": "0xCacC0AD0a55c098F2E3260FB2BAc7D7aE8c1b5f5",
+            "branch": "0x970a02943232958F3034A8B5068616a9B7c37Fe9",
+            "adapter": "0x4eaAeBA67C88aA68E5501c88A028EB3Cb0BAB6B8",
+            "route": "0x71108c7E63cb69fBF3288513b040981d18C1eC7A",
+            "axelar": "0x4425A318eFB46437278496d6AE29Ad2F0f701f1A",
+            "roleManager": "0x5e2EF33111A9E5DFDBA940e9699FE24088E40B1a"
         },
         "polygon": {
+            "chainName": "MATIC",
+            "chain": "Polygon",
+            "gateway": "0xBF62ef1486468a6bd26Dd669C06db43dEd5B849B",
+            "gasservice": "0xbE406F0189A0B4cf3A05C286473D23791Dd44Cc6",
             "endpoint": "0xf69186dfBa60DdB133E91E9A4B5673624293d8F8",
-            "chainId": 10109
+            "chainId": 10109,
+            "MATIC": "0x71108c7E63cb69fBF3288513b040981d18C1eC7A",
+            "USDC": "0xa17389a583ac05b9F43009319B8f0fd8B132a648",
+            "branch": "0xd8e88fadE153fed066B23133540795A7878af61A",
+            "adapter": "0x2F48c379043C088f621E31a6435DA5bFdE7C6f92",
+            "route": "0x5910B2d07331585Cd0b535591CDC777D2C4F0Ad6",
+            "axelar": "0x39bcf2b7B825962990b1fAB7b4060A298F309de9",
+            "roleManager": "0xBd4CC809720201BE428330b579F6B038B0c7Bb51"
         },
         "arbitrum": {
+            "chainName": "ARB",
+            "chain": "arbitrum",
+            "gateway": "0xe432150cce91c13a887f7D836923d5597adD8E31",
+            "gasservice": "0xbE406F0189A0B4cf3A05C286473D23791Dd44Cc6",
             "endpoint": "0x6aB5Ae6822647046626e83ee6dB8187151E1d5ab",
-            "chainId": 10143
+            "chainId": 10143,
+            "ETH": "0xad5EFB8E1568763a51730c587eDaD4eAaFBe37eD",
+            "USDC": "0xd8e88fadE153fed066B23133540795A7878af61A",
+            "branch": "0x2F48c379043C088f621E31a6435DA5bFdE7C6f92",
+            "adapter": "0x5910B2d07331585Cd0b535591CDC777D2C4F0Ad6",
+            "route": "0x39bcf2b7B825962990b1fAB7b4060A298F309de9",
+            "axelar": "0x60b7957d096ceee0eA097fd233380687eaEEe160",
+            "roleManager": "0x779e122b1Bad2affB035DC66eAbE12d5252FB79f"
         }
     },
-    "server": "0xd15Def19E5ACb4d1d47348ddBe3f0644Fb43164D",
-    "core": "0x66986bC0247c77C673C4B41232d80976eE8ADe21",
-    "adapter": "0xC0800f8E3bd0682f2fF157293eDd56c9347c5e19",
-    "route": "0x3cFAf07E3c2D1D0654Ace3999B32A200dbFd4fAA",
-    "feeProvider": "0x6F7fC6eB01B397aDFE47ffDCCd7685E57acbF24c",
-    "oracle": "0x1F377a0e50f9a4C1947C1a63F0D68dc0681A79Eb",
-    "cedroToken": "0x748bf843a04a1E86FE12e875fBBd0218E15611bD"
+    "pool": "0x44AD8a4912D55593cb670D4e18f68dEA5858F613",
+    "core": "0x01a2AFD378253860B833d1Ca25131EA47b968325",
+    "adapter": "0x508B210Cc5B55338d041326E2e58C943336eeb4F",
+    "route": "0xc7ECfc6Aca2EEF8fbb1A4D57548DF31148f376c9",
+    "feeProvider": "0x8398799bea3f71f7078E4E5AA878f39a0F9f689a",
+    "oracle": "0x4Cb94E2F841481436478B8F368867EC612A48810",
+    "cedroToken": "0x748bf843a04a1E86FE12e875fBBd0218E15611bD",
+    "liquidation": "0xB6734C9aF47766e8e409264fC8299dc3F8cFEDd7",
+    "axelar": "0x41F4D07944e29b0C8AeE2179541491Ab7554e52f",
+    "controller": "0x48ea87f25209ed24965e028e91c7aFf6Ef33C22A",
+    "roleManager": "0x17Ef64EF80279fb8Be82E6A375A8F5CD853EDe6a"
 }
