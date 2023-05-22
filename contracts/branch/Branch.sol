@@ -11,6 +11,7 @@ import "./interfaces/IStargateRouter.sol";
 import "./interfaces/IStargateEthVault.sol";
 import "./interfaces/IRoleManager.sol";
 import "../utils/ERC2771ContextUpgradeable.sol";
+import "hardhat/console.sol";
 
 string constant TAG = "Branch";
 
@@ -254,7 +255,7 @@ contract Branch is
             );
         }
 
-        (uint64 amountpx, uint64 amountsx) = _buildRemoteAmount(qty, pools[id].token);
+        (uint64 amountpx, uint64 amountsx,) = _buildRemoteAmount(qty, pools[id].token);
 
         // Creating payload with required info to perform swap
         bytes memory payload = abi.encodePacked(
@@ -299,8 +300,8 @@ contract Branch is
             amountpx := mload(add(payload, 72))
             amountsx := mload(add(payload, 80))
         }
-        uint256 amount = uint256(amountpx) * BASE + uint256(amountsx);
         address token = pools[id].token;
+        uint256 amount = _buildLocalAmount(amountpx, amountsx, token);
         address receipient = address(uint160(uint256(to)));
         if (token == address(0)) {
             payable(receipient).transfer(amount);
@@ -326,7 +327,7 @@ contract Branch is
         bytes32 route,
         uint256 airdropAmount
     ) internal {
-        (uint64 amountpx, uint64 amountsx) = _buildRemoteAmount(amount, token);
+        (uint64 amountpx, uint64 amountsx, uint payAmount) = _buildRemoteAmount(amount, token);
         bytes memory payload = abi.encodePacked(
             functionType,
             id,
@@ -335,8 +336,8 @@ contract Branch is
             amountsx
         );
         if (token == address(0)) {
-            require(msg.value >= amount, string.concat(TAG, "Invalid amount"));
-            IAdapter(adapter).send{value: msg.value.sub(amount)}(
+            require(msg.value >= payAmount, string.concat(TAG, "Invalid amount"));
+            IAdapter(adapter).send{value: msg.value.sub(payAmount)}(
                 payload,
                 msg.sender,
                 airdropAmount,
@@ -346,7 +347,7 @@ contract Branch is
             IERC20Upgradeable(token).safeTransferFrom(
                 _msgSender(),
                 address(this),
-                amount
+                payAmount
             );
             IAdapter(adapter).send{value: msg.value}(
                 payload,
@@ -396,6 +397,28 @@ contract Branch is
         return result;
     }
 
+    function _getTokenDecimal(address _token) internal view returns(uint8 decimals) {
+        decimals = 18;
+        if(_token != address(0)) {
+            (, bytes memory data) = _token.staticcall(
+                abi.encodeWithSignature("decimals()")
+            );
+            decimals = abi.decode(data, (uint8));
+        }
+    }
+
+    function _buildLocalAmount(
+        uint256 _amountpx, 
+        uint256 _amountsx,
+         address _token
+    )  internal view returns(uint _localAmount) {
+        uint _remoteAmount = uint256(_amountpx) * BASE + uint256(_amountsx);
+        uint8 decimals = _getTokenDecimal(_token);
+        _localAmount = decimals > ROOT_DECIMALS
+            ? _remoteAmount * (10 ** (decimals - ROOT_DECIMALS))
+            : _remoteAmount / (10 ** (ROOT_DECIMALS - decimals));
+    }
+
     /**
      * @dev split the amount into 2 uint64 number to fix other not evm branch like aptos witch not support uint256 and keep the message send to root chain in the same format
      * For example 123456789000000000987654321 = 123456789 * 1e18 + 987654321
@@ -405,18 +428,18 @@ contract Branch is
     function _buildRemoteAmount(
         uint256 _localAmount,
         address _token
-    ) internal view returns (uint64 amountpx, uint64 amountsx) {
-        uint8 decimals = 18;
-        if(_token != address(0)) {
-            (, bytes memory data) = _token.staticcall(
-                abi.encodeWithSignature("decimals()")
-            );
-            decimals = abi.decode(data, (uint8));
+    ) internal view returns (uint64 amountpx, uint64 amountsx, uint amount) {
+        uint8 decimals = _getTokenDecimal(_token);
+
+        if(decimals > ROOT_DECIMALS) {
+            //ignore decimals beyond the 18th digit
+            amount = amount / BASE * BASE;
+           _localAmount =  _localAmount / (10 ** (decimals - ROOT_DECIMALS));
+        } else {
+            amount = _localAmount;
+            _localAmount = _localAmount * (10 ** (ROOT_DECIMALS - decimals));
         }
 
-        _localAmount = decimals > ROOT_DECIMALS
-            ? _localAmount / (10 ** (decimals - ROOT_DECIMALS))
-            : _localAmount * (10 ** (ROOT_DECIMALS - decimals));
         amountpx = uint64(_localAmount / BASE);
         amountsx = uint64(_localAmount % BASE);
     }

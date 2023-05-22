@@ -18,13 +18,14 @@ const toMathAmount = (amount, decimals = 18) => new BN(amount.toString()).divide
 const MATIC = ethers.utils.formatBytes32String("MATIC");
 const FTM = ethers.utils.formatBytes32String("FTM");
 const BNB = ethers.utils.formatBytes32String("BNB");
+const USDC = ethers.utils.formatBytes32String("USDC");
 const LZO = ethers.utils.formatBytes32String("LZO");
 
 // Contracts
 let pool, core, liquidationManager, treasury, feeProvider, controller;
 let clientA, clientB, clientC, adapterA, adapterB, adapterC, adapterS, routeA, routeB, routeC, routeS;
 let roleManagerS, roleManagerA, roleManagerB, roleManagerC;
-let matic, ftm, bnb, ceFTM, ceBNB, ceMATIC, debtFTM, debtBNB, debtMATIC;
+let matic, ftm, bnb, usdc, ceUSDC, ceFTM, ceBNB, ceMATIC, debtUSDC, debtFTM, debtBNB, debtMATIC;
 
 
 function getAddress(b, a) {
@@ -66,19 +67,22 @@ describe("Ready", function () {
         ceMATIC = await upgrades.deployProxy(CEToken,["CEMATIC", "CEMATIC", roleManagerS.address]);
         ceFTM = await upgrades.deployProxy(CEToken,["CEFTM", "CEFTM", roleManagerS.address]);
         ceBNB = await upgrades.deployProxy(CEToken,["CEBNB", "CEBNB", roleManagerS.address]);
+        ceUSDC = await upgrades.deployProxy(CEToken,["CEUSDC", "CEUSDC", roleManagerS.address]);
 
         const DebtToken = await ethers.getContractFactory("DebtToken");
         debtMATIC = await upgrades.deployProxy(DebtToken,["DebtMATIC", "DebtMATIC", roleManagerS.address]);
         debtFTM = await upgrades.deployProxy(DebtToken,["DebtFTM", "DebtFTM", roleManagerS.address]);
         debtBNB = await upgrades.deployProxy(DebtToken,["DebtBNB", "DebtBNB", roleManagerS.address]);
+        debtUSDC = await upgrades.deployProxy(DebtToken,["DebtUSDC", "DebtUSDC", roleManagerS.address]);
     
 
 
 
         const ERC20 = await ethers.getContractFactory("ERC20Mock")
-        matic = await ERC20.deploy("MATIC", "MATIC")
-        ftm = await ERC20.deploy("FTM", "FTM")
-        bnb = await ERC20.deploy("BNB", "BNB")
+        matic = await ERC20.deploy("MATIC", "MATIC", 18)
+        ftm = await ERC20.deploy("FTM", "FTM", 18)
+        bnb = await ERC20.deploy("BNB", "BNB", 18)
+        usdc = await ERC20.deploy("USDC", "USDC", 6)
 
         const FeeProvider = await ethers.getContractFactory("FeeProvider");
         feeProvider = await upgrades.deployProxy(FeeProvider, [roleManagerS.address]);
@@ -170,16 +174,18 @@ describe("Ready", function () {
         await ceMATIC.setCore(core.address, MATIC);
         await ceFTM.setCore(core.address, FTM);
         await ceBNB.setCore(core.address, BNB);
+        await ceUSDC.setCore(core.address, USDC);
 
         await debtMATIC.setCore(core.address, MATIC);
         await debtFTM.setCore(core.address, FTM);
         await debtBNB.setCore(core.address, BNB);
+        await debtUSDC.setCore(core.address, USDC);
 
         await core.setOracle(this.oracle.address);
         await pool.setCore(core.address);
         await pool.setFeeProvider(feeProvider.address);
         await feeProvider.setCore(core.address);
-        await this.oracle.setPrice([MATIC, FTM, BNB], [toTokenAmount(1), toTokenAmount(1), toTokenAmount(1)])
+        await this.oracle.setPrice([MATIC, FTM, BNB, USDC], [toTokenAmount(1), toTokenAmount(1), toTokenAmount(1), toTokenAmount(1)])
         await liquidationManager.setOracle(this.oracle.address);
         await liquidationManager.setCore(core.address);
 
@@ -187,11 +193,14 @@ describe("Ready", function () {
         await core.connect(alice).initPool(MATIC, [toTokenAmount(0.5), toTokenAmount(0.1), toTokenAmount(0.5), 0, toTokenAmount(0.5), toTokenAmount(0.5), toTokenAmount(0.1), toTokenAmount(1), toTokenAmount(0.15)], ceMATIC.address, debtMATIC.address);
         await core.connect(alice).initPool(FTM, [toTokenAmount(0.5), toTokenAmount(0.1), toTokenAmount(0.5), 0, toTokenAmount(0.5), toTokenAmount(0.5), toTokenAmount(0.1), toTokenAmount(1), toTokenAmount(0.15)], ceFTM.address, debtFTM.address);
         await core.connect(alice).initPool(BNB, [toTokenAmount(0.5), toTokenAmount(0.1), toTokenAmount(0.5), 0, toTokenAmount(0.5), toTokenAmount(0.5), toTokenAmount(0.1), toTokenAmount(1), toTokenAmount(0.15)], ceBNB.address, debtBNB.address);
+        await core.connect(alice).initPool(USDC, [toTokenAmount(0.5), toTokenAmount(0.1), toTokenAmount(0.5), 0, toTokenAmount(0.5), toTokenAmount(0.5), toTokenAmount(0.1), toTokenAmount(1), toTokenAmount(0.15)], ceUSDC.address, debtUSDC.address);
+
 
         // bob account only has the permission to change pool status
         await core.connect(bob).changePoolStatus(MATIC, true);
         await core.connect(bob).changePoolStatus(FTM, true);
         await core.connect(bob).changePoolStatus(BNB, true);
+        await core.connect(bob).changePoolStatus(USDC, true);
 
         await this.lzEndpointMockServer.setDestLzEndpoint(routeA.address, this.lzEndpointMockClientA.address)
         await this.lzEndpointMockServer.setDestLzEndpoint(routeB.address, this.lzEndpointMockClientB.address)
@@ -210,9 +219,11 @@ describe("Ready", function () {
         await matic.mint(alice.address, toTokenAmount(1e6))
         await ftm.mint(alice.address, toTokenAmount(1e6))
         await bnb.mint(alice.address, toTokenAmount(1e6))
+        await usdc.mint(alice.address, 100e6)
         await matic.mint(bob.address, toTokenAmount(1e6))
         await ftm.mint(bob.address, toTokenAmount(1e6))
         await bnb.mint(bob.address, toTokenAmount(1e6))
+        await usdc.mint(bob.address, 100e6)
 
         await matic.connect(alice).approve(clientA.address, toTokenAmount(1e6));
         await matic.connect(bob).approve(clientA.address, toTokenAmount(1e6));
@@ -220,7 +231,10 @@ describe("Ready", function () {
         await ftm.connect(bob).approve(clientB.address, toTokenAmount(1e6));
         await bnb.connect(alice).approve(clientC.address, toTokenAmount(1e6));
         await bnb.connect(bob).approve(clientC.address, toTokenAmount(1e6));
+        await usdc.connect(alice).approve(clientA.address, toTokenAmount(1e6));
+        await usdc.connect(alice).approve(clientA.address, toTokenAmount(1e6));
 
+        await clientA.setPool(USDC, usdc.address, true);
         await clientA.setPool(MATIC, matic.address, true);
         await clientB.setPool(FTM, ftm.address, true);
         await clientC.setPool(BNB, bnb.address, true);
@@ -363,6 +377,23 @@ describe("Ready", function () {
         bob_balance = await debtFTM.balanceOf(bob.address);
         console.log(`debtToken alice: ${alice_balance} bob: ${bob_balance}`);
     }
+
+    it("test not 18 decimals", async function() {
+        let fees = await routeA.connect(alice).estimateFees(1, 1000000);
+        console.log("alice deposit usdc");
+        await clientA.connect(alice).depositRequest(USDC, 1000000, LZO, 0, { value: fees })
+        let ce_balance = await ceUSDC.balanceOf(alice.address);
+        let usdc_balance = await usdc.balanceOf(alice.address);
+        assert.equal(ce_balance, toTokenAmount(1));
+        assert.equal(usdc_balance, 99e6);
+
+        console.log("alice withdraw usdc")
+        await pool.connect(alice).withdraw(USDC, FTM, toTokenAmount(0.5), ethers.utils.hexZeroPad(alice.address, 32), LZO, 0, { value: fees })
+        ce_balance = await ceUSDC.balanceOf(alice.address);
+        usdc_balance = await usdc.balanceOf(alice.address);
+        assert.equal(ce_balance, toTokenAmount(0.5));
+        assert.equal(usdc_balance, 99.5e6);
+    })
 
     it("test liquidation", async function() {
         let fees = await routeA.connect(alice).estimateFees(1, 1000000);
