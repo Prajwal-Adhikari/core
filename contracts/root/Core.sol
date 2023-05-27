@@ -175,6 +175,8 @@ contract Core is Initializable, ContextUpgradeable {
 
             if (health.ltsValue > 0) {
                 health.factor = health.debtValue.mul(1e18).div(health.ltsValue);
+            } else if(health.debtValue > 0) {
+                health.factor = MAX_HEALTH_FACTOR;
             }
         }
     }
@@ -203,20 +205,21 @@ contract Core is Initializable, ContextUpgradeable {
     function withdraw(
         bytes32 id,
         bytes32 chainId,
-        uint256 ceAmount,
+        uint256 tokenAmount,
         address user
     ) external onlyRole(IRoleManager(roleManager).POOL()) returns (uint256) {
         refresh(id);
         Data.PoolData storage pool = pools[id];
         require(pool.enable, string.concat(TAG, ": Not enable now"));
 
-        uint256 tokenAmount = pool.ceScaled.mul(ceAmount).div(1e18);
+        uint256 burnAmount = tokenAmount.mul(1e18).div(pool.ceScaled);
         require(
             chainLiquidity[chainId][id] >= tokenAmount,
             string.concat(TAG, ": No enough liquidity")
         );
-        ICEToken(pool.ceToken).burn(user, ceAmount);
-        pool.ceSupply = pool.ceSupply.sub(ceAmount);
+        ICEToken(pool.ceToken).burn(user, burnAmount);
+
+        pool.ceSupply = pool.ceSupply.sub(burnAmount);
         chainLiquidity[chainId][id] -= tokenAmount;
         totalLiquidity[id] -= tokenAmount;
         updateInterestRate(id);
@@ -357,6 +360,12 @@ contract Core is Initializable, ContextUpgradeable {
             healthFactor(user).factor < MAX_HEALTH_FACTOR,
             string.concat(TAG, ": Health failed")
         );
+    }
+
+    function handleTransfer(address from, address to, bytes32 id) external {
+        require(msg.sender == pools[id].ceToken, string.concat(TAG, ": Invalid sender"));
+        checkHealth(from);
+        addToken(to, id);
     }
 
     function addToken(address user, bytes32 id) internal {

@@ -76,7 +76,7 @@ contract CEToken is ERC20Upgradeable {
         );
         uint ceScaled = ICore(core).getCEScaled(poolId);
         super._transfer(from, to, amount.mul(1e18).div(ceScaled));
-        ICore(core).checkHealth(from);
+        ICore(core).handleTransfer(from, to, poolId);
     }
 
     function balanceBeforeScaled(address user) external view returns (uint256) {

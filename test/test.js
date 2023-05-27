@@ -508,15 +508,13 @@ describe("Ready", function () {
         await clientB.connect(bob).depositRequest(FTM, toTokenAmount(5e5), LZO, 0, { value: fees })
         await printInfo();
 
-        console.log("alice deposit bnb");
-        await clientC.connect(alice).depositRequest(BNB, toTokenAmount(500000), LZO, 0, { value: fees })
-        await printInfo();
-
-
         console.log("alice borrow ftm and after one month");
         await pool.connect(alice).borrow(FTM, BNB, toTokenAmount(1e5), ethers.utils.hexZeroPad(alice.address, 32), LZO, 0, { value: fees });
         await network.provider.send("evm_increaseTime", [365 * 86400 - 1])
         await printInfo();
+
+        console.log("alice withdraw matic and get revert");
+        await expect(pool.connect(alice).withdraw(MATIC, FTM, toTokenAmount(5e5), ethers.utils.hexZeroPad(alice.address, 32), LZO, 0, { value: fees })).to.be.revertedWith("Core: Health failed");
 
         console.log("alice withdraw matic");
         await pool.connect(alice).withdraw(MATIC, FTM, toTokenAmount(1e5), ethers.utils.hexZeroPad(alice.address, 32), LZO, 0, { value: fees })
@@ -524,6 +522,10 @@ describe("Ready", function () {
 
         console.log("bob withdraw ftm");
         await pool.connect(bob).withdraw(FTM, BNB, toTokenAmount(1e5), ethers.utils.hexZeroPad(bob.address, 32), LZO, 0, { value: fees })
+        await printInfo();
+
+        console.log("alice deposit bnb");
+        await clientC.connect(alice).depositRequest(BNB, toTokenAmount(500000), LZO, 0, { value: fees })
         await printInfo();
 
         console.log("alice withdraw bnb");

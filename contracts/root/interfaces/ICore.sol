@@ -151,10 +151,12 @@ interface ICore {
     ) external view returns (Data.HealthData memory health);
 
     /**
-     * @notice Reverts if the health factor is not less than MAX_HEALTH_FACTOR
-     * @param user - wallet address for which the health factor is calculated.
+     * @notice Reverts if the health factor is not less than MAX_HEALTH_FACTOR, then add the pool to user as collateral
+     * @param from - wallet address the user send ceToken.
+     * @param to - wallet address the user receive ceToken.
+     * * @param to - pool id.
      **/
-    function checkHealth(address user) external view;
+    function handleTransfer(address from, address to, bytes32 id) external view;
 
     /**
      * @notice Returns liquidity of an asset for a chain
