@@ -130,7 +130,7 @@ contract LiquidationManager is
         );
 
         uint256 discount;
-        uint256 liqPercent;
+        uint256 liqPercent = 0;
         if (currentLTV < 1e18) {
             discount = 1e36 / currentLTV - 999000000000000000;
             if (discount > config.liqMaxDiscount) {
@@ -139,7 +139,7 @@ contract LiquidationManager is
 
             uint256 numerator_a = config
                 .liqClosingFac
-                .mul(1e18 + currentLTV);
+                .mul(1e18).add(currentLTV);
             uint256 numerator_b = config
                 .liqClosingFac
                 .mul(currentLTV).add(config.liqThreshold);
