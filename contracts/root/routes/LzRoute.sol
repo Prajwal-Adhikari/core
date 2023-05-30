@@ -21,6 +21,7 @@ contract LzRoutePool is Initializable, LzApp {
     mapping(uint16 => bytes32) public chainKey;
 
     uint256 public gasUsage;
+    bytes32 public route;
 
     /**
      * @dev Modifier that checks if caller has a specific role.
@@ -60,6 +61,10 @@ contract LzRoutePool is Initializable, LzApp {
         chainKey[id] = chainId;
     }
 
+    function setRoute(bytes32 routeKey) external onlyRole(IRoleManager(roleManager).SET_ROUTE_METHOD()) {
+        route = routeKey;
+    }
+
     /**
      * @dev Receive a cross chain message sent from the branch of chain with chain id `_srcChainId`.
      *
@@ -70,14 +75,15 @@ contract LzRoutePool is Initializable, LzApp {
         uint64,
         bytes memory _payload
     ) internal override {
-        IAdapter(adapter).execute(_payload, chainKey[_srcChainId]);
+        IAdapter(adapter).execute(_payload, chainKey[_srcChainId], route);
     }
 
     function send(
         bytes memory payload,
         bytes32 chainId,
         address sender,
-        uint256 airdropAmount
+        uint256 airdropAmount,
+        address airdropReceiver
     ) external payable onlyRole(IRoleManager(roleManager).ADAPTER()) {
         if (airdropAmount > 0) {
             _lzSend(
@@ -85,7 +91,7 @@ contract LzRoutePool is Initializable, LzApp {
                 payload,
                 payable(sender),
                 address(this),
-                abi.encodePacked(uint16(2), gasUsage, airdropAmount, sender),
+                abi.encodePacked(uint16(2), gasUsage, airdropAmount, airdropReceiver),
                 msg.value
             );
         } else {

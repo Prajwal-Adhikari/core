@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.9;
-import "hardhat/console.sol";
 import "@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
@@ -171,6 +170,7 @@ contract Pool is
             chainId,
             msg.sender,
             airdropAmount,
+            _bytesToAddress(to),
             route
         );
         emit Data.Withdraw(
@@ -179,9 +179,10 @@ contract Pool is
             id,
             chainId,
             tokenAmount,
-            ceAmount
+            ceAmount,
+            route
         );
-        emit Data.SendToken(_msgSender(), id, tokenAmount);
+        emit Data.SendToken(_bytesToAddress(to), id, tokenAmount);
     }
 
     function borrow(
@@ -218,6 +219,7 @@ contract Pool is
             chainId,
             msg.sender,
             airdropAmount,
+            _bytesToAddress(to),
             route
         );
         emit Data.Borrow(
@@ -226,21 +228,23 @@ contract Pool is
             id,
             chainId,
             tokenAmount,
-            debtAmount
+            debtAmount,
+            route
         );
-        emit Data.SendToken(_msgSender(), id, tokenAmount);
+        emit Data.SendToken(_bytesToAddress(to), id, tokenAmount);
     }
 
     function _repay(
         bytes32 id,
         bytes32 chainId,
         address user,
-        uint256 tokenAmount
+        uint256 tokenAmount,
+        bytes32 route
     ) internal {
         (uint256 repayAmount, uint256 debtAmount, uint256 ceAmount) = ICore(
             core
         ).repay(id, chainId, user, tokenAmount);
-        emit Data.Repay(user, id, chainId, repayAmount, debtAmount, ceAmount);
+        emit Data.Repay(user, id, chainId, repayAmount, debtAmount, ceAmount, route);
         emit Data.ReceiveToken(user, id, tokenAmount);
     }
 
@@ -248,26 +252,18 @@ contract Pool is
         bytes32 id,
         bytes32 chainId,
         address user,
-        uint256 tokenAmount
+        uint256 tokenAmount,
+        bytes32 route
     ) internal {
         uint256 ceAmount = ICore(core).deposit(id, chainId, user, tokenAmount);
-        emit Data.Deposit(user, id, chainId, tokenAmount, ceAmount);
+        emit Data.Deposit(user, id, chainId, tokenAmount, ceAmount, route);
         emit Data.ReceiveToken(user, id, tokenAmount);
-    }
-
-    function _swap(
-        bytes32 id,
-        bytes32 srcChainId,
-        bytes32 destChainId,
-        uint256 tokenAmount
-    ) internal {
-        ICore(core).swap(id, srcChainId, destChainId, tokenAmount);
-        emit Data.Swap(id, srcChainId, destChainId, tokenAmount);
     }
 
     function execute(
         bytes memory _payload,
-        bytes32 chainId
+        bytes32 chainId,
+        bytes32 route
     ) external onlyRole(IRoleManager(roleManager).ADAPTER()) {
         bytes32 tokenId;
         bytes32 data;
@@ -283,11 +279,9 @@ contract Pool is
 
         uint256 amount = uint256(amountpx) * BASE + uint256(amountsx);
         if (functionType == TYPE_DEPOSIT) {
-            _deposit(tokenId, chainId, _bytesToAddress(data), amount);
+            _deposit(tokenId, chainId, _bytesToAddress(data), amount, route);
         } else if (functionType == TYPE_REPAY) {
-            _repay(tokenId, chainId, _bytesToAddress(data), amount);
-        } else if (functionType == TYPE_SWAP) {
-            _swap(tokenId, chainId, data, amount);
+            _repay(tokenId, chainId, _bytesToAddress(data), amount, route);
         } else {
             revert(string.concat(TAG, "Unsupport functionType"));
         }

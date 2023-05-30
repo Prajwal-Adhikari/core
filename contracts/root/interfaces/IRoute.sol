@@ -52,13 +52,15 @@ interface IRoute {
      * @param chainId - id of the destination chain.
      * @param sender - address of tx sender
      * @param airdropAmount - amount to be airdropped to destination chain
+     * @param airdropReceiver - receiver of the airdrop
      **/
 
     function send(
         bytes memory payload,
         bytes32 chainId,
         address sender,
-        uint256 airdropAmount
+        uint256 airdropAmount,
+        address airdropReceiver
     ) external payable;
 
     /**

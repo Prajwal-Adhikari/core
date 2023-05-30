@@ -65,6 +65,7 @@ contract AdapterPool is Initializable, ContextUpgradeable {
         bytes32 chainId,
         address sender,
         uint256 airdropAmount,
+        address airdropReceiver,
         bytes32 route
     ) external payable onlyRole(IRoleManager(roleManager).POOL()) {
         require(routeExist[router[route]], string.concat(TAG,": No route exists"));
@@ -72,16 +73,18 @@ contract AdapterPool is Initializable, ContextUpgradeable {
             payload,
             chainId,
             sender,
-            airdropAmount
+            airdropAmount,
+            airdropReceiver
         );
     }
 
     function execute(
         bytes memory payload,
-        bytes32 chainId
+        bytes32 chainId,
+        bytes32 route
        
     ) external onlyRole(IRoleManager(roleManager).ROUTE()){
-         IPool(pool).execute(payload, chainId);
+         IPool(pool).execute(payload, chainId, route);
 
     }
 }

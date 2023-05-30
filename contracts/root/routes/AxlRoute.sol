@@ -22,6 +22,7 @@ contract AxlRoutePool is Initializable, AxelarExecutable, ContextUpgradeable {
     address public adapter;
     address public roleManager;
     IAxelarGasService gasService;
+    bytes32 public route;
 
     event Executed();
 
@@ -66,12 +67,17 @@ contract AxlRoutePool is Initializable, AxelarExecutable, ContextUpgradeable {
         chainKey[keccak256(abi.encodePacked(name))] = chainId;
         trustedContract[keccak256(abi.encodePacked(name))] = Address.parseAddr(addr);
     }
+    
+    function setRoute(bytes32 routeKey) external onlyRole(IRoleManager(roleManager).SET_ROUTE_METHOD()) {
+        route = routeKey;
+    }
 
     function send(
         bytes memory payload,
         bytes32 chainId,
         address sender,
-        uint256
+        uint256,
+        address
     ) external payable onlyRole(IRoleManager(roleManager).ADAPTER()) {
         if (
             keccak256(abi.encodePacked(localChainId)) ==
@@ -107,7 +113,7 @@ contract AxlRoutePool is Initializable, AxelarExecutable, ContextUpgradeable {
             trustedContract[chain] == addr,
             string.concat(TAG, ": Invalid contract")
         );
-        IAdapter(adapter).execute(payload_, chainKey[chain]);
+        IAdapter(adapter).execute(payload_, chainKey[chain], route);
       
     }
 }

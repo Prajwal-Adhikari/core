@@ -30,8 +30,9 @@ interface IAdapter {
      * This function can only be accessed by account with role ROUTE.
      * @param payload - information containing data , pool id and token amount
      * @param chainId - chain id of the source chain
+     * @param route - communication protocol through which payload is received
      **/
-    function execute(bytes memory payload, bytes32 chainId) external;
+    function execute(bytes memory payload, bytes32 chainId, bytes32 route) external;
 
     /**
      * @notice Sends swap information from adapter to route
@@ -40,12 +41,15 @@ interface IAdapter {
      * @param chainId - chain id of the destination chain
      * @param sender - user address
      * @param airdropAmount - amount to be airdropped to destination chain
+     * @param airdropReceiver - receiver of the airdrop
+     * @param route - communication protocol
      **/
     function send(
         bytes memory payload,
         bytes32 chainId,
         address sender,
         uint256 airdropAmount,
+        address airdropReceiver,
         bytes32 route
     ) external payable;
 }

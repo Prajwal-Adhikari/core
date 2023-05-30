@@ -77,8 +77,9 @@ interface IPool {
      * This function can only be accessed by the account with role ADAPTER
      * @param payload - information of pool id, user and token amount
      * @param chainId - chain id of the source chain
+     * @param route - communication protocol through which payload is received
      **/
-    function execute(bytes memory payload, bytes32 chainId) external;
+    function execute(bytes memory payload, bytes32 chainId, bytes32 route) external;
 
     /**
      * @notice Configures fee status.
