@@ -65,8 +65,7 @@ contract Branch is
     // Protocol level pause for all pools
     bool public protocolPause;
 
-    // Toggle to enable swap for Stargate cross chain liquidity transfer
-    bool public swapDisable;
+
 
     /**
      * Mapping LayerZero's chain id to Cedro's chain id for a chain
@@ -76,6 +75,8 @@ contract Branch is
 
     event SendToken(address user, bytes32 id, uint256 tokenAmount);
     event ReceiveToken(address user, bytes32 id, uint256 tokenAmount);
+    event Deposit(address user, bytes32 id, uint256 tokenAmount, bytes32 route, uint256 aidrdropAmount);
+    event Repay(address user, bytes32 id, uint256 tokenAmount, bytes32 route, uint256 aidrdropAmount);
 
     function initialize(
         address forwarder,
@@ -153,13 +154,6 @@ contract Branch is
         protocolPause = !protocolPause;
     }
 
-    function toggleSwapStatus()
-        external
-        onlyRole(IRoleManager(roleManager).SWAP())
-    {
-        swapDisable = !swapDisable;
-    }
-
     function setChainId(
         bytes32 chainID, // Cedro's chain id
         uint16 id // LayerZero chain id
@@ -179,6 +173,7 @@ contract Branch is
         );
         require(pools[id].enable, string.concat(TAG, ": Pool not enable"));
         _pay(pools[id].token, amount, id, TYPE_DEPOSIT, route, airdropAmount);
+        emit Deposit(_msgSender(), id, amount, route, airdropAmount);
         emit SendToken(_msgSender(), id, amount);
     }
 
@@ -194,6 +189,7 @@ contract Branch is
         );
         require(pools[id].enable, string.concat(TAG, ": Pool not enable"));
         _pay(pools[id].token, amount, id, TYPE_REPAY, route, airdropAmount);
+        emit Repay(_msgSender(), id, amount, route, airdropAmount);
         emit SendToken(_msgSender(), id, amount);
     }
 
@@ -204,70 +200,31 @@ contract Branch is
         uint16 srcPoolId,
         uint16 dstPoolId,
         address destination,
-        bytes32 route,
-        uint256 fee
+        uint256 amountMin
     ) external payable onlyRole(IRoleManager(roleManager).SWAP()) {
-        require(
-            msg.value > 0 && fee > 0,
-            string.concat(
-                TAG,
-                ": requires a msg.value to pay crosschain message"
-            )
-        );
-        require(
-            qty > 0,
-            string.concat(TAG, ": error: swap() requires qty > 0")
-        );
-
-        /**
-         * Disable swap is done in case of a Stargate swap failure tx
-         * only to update core contract values without doing actual swap through Stargate
-         * to reverse the previous liquidity change made in case of swap failure through Adapter
-         **/
-        if (!swapDisable) {
-            uint256 messageFee;
-            if (pools[id].token == address(0)) {
-                require(
-                    msg.value > qty - fee,
-                    string.concat(TAG, "msg.value must be > qty")
-                );
-
-                // wrap the ETH into WETH
-                IStargateEthVault(stargateEthVault).deposit{value: qty}();
-                IStargateEthVault(stargateEthVault).approve(
-                    stargateRouter,
-                    qty
-                );
-
-                messageFee = msg.value - qty - fee;
-            } else {
-                IERC20Upgradeable(pools[id].token).approve(stargateRouter, qty);
-                messageFee = msg.value.sub(fee);
-            }
-
-            _swap(
-                dstChainId,
-                srcPoolId,
-                dstPoolId,
-                qty,
-                destination,
-                messageFee
-            );
+        if (pools[id].token == address(0)) {
+            // wrap the ETH into WETH
+            IStargateEthVault(stargateEthVault).deposit{value: qty}();
+            IStargateEthVault(stargateEthVault).approve(stargateRouter, qty);
+        } else {
+            IERC20Upgradeable(pools[id].token).approve(stargateRouter, qty);
         }
 
-        (uint64 amountpx, uint64 amountsx,) = _buildRemoteAmount(qty, pools[id].token);
-
-        // Creating payload with required info to perform swap
-        bytes memory payload = abi.encodePacked(
-            TYPE_SWAP,
-            id,
-            chainId[dstChainId],
-            amountpx,
-            amountsx
+        IStargateRouter(stargateRouter).swap{value: msg.value}(
+            dstChainId, // the destination chain id
+            srcPoolId, // the source Stargate poolId
+            dstPoolId, // the destination Stargate poolId
+            payable(msg.sender), // refund adddress. if msg.sender pays too much gas, return extra eth
+            qty, // total tokens to send to destination chain
+            amountMin, // min amount allowed out
+            IStargateRouter.lzTxObj(0, 0, "0x"), // default lzTxObj
+            abi.encodePacked(destination), // destination address, the sgReceive() implementer
+            bytes("") // bytes payload
         );
 
-        // Sending `payload` to destination chain through chosen `route`
-        IAdapter(adapter).send{value: fee}(payload, msg.sender, 0, route);
+       
+
+
     }
 
     function emergencyWithdraw(
@@ -356,36 +313,6 @@ contract Branch is
                 route
             );
         }
-    }
-
-    /**
-     * @dev Swaps liquidity across chain using Stargate Protocol
-     * @param dstChainId - chain id of destination
-     * @param srcPoolId - pool id of source token in Stargate
-     * @param dstPoolId - pool id of destination token in Stargate
-     * @param qty - amount to be swapped
-     * @param destination - address of the receiver
-     * @param fee - communication protocol fee
-     **/
-    function _swap(
-        uint16 dstChainId,
-        uint16 srcPoolId,
-        uint16 dstPoolId,
-        uint256 qty,
-        address destination,
-        uint256 fee
-    ) internal {
-        IStargateRouter(stargateRouter).swap{value: fee}(
-            dstChainId, // the destination chain id
-            srcPoolId, // the source Stargate poolId
-            dstPoolId, // the destination Stargate poolId
-            payable(msg.sender), // refund adddress. if msg.sender pays too much gas, return extra eth
-            qty, // total tokens to send to destination chain
-            0, // min amount allowed out
-            IStargateRouter.lzTxObj(0, 0, "0x"), // default lzTxObj
-            abi.encodePacked(destination), // destination address, the sgReceive() implementer
-            bytes("") // bytes payload
-        );
     }
 
     function addressToBytes32(address addr) public pure returns (bytes32) {
