@@ -252,6 +252,8 @@ contract Branch is
             !protocolPause,
             string.concat(TAG, ": Token transfer is halted")
         );
+        require(payload.length == 80, string.concat(TAG, ": Bad payload"));
+
         bytes32 id;
         bytes32 to;
         uint64 amountpx;
@@ -300,6 +302,8 @@ contract Branch is
             amountpx,
             amountsx
         );
+        require(payload.length == 81, string.concat(TAG, ": Bad payload"));
+        
         if (token == address(0)) {
             require(
                 msg.value >= payAmount,

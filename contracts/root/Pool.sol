@@ -164,7 +164,7 @@ contract Pool is
             uint64(tokenAmount / BASE),
             uint64(tokenAmount % BASE)
         );
-        require(payload.length == 80, string.concat(TAG, "Bad payload"));
+        require(payload.length == 80, string.concat(TAG, ": Bad payload"));
         IAdapter(adapter).send{value: msg.value}(
             payload,
             chainId,
@@ -214,6 +214,7 @@ contract Pool is
             uint64(tokenAmount / BASE),
             uint64(tokenAmount % BASE)
         );
+        require(payload.length == 80, string.concat(TAG, ": Bad payload"));
         IAdapter(adapter).send{value: msg.value}(
             payload,
             chainId,
@@ -269,6 +270,8 @@ contract Pool is
         bytes32 data;
         uint64 amountpx;
         uint64 amountsx;
+        require(_payload.length == 81, string.concat(TAG, ": Bad payload"));
+        
         uint8 functionType = uint8(_payload[0]); // _payload received is encoded in format (uint8, bytes32, bytes32, uint64, uint64)
         assembly {
             tokenId := mload(add(_payload, 33))
