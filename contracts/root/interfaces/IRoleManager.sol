@@ -92,6 +92,11 @@ interface IRoleManager {
     function MINT_BURN_CE_DEBT_TOKEN() external view returns (bytes32);
 
     /**
+     * @notice Returns bytes32 value of the public variable SWAP
+     **/
+    function SWAP() external view returns (bytes32);
+
+    /**
      * @notice Returns bytes32 value of the public variable POOL
      **/
     function POOL() external view returns (bytes32);

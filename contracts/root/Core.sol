@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.9;
-import "hardhat/console.sol";
+
 import "@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
-
 import "./interfaces/ICEToken.sol";
 import "./interfaces/IDebtToken.sol";
 import "./interfaces/IOracle.sol";
@@ -349,10 +348,11 @@ contract Core is Initializable, ContextUpgradeable {
         bytes32 id,
         bytes32 srcChainId,
         bytes32 destChainId,
-        uint256 tokenAmount
-    ) external onlyRole(IRoleManager(roleManager).POOL()) {
-        chainLiquidity[srcChainId][id] -= tokenAmount;
-        chainLiquidity[destChainId][id] += tokenAmount;
+        uint256 tokenAmountInSrc,
+        uint256 tokenAmountInDest
+    ) external onlyRole(IRoleManager(roleManager).SWAP()) {
+        chainLiquidity[srcChainId][id] -= tokenAmountInSrc;
+        chainLiquidity[destChainId][id] += tokenAmountInDest;
     }
 
     function checkHealth(address user) public view {

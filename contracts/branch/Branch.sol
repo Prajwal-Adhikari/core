@@ -11,7 +11,6 @@ import "./interfaces/IStargateRouter.sol";
 import "./interfaces/IStargateEthVault.sol";
 import "./interfaces/IRoleManager.sol";
 import "../utils/ERC2771ContextUpgradeable.sol";
-import "hardhat/console.sol";
 
 string constant TAG = "Branch";
 
@@ -65,8 +64,6 @@ contract Branch is
     // Protocol level pause for all pools
     bool public protocolPause;
 
-
-
     /**
      * Mapping LayerZero's chain id to Cedro's chain id for a chain
      * Example: 10112 ->  keccak256("FTM")
@@ -75,8 +72,20 @@ contract Branch is
 
     event SendToken(address user, bytes32 id, uint256 tokenAmount);
     event ReceiveToken(address user, bytes32 id, uint256 tokenAmount);
-    event Deposit(address user, bytes32 id, uint256 tokenAmount, bytes32 route, uint256 aidrdropAmount);
-    event Repay(address user, bytes32 id, uint256 tokenAmount, bytes32 route, uint256 aidrdropAmount);
+    event Deposit(
+        address user,
+        bytes32 id,
+        uint256 tokenAmount,
+        bytes32 route,
+        uint256 aidrdropAmount
+    );
+    event Repay(
+        address user,
+        bytes32 id,
+        uint256 tokenAmount,
+        bytes32 route,
+        uint256 aidrdropAmount
+    );
 
     function initialize(
         address forwarder,
@@ -221,10 +230,6 @@ contract Branch is
             abi.encodePacked(destination), // destination address, the sgReceive() implementer
             bytes("") // bytes payload
         );
-
-       
-
-
     }
 
     function emergencyWithdraw(
@@ -284,7 +289,10 @@ contract Branch is
         bytes32 route,
         uint256 airdropAmount
     ) internal {
-        (uint64 amountpx, uint64 amountsx, uint payAmount) = _buildRemoteAmount(amount, token);
+        (uint64 amountpx, uint64 amountsx, uint payAmount) = _buildRemoteAmount(
+            amount,
+            token
+        );
         bytes memory payload = abi.encodePacked(
             functionType,
             id,
@@ -293,7 +301,10 @@ contract Branch is
             amountsx
         );
         if (token == address(0)) {
-            require(msg.value >= payAmount, string.concat(TAG, "Invalid amount"));
+            require(
+                msg.value >= payAmount,
+                string.concat(TAG, "Invalid amount")
+            );
             IAdapter(adapter).send{value: msg.value.sub(payAmount)}(
                 payload,
                 msg.sender,
@@ -324,9 +335,11 @@ contract Branch is
         return result;
     }
 
-    function _getTokenDecimal(address _token) internal view returns(uint8 decimals) {
+    function _getTokenDecimal(
+        address _token
+    ) internal view returns (uint8 decimals) {
         decimals = 18;
-        if(_token != address(0)) {
+        if (_token != address(0)) {
             (, bytes memory data) = _token.staticcall(
                 abi.encodeWithSignature("decimals()")
             );
@@ -335,10 +348,10 @@ contract Branch is
     }
 
     function _buildLocalAmount(
-        uint256 _amountpx, 
+        uint256 _amountpx,
         uint256 _amountsx,
-         address _token
-    )  internal view returns(uint _localAmount) {
+        address _token
+    ) internal view returns (uint _localAmount) {
         uint _remoteAmount = uint256(_amountpx) * BASE + uint256(_amountsx);
         uint8 decimals = _getTokenDecimal(_token);
         _localAmount = decimals > ROOT_DECIMALS
@@ -358,10 +371,10 @@ contract Branch is
     ) internal view returns (uint64 amountpx, uint64 amountsx, uint amount) {
         uint8 decimals = _getTokenDecimal(_token);
 
-        if(decimals > ROOT_DECIMALS) {
+        if (decimals > ROOT_DECIMALS) {
             //ignore decimals beyond the 18th digit
-            amount = amount / BASE * BASE;
-           _localAmount =  _localAmount / (10 ** (decimals - ROOT_DECIMALS));
+            amount = (amount / BASE) * BASE;
+            _localAmount = _localAmount / (10 ** (decimals - ROOT_DECIMALS));
         } else {
             amount = _localAmount;
             _localAmount = _localAmount * (10 ** (ROOT_DECIMALS - decimals));

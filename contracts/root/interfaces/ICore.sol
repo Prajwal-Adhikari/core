@@ -118,14 +118,16 @@ interface ICore {
      * @param id - pool id of the asset.
      * @param srcChainId - chain id of the source chain
      * @param destChainId - chain id of the destination chain
-     * @param tokenAmount - liquidity amount
+     * @param tokenAmountInSrc - liquidity amount sent from source chain
+     * @param tokenAmountInDest - liquidity amount received to destination chain
      **/
 
     function swap(
         bytes32 id,
         bytes32 srcChainId,
         bytes32 destChainId,
-        uint256 tokenAmount
+        uint256 tokenAmountInSrc,
+        uint256 tokenAmountInDest
     ) external;
 
     /**
