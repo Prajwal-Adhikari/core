@@ -4,6 +4,8 @@ pragma solidity ^0.8.9;
 import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
+import "./interfaces/IUniswapV3Factory.sol";
+import "./libraries/OracleLibrary.sol";
 import "./interfaces/IRoleManager.sol";
 
 interface IERC20 {
@@ -11,8 +13,6 @@ interface IERC20 {
 }
 
 string constant TAG = "Oracle";
-
-pragma solidity >=0.6.2;
 
 interface DexRouter {
     function getAmountsOut(
@@ -30,8 +30,10 @@ contract Oracle is Initializable, ContextUpgradeable {
     mapping(bytes32 => bool) public isStableCoin;
     mapping(bytes32 => bool) public fetchFromDex;
     mapping(bytes32 => uint256) public prices;
+    mapping(bytes32 => uint24) public fee;
+    mapping(bytes32 => uint32) public timeInterval;
 
-    address public dexRouterAddress;
+    address public dexFactoryAddress;
     address public roleManager;
 
     event SetPrice(bytes32 symbol, uint256 price);
@@ -82,10 +84,20 @@ contract Oracle is Initializable, ContextUpgradeable {
         isStableCoin[_id] = _status;
     }
 
-    function setDexRouterAddress(
-        address _dexRouterAddress
+    function setDexFactoryAddress(
+        address _dexFactoryAddress
     ) external onlyRole(IRoleManager(roleManager).SET_ORACLE_METHOD()) {
-        dexRouterAddress = _dexRouterAddress;
+        dexFactoryAddress = _dexFactoryAddress;
+    }
+
+    function setFeeAndTimeInterval(
+        bytes32 _id,
+        uint24 _fee,
+        uint32 _timeInterval
+
+    ) external onlyRole(IRoleManager(roleManager).SET_ORACLE_METHOD()) {
+        fee[_id] = _fee;
+        timeInterval[_id] = _timeInterval;
     }
 
     function setPriceSource(
@@ -120,7 +132,7 @@ contract Oracle is Initializable, ContextUpgradeable {
     ) external view returns (uint256 result) {
             if (fetchFromDex[_symbol]) {
                 if (isStableCoin[_symbol]) {
-                    result = 1e18;
+                    result = getPriceFromChainlink(_symbol);
                 } else {
                     result = getPriceFromDex(_symbol);
                 }
@@ -137,16 +149,20 @@ contract Oracle is Initializable, ContextUpgradeable {
     ) public view returns (uint256) {
         // prettier-ignore
         (
-            /* uint80 roundID */,
+            uint80 roundID,
             int256 basePrice,
             /*uint startedAt*/,
-            /*uint timeStamp*/,
-            /*uint80 answeredInRound*/
+            uint timeStamp,
+            uint80 answeredInRound
         ) =
          AggregatorV3Interface(
             aggregator[_symbol]
         ).latestRoundData();
 
+        require(basePrice != 0, string.concat(TAG, ": Chainlink Malfunction"));
+        require(timeStamp != 0, string.concat(TAG, ": Round is not complete"));
+        require(answeredInRound >= roundID, string.concat(TAG, ": Stale data"));
+        
         uint8 quoteDecimals = AggregatorV3Interface(aggregator[_symbol])
             .decimals();
         uint256 quotePrice = scalePrice(
@@ -161,23 +177,36 @@ contract Oracle is Initializable, ContextUpgradeable {
     function getPriceFromDex(
         bytes32 _symbol
     ) public view returns (uint256) {
-        address[] memory path = new address[](2);
-        path[0] = assetAddress[_symbol];
-        path[1] = assetAddress[stableCoinId[_symbol]];
-        uint8 baseDecimals = IERC20(path[0]).decimals();
-        uint256[] memory amounts = DexRouter(dexRouterAddress).getAmountsOut(
-            uint256(10 ** baseDecimals),
-            path
+
+        address pool = IUniswapV3Factory(dexFactoryAddress).getPool(
+            assetAddress[_symbol],
+            assetAddress[stableCoinId[_symbol]],
+            fee[_symbol]
+        );
+        require(pool != address(0), string.concat(TAG, ": Pool doesn't exist"));
+        int24 tick = OracleLibrary.consult(pool, timeInterval[_symbol]);
+
+        uint8 baseDecimals = IERC20(assetAddress[_symbol]).decimals();
+        uint256 amountOut = OracleLibrary.getQuoteAtTick(
+            tick,
+            uint128(10 ** baseDecimals),
+            assetAddress[_symbol],
+            assetAddress[stableCoinId[_symbol]]
         );
 
-        uint8 quoteDecimals = IERC20(path[1]).decimals();
+        uint8 quoteDecimals = IERC20( assetAddress[stableCoinId[_symbol]]).decimals();
         uint256 quotePrice = scalePrice(
-            amounts[1],
+            amountOut,
             quoteDecimals,
             ROOT_DECIMALS
         );
 
+        uint256 stableCoinPrice = getPriceFromChainlink(stableCoinId[_symbol]);
+
+        quotePrice = (quotePrice * stableCoinPrice)/ (10 ** ROOT_DECIMALS );
+
         return quotePrice;
+
     }
 
     function scalePrice(

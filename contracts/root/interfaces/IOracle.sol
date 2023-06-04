@@ -14,10 +14,10 @@ interface IOracle  {
     /**
      * @notice Configures router address of the dex
      * This function can only be accessed by the account with role SET_ORACLE_METHOD.
-     * @param _dexRouterAddress - address of the dex router contract.
+     * @param _dexFactoryAddress - address of the dex factory contract.
      **/
-    function setDexRouterAddress(
-        address _dexRouterAddress
+    function setDexFactoryAddress(
+        address _dexFactoryAddress
     ) external;
 
     /**
