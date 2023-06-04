@@ -89,6 +89,10 @@ contract CEToken is ERC20Upgradeable {
     }
 
     function mint(address to, uint256 amount) external onlyRole(IRoleManager(roleManager).MINT_BURN_CE_DEBT_TOKEN()) {
+        require(
+            transferBlockRelease[to] != 2 ** 256 - 1,
+            string.concat(TAG,": User is already caged")
+        );
         if (amount > lockupTriggerAmt) {
             transferBlockRelease[to] = block.number + transferBlockWait;
         }
