@@ -12,8 +12,7 @@ import "../../root/libraries/Address.sol";
 
 string constant TAG = "AxlRouteBranch";
 
-contract AxlRouteBranch is Initializable, AxelarExecutable, ContextUpgradeable{
-
+contract AxlRouteBranch is Initializable, AxelarExecutable, ContextUpgradeable {
     //Axelar's chain id of the chain where root is deployed
     string public rootChainId;
     // Destination contract address
@@ -23,6 +22,13 @@ contract AxlRouteBranch is Initializable, AxelarExecutable, ContextUpgradeable{
     address public roleManager;
 
     IAxelarGasService gasService;
+
+    event Executed();
+
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
 
     function initialize(
         address _gateway,
@@ -35,8 +41,6 @@ contract AxlRouteBranch is Initializable, AxelarExecutable, ContextUpgradeable{
         roleManager = roleManagerAddress;
     }
 
-    event Executed();
-
     /**
      * @dev Modifier that checks if caller has a specific role.
      **/
@@ -45,11 +49,15 @@ contract AxlRouteBranch is Initializable, AxelarExecutable, ContextUpgradeable{
         _;
     }
 
-    function setRoleManager(address roleManagerAddress) external onlyRole(IRoleManager(roleManager).DEFAULT_ADMIN_ROLE()) {
+    function setRoleManager(
+        address roleManagerAddress
+    ) external onlyRole(IRoleManager(roleManager).DEFAULT_ADMIN_ROLE()) {
         roleManager = roleManagerAddress;
     }
 
-    function setAdapter(address adapterAddress) external onlyRole(IRoleManager(roleManager).SET_ROUTE_METHOD()) {
+    function setAdapter(
+        address adapterAddress
+    ) external onlyRole(IRoleManager(roleManager).SET_ROUTE_METHOD()) {
         adapter = adapterAddress;
     }
 
@@ -66,23 +74,26 @@ contract AxlRouteBranch is Initializable, AxelarExecutable, ContextUpgradeable{
         address sender,
         uint256
     ) external payable onlyRole(IRoleManager(roleManager).ADAPTER()) {
-        if (keccak256(abi.encodePacked(localChainId)) == keccak256(abi.encodePacked(rootChainId))){
-            IAxelarGateway(Address.parseAddr(rootAddress)).localReceive(localChainId, StringsUpgradeable.toHexString(
-                            address(this))
-                        , payload);
-        }
-        else{
-
-        if (msg.value > 0) {
-            gasService.payNativeGasForContractCall{value: msg.value}(
-                address(this),
-                rootChainId,
-                rootAddress,
-                payload,
-                sender
+        if (
+            keccak256(abi.encodePacked(localChainId)) ==
+            keccak256(abi.encodePacked(rootChainId))
+        ) {
+            IAxelarGateway(Address.parseAddr(rootAddress)).localReceive(
+                localChainId,
+                StringsUpgradeable.toHexString(address(this)),
+                payload
             );
-        }
-        gateway.callContract(rootChainId, rootAddress, payload);
+        } else {
+            if (msg.value > 0) {
+                gasService.payNativeGasForContractCall{value: msg.value}(
+                    address(this),
+                    rootChainId,
+                    rootAddress,
+                    payload,
+                    sender
+                );
+            }
+            gateway.callContract(rootChainId, rootAddress, payload);
         }
     }
 
@@ -96,7 +107,7 @@ contract AxlRouteBranch is Initializable, AxelarExecutable, ContextUpgradeable{
                 keccak256(abi.encodePacked(sourceChain_)) &&
                 Address.parseAddr(rootAddress) ==
                 Address.parseAddr(sourceAddress_),
-            string.concat(TAG,"Invalid source")
+            string.concat(TAG, "Invalid source")
         );
         IAdapter(adapter).execute(payload_);
 

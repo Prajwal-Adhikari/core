@@ -19,6 +19,19 @@ contract CEToken is ERC20Upgradeable {
     uint256 public lockupTriggerAmt; //amount where lockup will kick in after cross-chain transfer
     mapping(address => uint256) public transferBlockRelease; //Block number
 
+    /**
+     * @dev Modifier that checks if caller has a specific role.
+     **/
+    modifier onlyRole(bytes32 role) {
+        IRoleManager(roleManager).checkRole(role, _msgSender());
+        _;
+    }
+
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     function initialize(
         string memory name_,
         string memory symbol_,
@@ -28,15 +41,6 @@ contract CEToken is ERC20Upgradeable {
         roleManager = roleManagerAddress;
     }
 
-    /**
-     * @dev Modifier that checks if caller has a specific role.
-     **/
-    modifier onlyRole(bytes32 role) {
-        IRoleManager(roleManager).checkRole(role, _msgSender());
-        _;
-    }
-
-    
     function setRoleManager(address roleManagerAddress) external onlyRole(IRoleManager(roleManager).DEFAULT_ADMIN_ROLE()) {
         roleManager = roleManagerAddress;
     }

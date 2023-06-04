@@ -38,6 +38,11 @@ contract RoleManagerPool is Initializable, AccessControlUpgradeable {
     bytes32 public constant ROUTE = keccak256("ROUTE");
     bytes32 public constant CONTROLLER = keccak256("CONTROLLER");
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     function initialize() public initializer {
         __AccessControl_init();
         // Grant the contract deployer the default admin role: it will be able

@@ -31,6 +31,11 @@ contract LzRoutePool is Initializable, LzApp {
         _;
     }
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     function initialize(
         address _lzEndpoint,
         uint16 _localChainId,

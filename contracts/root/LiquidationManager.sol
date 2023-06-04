@@ -34,17 +34,22 @@ contract LiquidationManager is
     address public core;
     IOracle public oracle;
 
-    function initialize(address roleManagerAddress) public initializer {
-        __ReentrancyGuard_init();
-        roleManager = roleManagerAddress;
-    }
-
     /**
      * @dev Modifier that checks if caller has a specific role.
      **/
     modifier onlyRole(bytes32 role) {
         IRoleManager(roleManager).checkRole(role, _msgSender());
         _;
+    }
+
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    function initialize(address roleManagerAddress) public initializer {
+        __ReentrancyGuard_init();
+        roleManager = roleManagerAddress;
     }
 
     // Set contract addresses

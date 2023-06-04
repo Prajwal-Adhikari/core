@@ -48,6 +48,11 @@ contract Core is Initializable, ContextUpgradeable {
         _;
     }
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     function initialize(address treasuryAddress, address roleManagerAddress) public initializer {
         treasury = treasuryAddress;
         roleManager = roleManagerAddress;

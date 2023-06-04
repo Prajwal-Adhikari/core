@@ -46,6 +46,11 @@ contract Oracle is Initializable, ContextUpgradeable {
         _;
     }
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     function initialize(address roleManagerAddress) public initializer {
         roleManager = roleManagerAddress;
     }

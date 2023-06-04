@@ -55,6 +55,19 @@ contract Pool is
 
     bool public feeEnable;
 
+    /**
+     * @dev Modifier that checks if caller has a specific role.
+     **/
+    modifier onlyRole(bytes32 role) {
+        IRoleManager(roleManager).checkRole(role, _msgSender());
+        _;
+    }
+
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     function initialize(
         address forwarder,
         address roleManagerAddress
@@ -62,14 +75,6 @@ contract Pool is
         __ReentrancyGuard_init();
         __ERC2771Context_init(forwarder);
         roleManager = roleManagerAddress;
-    }
-
-    /**
-     * @dev Modifier that checks if caller has a specific role.
-     **/
-    modifier onlyRole(bytes32 role) {
-        IRoleManager(roleManager).checkRole(role, _msgSender());
-        _;
     }
 
     // Set contract addresses

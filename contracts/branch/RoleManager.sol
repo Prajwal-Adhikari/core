@@ -22,6 +22,11 @@ contract RoleManagerBranch is Initializable, AccessControlUpgradeable {
     bytes32 public constant ADAPTER = keccak256("ADAPTER");
     bytes32 public constant ROUTE = keccak256("ROUTE");
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     function initialize() public initializer {
         __AccessControl_init();
         // Grant the contract deployer the default admin role: it will be able

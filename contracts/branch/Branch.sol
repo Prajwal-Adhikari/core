@@ -87,6 +87,11 @@ contract Branch is
         uint256 aidrdropAmount
     );
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     function initialize(
         address forwarder,
         address roleManagerAddress

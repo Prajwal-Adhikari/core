@@ -34,6 +34,11 @@ contract AxlRoutePool is Initializable, AxelarExecutable, ContextUpgradeable {
         _;
     }
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     function initialize(
         address _gateway,
         address _gasReceiver,

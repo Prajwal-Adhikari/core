@@ -14,6 +14,11 @@ contract DebtToken is ERC20Upgradeable {
     address public core;
     address public roleManager;
     bytes32 public poolId;
+
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
     
     function initialize(
         string memory name_,
