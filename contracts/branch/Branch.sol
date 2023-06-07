@@ -382,7 +382,7 @@ contract Branch is
 
         if (decimals > ROOT_DECIMALS) {
             //ignore decimals beyond the 18th digit
-            amount = amount / (10 ** (decimals - ROOT_DECIMALS)) * 10 ** (decimals - ROOT_DECIMALS);
+            amount = _localAmount / (10 ** (decimals - ROOT_DECIMALS)) * 10 ** (decimals - ROOT_DECIMALS);
             _localAmount = _localAmount / (10 ** (decimals - ROOT_DECIMALS));
         } else {
             amount = _localAmount;
