@@ -216,6 +216,15 @@ contract Branch is
         address destination,
         uint256 amountMin
     ) external payable onlyRole(IRoleManager(roleManager).SWAP()) {
+        require(
+            msg.value > 0,
+            string.concat(
+                TAG,
+                ": requires a msg.value to pay crosschain message"
+            )
+        );
+        require(qty > 0, string.concat(TAG, ": swap() requires qty > 0"));
+
         if (pools[id].token == address(0)) {
             // wrap the ETH into WETH
             IStargateEthVault(stargateEthVault).deposit{value: qty}();
@@ -308,7 +317,7 @@ contract Branch is
             amountsx
         );
         require(payload.length == 81, string.concat(TAG, ": Bad payload"));
-        
+
         if (token == address(0)) {
             require(
                 msg.value >= payAmount,
@@ -382,7 +391,9 @@ contract Branch is
 
         if (decimals > ROOT_DECIMALS) {
             //ignore decimals beyond the 18th digit
-            amount = _localAmount / (10 ** (decimals - ROOT_DECIMALS)) * 10 ** (decimals - ROOT_DECIMALS);
+            amount =
+                (_localAmount / (10 ** (decimals - ROOT_DECIMALS))) *
+                10 ** (decimals - ROOT_DECIMALS);
             _localAmount = _localAmount / (10 ** (decimals - ROOT_DECIMALS));
         } else {
             amount = _localAmount;
