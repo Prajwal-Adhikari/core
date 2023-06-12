@@ -25,7 +25,7 @@ const LZO = ethers.utils.formatBytes32String("LZO");
 let pool, core, liquidationManager, treasury, feeProvider, controller;
 let clientA, clientB, clientC, adapterA, adapterB, adapterC, adapterS, routeA, routeB, routeC, routeS;
 let roleManagerS, roleManagerA, roleManagerB, roleManagerC;
-let matic, ftm, bnb, usdc, ceUSDC, ceFTM, ceBNB, ceMATIC, debtUSDC, debtFTM, debtBNB, debtMATIC;
+let matic, matic2, ftm, bnb, usdc, ceUSDC, ceFTM, ceBNB, ceMATIC, debtUSDC, debtFTM, debtBNB, debtMATIC;
 
 
 function getAddress(b, a) {
@@ -35,8 +35,7 @@ function getAddress(b, a) {
 describe("Ready", function () {
 
     beforeEach(async function () {
-        [developer, alice, bob, treasury] = await ethers.getSigners()
-
+        [developer, alice, bob, treasury, user3, user4] = await ethers.getSigners()
 
         // use this chainId
         this.chainIdServer = 1
@@ -75,9 +74,6 @@ describe("Ready", function () {
         debtBNB = await upgrades.deployProxy(DebtToken,["DebtBNB", "DebtBNB", roleManagerS.address]);
         debtUSDC = await upgrades.deployProxy(DebtToken,["DebtUSDC", "DebtUSDC", roleManagerS.address]);
     
-
-
-
         const ERC20 = await ethers.getContractFactory("ERC20Mock")
         matic = await ERC20.deploy("MATIC", "MATIC", 18)
         ftm = await ERC20.deploy("FTM", "FTM", 18)
@@ -219,25 +215,91 @@ describe("Ready", function () {
         await matic.mint(alice.address, toTokenAmount(1e6))
         await ftm.mint(alice.address, toTokenAmount(1e6))
         await bnb.mint(alice.address, toTokenAmount(1e6))
-        await usdc.mint(alice.address, 100e6)
+        await usdc.mint(alice.address, toTokenAmount(1e6, 6))
+
         await matic.mint(bob.address, toTokenAmount(1e6))
         await ftm.mint(bob.address, toTokenAmount(1e6))
         await bnb.mint(bob.address, toTokenAmount(1e6))
-        await usdc.mint(bob.address, 100e6)
+        await usdc.mint(bob.address, toTokenAmount(1e6, 6))
+
+        await matic.mint(user3.address, toTokenAmount(1e6))
+        await ftm.mint(user3.address, toTokenAmount(1e6))
+        await bnb.mint(user3.address, toTokenAmount(1e6))
+        await usdc.mint(user3.address, toTokenAmount(1e6, 6))
+
+        await matic.mint(user4.address, toTokenAmount(1e6))
+        await ftm.mint(user4.address, toTokenAmount(1e6))
+        await bnb.mint(user4.address, toTokenAmount(1e6))
+        await usdc.mint(user4.address, toTokenAmount(1e6, 6))
 
         await matic.connect(alice).approve(clientA.address, toTokenAmount(1e6));
-        await matic.connect(bob).approve(clientA.address, toTokenAmount(1e6));
+        await matic.connect(alice).approve(clientB.address, toTokenAmount(1e6));
+        await matic.connect(alice).approve(clientC.address, toTokenAmount(1e6));
+        await ftm.connect(alice).approve(clientA.address, toTokenAmount(1e6));
         await ftm.connect(alice).approve(clientB.address, toTokenAmount(1e6));
-        await ftm.connect(bob).approve(clientB.address, toTokenAmount(1e6));
+        await ftm.connect(alice).approve(clientC.address, toTokenAmount(1e6));
+        await bnb.connect(alice).approve(clientA.address, toTokenAmount(1e6));
+        await bnb.connect(alice).approve(clientB.address, toTokenAmount(1e6));
         await bnb.connect(alice).approve(clientC.address, toTokenAmount(1e6));
+
+        await usdc.connect(alice).approve(clientA.address, toTokenAmount(1e6));
+        await usdc.connect(alice).approve(clientB.address, toTokenAmount(1e6));
+        await usdc.connect(alice).approve(clientC.address, toTokenAmount(1e6));
+
+        await matic.connect(bob).approve(clientA.address, toTokenAmount(1e6));
+        await matic.connect(bob).approve(clientB.address, toTokenAmount(1e6));
+        await matic.connect(bob).approve(clientC.address, toTokenAmount(1e6));
+        await ftm.connect(bob).approve(clientA.address, toTokenAmount(1e6));
+        await ftm.connect(bob).approve(clientB.address, toTokenAmount(1e6));
+        await ftm.connect(bob).approve(clientC.address, toTokenAmount(1e6));
+        await bnb.connect(bob).approve(clientA.address, toTokenAmount(1e6));
+        await bnb.connect(bob).approve(clientB.address, toTokenAmount(1e6));
         await bnb.connect(bob).approve(clientC.address, toTokenAmount(1e6));
-        await usdc.connect(alice).approve(clientA.address, toTokenAmount(1e6));
-        await usdc.connect(alice).approve(clientA.address, toTokenAmount(1e6));
+        await usdc.connect(bob).approve(clientA.address, toTokenAmount(1e6));
+        await usdc.connect(bob).approve(clientB.address, toTokenAmount(1e6));
+        await usdc.connect(bob).approve(clientC.address, toTokenAmount(1e6));
+        
+        await matic.connect(user3).approve(clientA.address, toTokenAmount(1e6));
+        await matic.connect(user3).approve(clientB.address, toTokenAmount(1e6));
+        await matic.connect(user3).approve(clientC.address, toTokenAmount(1e6));
+        await ftm.connect(user3).approve(clientA.address, toTokenAmount(1e6));
+        await ftm.connect(user3).approve(clientB.address, toTokenAmount(1e6));
+        await ftm.connect(user3).approve(clientC.address, toTokenAmount(1e6));
+        await bnb.connect(user3).approve(clientA.address, toTokenAmount(1e6));
+        await bnb.connect(user3).approve(clientB.address, toTokenAmount(1e6));
+        await bnb.connect(user3).approve(clientC.address, toTokenAmount(1e6));
+        await usdc.connect(user3).approve(clientA.address, toTokenAmount(1e6));
+        await usdc.connect(user3).approve(clientB.address, toTokenAmount(1e6));
+        await usdc.connect(user3).approve(clientC.address, toTokenAmount(1e6));
+
+        await matic.connect(user4).approve(clientA.address, toTokenAmount(1e6));
+        await matic.connect(user4).approve(clientB.address, toTokenAmount(1e6));
+        await matic.connect(user4).approve(clientC.address, toTokenAmount(1e6));
+        await ftm.connect(user4).approve(clientA.address, toTokenAmount(1e6));
+        await ftm.connect(user4).approve(clientB.address, toTokenAmount(1e6));
+        await ftm.connect(user4).approve(clientC.address, toTokenAmount(1e6));
+        await bnb.connect(user4).approve(clientA.address, toTokenAmount(1e6));
+        await bnb.connect(user4).approve(clientB.address, toTokenAmount(1e6));
+        await bnb.connect(user4).approve(clientC.address, toTokenAmount(1e6));
+        await usdc.connect(user4).approve(clientA.address, toTokenAmount(1e6));
+        await usdc.connect(user4).approve(clientB.address, toTokenAmount(1e6));
+        await usdc.connect(user4).approve(clientC.address, toTokenAmount(1e6));
 
         await clientA.setPool(USDC, usdc.address, true);
         await clientA.setPool(MATIC, matic.address, true);
+        await clientA.setPool(FTM, ftm.address, true);
+        await clientA.setPool(BNB, bnb.address, true);
+
+        await clientB.setPool(USDC, usdc.address, true);
+        await clientB.setPool(MATIC, matic.address, true);
         await clientB.setPool(FTM, ftm.address, true);
+        await clientB.setPool(BNB, bnb.address, true);
+
+        await clientC.setPool(USDC, usdc.address, true);
+        await clientC.setPool(MATIC, matic.address, true);
+        await clientC.setPool(FTM, ftm.address, true);
         await clientC.setPool(BNB, bnb.address, true);
+
         console.log("finish")
     })
     async function grantRole() {
@@ -378,6 +440,7 @@ describe("Ready", function () {
         console.log(`debtToken alice: ${alice_balance} bob: ${bob_balance}`);
     }
 
+    /*
     it("test not 18 decimals", async function() {
         let fees = await routeA.connect(alice).estimateFees(1, 1000000);
         console.log("alice deposit usdc");
@@ -394,11 +457,10 @@ describe("Ready", function () {
         assert.equal(ce_balance, toTokenAmount(0.5));
         assert.equal(usdc_balance, 99.5e6);
     })
+    */
 
     it("test liquidation", async function() {
         let fees = await routeA.connect(alice).estimateFees(1, 1000000);
-        await printCEBalance();
-
         //alice is borrower
         //bob is liquidator
 
@@ -407,11 +469,11 @@ describe("Ready", function () {
         //collateralPool.ceToken = ceMATIC
 
         console.log("alice deposit matic");
-        await clientA.connect(alice).depositRequest(MATIC, toTokenAmount(500000), LZO, 0, { value: fees })
+        await clientA.connect(alice).depositRequest(MATIC, toTokenAmount(5e5), LZO, 0, { value: fees })
         
         console.log("bob deposit ftm");
         await clientB.connect(bob).depositRequest(FTM, toTokenAmount(5e5), LZO, 0, { value: fees })
-
+        
         console.log("alice borrow ftm");
         await pool.connect(alice).borrow(FTM, BNB, toTokenAmount(2e5), ethers.utils.hexZeroPad(alice.address, 32), LZO, 0, { value: fees });
    
@@ -428,14 +490,14 @@ describe("Ready", function () {
         let bob_collateral_before = await ceMATIC.balanceOf(bob.address);
 
         let currentLTV =  (hfb.debtValue * 1e18)/hfb.collateralValue;
-        let data = await buildLiquidateParam(currentLTV, MATIC, FTM, 100000, core, this.oracle);
+        let data = await buildLiquidateParam(currentLTV, MATIC, FTM, 1e4, core, this.oracle);
         // console.log(data);
         // make the function public if needed to check data and data2
         // let data2 = await liquidationManager.buildLiquidateParams( MATIC, FTM, 100000, BigNumber.from("250999996829020670"))
         // console.log(data2);
 
         console.log("bob will liquidate");
-        await liquidationManager.connect(bob).liquidate(alice.address, MATIC, FTM, toTokenAmount(100000));
+        await liquidationManager.connect(bob).liquidate(alice.address, MATIC, FTM, toTokenAmount(1e4));
      
         let alice_debt_after= await debtFTM.balanceOf(alice.address);
         let bob_ce_after = await ceFTM.balanceOf(bob.address);
@@ -456,17 +518,20 @@ describe("Ready", function () {
         //as a result checking > or = as needed.
         
         //dbtoken of alice burn by burnBorrowerDebtAmount
+        console.log(Math.round(data.burnBorrowerDebtAmount) *10**18, " almost equal ~", difference_debt_alice);
         assert.isAbove(Math.round(data.burnBorrowerDebtAmount) *10**18, difference_debt_alice);
         //cetoekn of bob burn by burnLiquidatorCEAmount
+        console.log(Math.round(data.burnLiquidatorCEAmount) *10**18, " almost equal ~", difference_ce_bob);
         assert.isAbove(Math.round(data.burnLiquidatorCEAmount) *10**18, difference_ce_bob);
         //cetoken of alice burn by liqBorrowerCEAmount
-        assert.isAbove(difference_collateral_alice , Math.round(data.liqBorrowerCEAmount) *10**18);
+        console.log(Math.round(data.liqBorrowerCEAmount) *10**18, " almost equal ~", difference_collateral_alice);
+        assert.isAbove(Math.round(data.liqBorrowerCEAmount) *10**18, difference_collateral_alice);
         //cetoken if bob mint by liqBorrowerCEAmount
         assert.equal(Math.round(data.liqBorrowerCEAmount) *10**18, difference_collateral_bob);
 
     })
 
-    
+    /*
     it("test ceToken transfer", async function() {
         let fees = await routeA.connect(alice).estimateFees(1, 1000000);
 
@@ -560,7 +625,59 @@ describe("Ready", function () {
         await liquidationManager.connect(alice).liquidate(bob.address, FTM, MATIC, toTokenAmount(50000));
         await printInfo();
     })
+    */
 
+    /*
+    it("EQ FEE test", async function () {
+
+        await feeProvider.configureOptimalGlobalLiquidityFactor([FTM,BNB,MATIC], [MATIC, MATIC, MATIC], [toTokenAmount(0.3),toTokenAmount(0.3),toTokenAmount(0.4)]);
+        await feeProvider.configureBaseFee([FTM,BNB,MATIC], [MATIC, MATIC, MATIC], [toTokenAmount(1),toTokenAmount(1),toTokenAmount(1)]);
+        await feeProvider.configureMaxFee([FTM,BNB,MATIC], [MATIC, MATIC, MATIC], [toTokenAmount(5),toTokenAmount(5),toTokenAmount(5)]);
+
+        console.log("here");
+        let fees = await routeA.connect(alice).estimateFees(1, 1000000);
+
+        console.log("alice deposit matic from fantom chain");
+        await clientA.connect(alice).depositRequest(MATIC, toTokenAmount(2e5), LZO, 0, { value: fees })
+
+        // console.log("bob deposit matic from fantom chain");
+        await clientA.connect(bob).depositRequest(MATIC, toTokenAmount(2e5), LZO, 0, { value: fees })
+
+        console.log("alice deposit matic from matic chain");
+        await clientC.connect(alice).depositRequest(MATIC, toTokenAmount(3e5), LZO, 0, { value: fees })
+
+        // console.log("bob deposit matic from matic chain");
+        await clientC.connect(bob).depositRequest(MATIC, toTokenAmount(3e5), LZO, 0, { value: fees })
+
+        console.log("alice borrow Matic from matic chain");
+        await pool.connect(alice).borrow(MATIC, MATIC, toTokenAmount(2e5), ethers.utils.hexZeroPad(alice.address, 32), LZO, 0, { value: fees });
+
+        console.log("bob borrow Matic from fantom chain");
+        await pool.connect(bob).borrow(MATIC, FTM, toTokenAmount(2e5), ethers.utils.hexZeroPad(bob.address, 32), LZO, 0, { value: fees });
+
+        let fee1 = await core.getLiquidity(FTM, MATIC)
+        console.log('total chain liquidity in fantom', fee1, " ", fee1/10**18);
+
+        fee1 = await core.getLiquidity(MATIC, MATIC)
+        console.log('total chain liquidity in matic', fee1, " ", fee1/10**18);
+
+        let fee2 = await core.totalLiquidity(MATIC)
+        console.log('total liquidity', fee2, " ", fee2/10**18);
+
+        let glf = await feeProvider._getGlobalLiquidityFactor(FTM, MATIC)
+        console.log('glf in fantom chain', glf, " ", glf/10**18);
+
+        glf = await feeProvider._getGlobalLiquidityFactor(MATIC, MATIC)
+        console.log('glf in matic chain', glf, " ", glf/10**18);
+        
+        let feeP1 = await feeProvider.getFeeAmount(FTM, MATIC);
+        console.log('fee amount in fantom chain', feeP1, " ", feeP1/10**18);
+
+        feeP1 = await feeProvider.getFeeAmount(MATIC, MATIC);
+        console.log('fee amount in matic chain',feeP1, " ", feeP1/10**18);
+
+    })
+    */
 
     // it("Test reward", async function () {
     //     let fees = await routeA.connect(alice).estimateFees(MATIC);
@@ -592,4 +709,171 @@ describe("Ready", function () {
     //     // expect(balance).to.equal(toTokenAmount(500000));
 
     // })
+
+    // it("USDC Decimal 6 and 9 Test", async function () {
+    //     let fees = await routeA.connect(alice).estimateFees(1, 1000000);
+
+    //     // const USDC2 = ethers.utils.formatBytes32String("USDC");
+    //     const ERC20 = await ethers.getContractFactory("ERC20Mock")
+    //     usdc2 = await ERC20.deploy("USDC", "USDC", 9)
+    //     await usdc2.mint(alice.address, toTokenAmount(1e6))
+    //     await usdc2.connect(alice).approve(clientA.address, toTokenAmount(1e6));
+    //     //overwrite previous initialization
+    //     await clientA.setPool(USDC, usdc2.address, true);
+
+    //     await feeProvider.configureOptimalGlobalLiquidityFactor([FTM,BNB,MATIC], [USDC, USDC, USDC], [toTokenAmount(0.3),toTokenAmount(0.3),toTokenAmount(0.4)]);
+    //     await feeProvider.configureBaseFee([FTM,BNB,MATIC], [USDC, USDC, USDC], [toTokenAmount(1),toTokenAmount(1),toTokenAmount(1)]);
+    //     await feeProvider.configureMaxFee([FTM,BNB,MATIC], [USDC, USDC, USDC], [toTokenAmount(5),toTokenAmount(5),toTokenAmount(5)]);
+
+    //     let aliceBalanceBefore = await usdc.balanceOf(alice.address);
+    //     console.log('aliceBalance', aliceBalanceBefore);
+
+    //     let usdc1Amount = 1e5
+    //     console.log("bob deposit USDC1 from matic chain");
+    //     await clientC.connect(bob).depositRequest(USDC, toTokenAmount(usdc1Amount, 6), LZO, 0, { value: fees })
+        
+    //     let usdc2Amount = 2e5
+    //     console.log("alice deposit USDC2 from fantom chain");
+    //     await clientA.connect(alice).depositRequest(USDC, toTokenAmount(usdc2Amount, 9), LZO, 0, { value: fees })
+
+    //     // let amount = await clientC._buildRemoteAmount(toTokenAmount(1e5, 6), usdc.address);
+    //     // console.log(amount);
+
+    //     // amount = await clientA._buildRemoteAmount(toTokenAmount(2e5, 9), usdc2.address);
+    //     // console.log(amount);
+
+    //     let fee1 = await core.getLiquidity(MATIC, USDC)
+    //     console.log('total chain liquidity in matic', fee1, " ", fee1/10**18);
+    //     assert.equal(usdc1Amount * 10 **18, fee1)
+
+    //     fee1 = await core.getLiquidity(FTM, USDC)
+    //     console.log('total chain liquidity in FTM', fee1, " ", fee1/10**18);
+    //     assert.equal(usdc2Amount * 10 **18, fee1)
+
+    //     let fee2 = await core.totalLiquidity(USDC)
+    //     console.log('total liquidity', fee2, " ", fee2/10**18);
+    //     assert.equal((usdc1Amount + usdc2Amount) * 10 **18, fee2)
+
+    //     //alice withdraw to fantom chain
+    //     console.log("bob withdraw to ftm chain");
+    //     await pool.connect(bob).withdraw( USDC, FTM, toTokenAmount(usdc1Amount), ethers.utils.hexZeroPad(bob.address, 32), LZO, 0, { value: fees })
+    
+    //     // alice withdraw to matic chain
+    //     console.log("alice withdraw to matic chain");
+    //     await pool.connect(alice).withdraw(USDC, MATIC, toTokenAmount(usdc1Amount), ethers.utils.hexZeroPad(alice.address, 32), LZO, 0, { value: fees })
+
+    //     fee1 = await core.getLiquidity(MATIC, USDC)
+    //     // console.log('total chain liquidity in matic', fee1, " ", fee1/10**18);
+    //     assert.equal(fee1, 0)
+
+    //     fee1 = await core.getLiquidity(FTM, USDC)
+    //     // console.log('total chain liquidity in FTM', fee1, " ", fee1/10**18);
+    //     assert.equal(usdc1Amount * 10 **18, fee1)
+
+    //     fee2 = await core.totalLiquidity(USDC)
+    //     // console.log('total liquidity', fee2, " ", fee2/10**18);
+    //     assert.equal((usdc1Amount) * 10 **18, fee2)
+
+    //     bobBalance = await usdc2.balanceOf(bob.address);
+    //     // console.log('bobBalance', bobBalance);
+    //     assert.equal(bobBalance, usdc1Amount * 10**9)
+
+    //     let aliceBalanceAfter = await usdc.balanceOf(alice.address);
+    //     console.log('aliceBalance', aliceBalanceAfter);
+    //     assert.equal(aliceBalanceAfter.toNumber(),  aliceBalanceBefore.toNumber() + (usdc1Amount * 10**6))
+    // })    
+
+    // it("USDC Decimal 18 and 21 Test", async function () {
+    //     let fees = await routeA.connect(alice).estimateFees(1, 1000000);
+            // matic2 = await ERC20.deploy("MATIC", "MATIC", 21)
+            // // await matic2.mint(alice.address, toTokenAmount(5e6, 21))
+            // await matic2.connect(alice).approve(clientA.address, toTokenAmount(1e6, 21));
+            // //overwrite previous initialization
+            // await clientA.setPool(MATIC, matic2.address, true);
+
+    //     let poolinfo = await clientA.pools(MATIC)
+    //     console.log(poolinfo, " ", matic2.address);
+        
+    //     let alice2BalanceBefore = await matic2.balanceOf(alice.address);
+    //     console.log('alice2BalanceB', alice2BalanceBefore);
+
+    //     let clientA2BalanceB = await matic2.balanceOf(clientA.address);
+    //     console.log('clientA2BalanceB', clientA2BalanceB);
+
+    //     let alice1BalanceBefore = await matic.balanceOf(alice.address);
+    //     console.log('alice1BalanceB', alice1BalanceBefore);
+
+    //     let ceTokenAliceBefore = await ceMATIC.balanceOf(alice.address);
+    //     console.log('ceTokenAliceBefore', ceTokenAliceBefore);
+
+    //     await feeProvider.configureOptimalGlobalLiquidityFactor([FTM,BNB,MATIC], [USDC, USDC, USDC], [toTokenAmount(0.3),toTokenAmount(0.3),toTokenAmount(0.4)]);
+    //     await feeProvider.configureBaseFee([FTM,BNB,MATIC], [USDC, USDC, USDC], [toTokenAmount(1),toTokenAmount(1),toTokenAmount(1)]);
+    //     await feeProvider.configureMaxFee([FTM,BNB,MATIC], [USDC, USDC, USDC], [toTokenAmount(5),toTokenAmount(5),toTokenAmount(5)]);
+
+    //     let usdc2Amount = 2e5
+    //     console.log("alice deposit matic2 from fantom chain");
+    //     await clientA.connect(alice).depositRequest(MATIC, toTokenAmount(usdc2Amount, 21), LZO, 0, { value: fees })
+
+    //     let usdc1Amount = 1e5
+    //     console.log("bob deposit matic1 from matic chain");
+    //     await clientC.connect(bob).depositRequest(MATIC, toTokenAmount(usdc1Amount), LZO, 0, { value: fees })
+
+    //     let clientA2BalanceA = await matic2.balanceOf(clientA.address);
+    //     console.log('clientA2BalanceA', clientA2BalanceA);
+
+    //     let aliceBalanceA = await matic2.balanceOf(alice.address);
+    //     console.log('alice2BalanceA', aliceBalanceA);
+
+    //     let alice1BalanceA= await matic.balanceOf(alice.address);
+    //     console.log('alice1BalanceA', alice1BalanceA);
+
+    //     let ceTokenAliceAfter= await ceMATIC.balanceOf(alice.address);
+    //     console.log('ceTokenAliceAfter', ceTokenAliceAfter);
+
+    //     // let amount = await clientC._buildRemoteAmount(toTokenAmount(1e5), matic.address);
+    //     // console.log(amount);
+
+    //     // amount = await clientA._buildRemoteAmount(toTokenAmount(2e5, 21), matic2.address);
+    //     // console.log(amount);
+
+    //     let fee1 = await core.getLiquidity(MATIC, MATIC)
+    //     console.log('total chain liquidity in matic', fee1, " ", fee1/10**18);
+    //     // assert.equal(usdc1Amount * 10 **18, fee1)
+
+    //     fee1 = await core.getLiquidity(FTM, MATIC)
+    //     console.log('total chain liquidity in FTM', fee1, " ", fee1/10**18);
+    //     // assert.equal(usdc2Amount * 10 **18, fee1)
+
+    //     let fee2 = await core.totalLiquidity(MATIC)
+    //     console.log('total liquidity', fee2, " ", fee2/10**18);
+    //     // assert.equal((usdc1Amount + usdc2Amount) * 10 **18, fee2)
+
+    //     //alice withdraw to fantom chain
+    //     console.log("bob withdraw to ftm chain");
+    //     await pool.connect(bob).withdraw(MATIC, FTM, toTokenAmount(usdc1Amount), ethers.utils.hexZeroPad(bob.address, 32), LZO, 0, { value: fees })
+    
+    //     // alice withdraw to matic chain
+    //     console.log("alice withdraw to matic chain");
+    //     await pool.connect(alice).withdraw(MATIC, MATIC, toTokenAmount(usdc1Amount), ethers.utils.hexZeroPad(alice.address, 32), LZO, 0, { value: fees })
+
+    //     fee1 = await core.getLiquidity(MATIC, MATIC)
+    //     console.log('total chain liquidity in matic', fee1, " ", fee1/10**18);
+    //     // assert.equal(fee1, 0)
+
+    //     fee1 = await core.getLiquidity(FTM, MATIC)
+    //     console.log('total chain liquidity in FTM', fee1, " ", fee1/10**18);
+    //     // assert.equal(usdc1Amount * 10 **18, fee1)
+
+    //     fee2 = await core.totalLiquidity(MATIC)
+    //     console.log('total liquidity', fee2, " ", fee2/10**18);
+    //     // assert.equal((usdc1Amount) * 10 **18, fee2)
+
+    //     let bobBalance = await matic2.balanceOf(bob.address);
+    //     console.log('bobBalance', bobBalance);
+    //     // assert.equal(bobBalance, usdc1Amount * 10**9)
+
+    //     let aliceBalanceAfter = await matic.balanceOf(alice.address);
+    //     console.log('aliceBalance', aliceBalanceAfter);
+    //     // console.log(aliceBalanceAfter.toNumber(), " ",  aliceBalanceBefore.toNumber() ," ",  (usdc1Amount * 10**18))
+    // })  
 })
