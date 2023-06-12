@@ -10,7 +10,7 @@ import "../interfaces/IAdapter.sol";
 import "../interfaces/IRoleManager.sol";
 import "../../root/libraries/Address.sol";
 
-string constant TAG = "AxlRouteBranch";
+// string constant TAG = "AxlRouteBranch";
 
 contract AxlRouteBranch is Initializable, AxelarExecutable, ContextUpgradeable {
     //Axelar's chain id of the chain where root is deployed
@@ -24,6 +24,7 @@ contract AxlRouteBranch is Initializable, AxelarExecutable, ContextUpgradeable {
     IAxelarGasService gasService;
 
     event Executed();
+    error InvalidSource();
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -102,15 +103,24 @@ contract AxlRouteBranch is Initializable, AxelarExecutable, ContextUpgradeable {
         string calldata sourceAddress_,
         bytes calldata payload_
     ) internal override {
-        require(
-            keccak256(abi.encodePacked(rootChainId)) ==
-                keccak256(abi.encodePacked(sourceChain_)) &&
-                Address.parseAddr(rootAddress) ==
-                Address.parseAddr(sourceAddress_),
-            string.concat(TAG, "Invalid source")
-        );
-        IAdapter(adapter).execute(payload_);
+        // require(
+        //     keccak256(abi.encodePacked(rootChainId)) ==
+        //         keccak256(abi.encodePacked(sourceChain_)) &&
+        //         Address.parseAddr(rootAddress) ==
+        //         Address.parseAddr(sourceAddress_),
+        //     string.concat(TAG, "Invalid source")
+        // );
 
+        if( 
+            keccak256(abi.encodePacked(rootChainId)) !=
+            keccak256(abi.encodePacked(sourceChain_)) 
+            ||
+            Address.parseAddr(rootAddress) !=
+            Address.parseAddr(sourceAddress_)
+        )
+            revert InvalidSource();
+
+        IAdapter(adapter).execute(payload_);
         emit Executed();
     }
 }

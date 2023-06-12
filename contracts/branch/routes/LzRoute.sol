@@ -25,7 +25,7 @@ contract LzRouteBranch is Initializable, LzApp {
     uint8 internal constant TYPE_SWAP = 3;
 
     uint256 public gasUsage;
-
+    error InvalidChainId(uint16 chainIdReceived);
     /**
      * @dev Modifier that checks if caller has a specific role.
      **/
@@ -117,7 +117,9 @@ contract LzRouteBranch is Initializable, LzApp {
         uint64,
         bytes memory _payload
     ) internal override {
-        require(rootChainId == _srcId, string.concat(TAG, "Invalid chainId"));
+        // require(rootChainId == _srcId, string.concat(TAG, "Invalid chainId"));
+        if(rootChainId != _srcId)
+            revert InvalidChainId(_srcId);
         IAdapter(adapter).execute(_payload);
     }
 

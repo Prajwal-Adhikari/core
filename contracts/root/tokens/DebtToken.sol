@@ -15,6 +15,7 @@ contract DebtToken is ERC20Upgradeable {
     address public roleManager;
     bytes32 public poolId;
 
+    error CannotTransferDebtToken();
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -64,7 +65,9 @@ contract DebtToken is ERC20Upgradeable {
         uint256 amount
     ) internal pure override {
         (from, to, amount);
-        require(false, string.concat(TAG,": Cannot transfer debt token"));
+        // require(false, string.concat(TAG,": Cannot transfer debt token"));
+        if(true)
+            revert CannotTransferDebtToken();
     }
 
     function mint(address to, uint256 amount) external onlyRole(IRoleManager(roleManager).MINT_BURN_CE_DEBT_TOKEN()) {

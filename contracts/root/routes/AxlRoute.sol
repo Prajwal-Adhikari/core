@@ -25,7 +25,8 @@ contract AxlRoutePool is Initializable, AxelarExecutable, ContextUpgradeable {
     bytes32 public route;
 
     event Executed();
-
+    error InvalidContract(address receivedAddress);
+    
     /**
      * @dev Modifier that checks if caller has a specific role.
      **/
@@ -114,10 +115,13 @@ contract AxlRoutePool is Initializable, AxelarExecutable, ContextUpgradeable {
     ) internal override {
         bytes32 chain = keccak256(abi.encodePacked(sourceChain_));
         address addr = Address.parseAddr(sourceAddress_);
-        require(
-            trustedContract[chain] == addr,
-            string.concat(TAG, ": Invalid contract")
-        );
+        // require(
+        //     trustedContract[chain] == addr,
+        //     string.concat(TAG, ": Invalid contract")
+        // );
+
+        if(trustedContract[chain] != addr)
+            revert InvalidContract(addr);
         IAdapter(adapter).execute(payload_, chainKey[chain], route);
       
     }

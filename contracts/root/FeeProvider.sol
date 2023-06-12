@@ -23,6 +23,7 @@ contract FeeProvider is Initializable, ContextUpgradeable {
     address public core;
     address public roleManager;
 
+    error ArgumentsMismatch();
     /**
      * @dev Modifier that checks if caller has a specific role.
      **/
@@ -57,11 +58,15 @@ contract FeeProvider is Initializable, ContextUpgradeable {
         bytes32[] memory poolId,
         uint256[] memory liquidityFactor
     ) external onlyRole(IRoleManager(roleManager).SET_FEEPROVIDER_METHOD()) {
-        require(
-            chainId.length == poolId.length &&
-                poolId.length == liquidityFactor.length,
-            string.concat(TAG, ": Arguments number mismatched")
-        );
+        // require(
+        //     chainId.length == poolId.length &&
+        //         poolId.length == liquidityFactor.length,
+        //     string.concat(TAG, ": Arguments number mismatched")
+        // );
+
+        if(chainId.length != poolId.length || poolId.length != liquidityFactor.length)
+            revert ArgumentsMismatch();
+
         for (uint256 i = 0; i < poolId.length; i++) {
             OPTIMAL_GLOBAL_LIQUIDITY_FACTOR[chainId[i]][
                 poolId[i]
@@ -74,10 +79,14 @@ contract FeeProvider is Initializable, ContextUpgradeable {
         bytes32[] memory poolId,
         uint256[] memory baseFee
     ) external onlyRole(IRoleManager(roleManager).SET_FEEPROVIDER_METHOD()) {
-        require(
-            chainId.length == poolId.length && poolId.length == baseFee.length,
-            string.concat(TAG, ": Arguments number mismatched")
-        );
+        // require(
+        //     chainId.length == poolId.length && poolId.length == baseFee.length,
+        //     string.concat(TAG, ": Arguments number mismatched")
+        // );
+
+        if(chainId.length != poolId.length || poolId.length != baseFee.length)
+            revert ArgumentsMismatch();
+
         for (uint256 i = 0; i < poolId.length; i++) {
             BASE_FEE[chainId[i]][poolId[i]] = baseFee[i];
         }
@@ -88,10 +97,14 @@ contract FeeProvider is Initializable, ContextUpgradeable {
         bytes32[] memory poolId,
         uint256[] memory maxFee
     ) external onlyRole(IRoleManager(roleManager).SET_FEEPROVIDER_METHOD()) {
-        require(
-            chainId.length == poolId.length && poolId.length == maxFee.length,
-            string.concat(TAG, ": Arguments number mismatched")
-        );
+        // require(
+        //     chainId.length == poolId.length && poolId.length == maxFee.length,
+        //     string.concat(TAG, ": Arguments number mismatched")
+        // );
+
+        if(chainId.length != poolId.length || poolId.length != maxFee.length)
+            revert ArgumentsMismatch();
+
         for (uint256 i = 0; i < poolId.length; i++) {
             MAX_FEE[chainId[i]][poolId[i]] = maxFee[i];
         }

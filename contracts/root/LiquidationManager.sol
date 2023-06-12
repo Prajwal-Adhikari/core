@@ -34,6 +34,8 @@ contract LiquidationManager is
     address public core;
     IOracle public oracle;
 
+    error CannotLiquidate(uint256 currentHealthFactor);
+    error ClosingFactotExceeded();
     /**
      * @dev Modifier that checks if caller has a specific role.
      **/
@@ -124,10 +126,13 @@ contract LiquidationManager is
         Data.ConfigData memory config = ICore(core).configs(collateralId);
 
         // whether borrower can be liquidated
-        require(
-            healthData.factor >= MAX_HEALTH_FACTOR,
-            string.concat(TAG, ": Cannot liquidate now")
-        );
+        // require(
+        //     healthData.factor >= MAX_HEALTH_FACTOR,
+        //     string.concat(TAG, ": Cannot liquidate now")
+        // );
+
+        if(healthData.factor < MAX_HEALTH_FACTOR)
+            revert CannotLiquidate(healthData.factor);
 
         // calculate LTV, and using formula to calculate liquidate discount and closing factor
         uint256 currentLTV = healthData.debtValue.mul(1e18).div(
@@ -166,12 +171,14 @@ contract LiquidationManager is
             borrowerCollateral,
             discount
         );
-        require(
-            healthData.collateralValue.mul(liqPercent).div(1e18) >=
-                params.liqValue,
-            "Closing factor exceed"
-        );
+        // require(
+        //     healthData.collateralValue.mul(liqPercent).div(1e18) >=
+        //         params.liqValue,
+        //     "Closing factor exceed"
+        // );
 
+        if(healthData.collateralValue.mul(liqPercent).div(1e18) < params.liqValue)
+            revert ClosingFactotExceeded();  //TODO: what to add here?
         // mint and burn CEToken and DebtToken then update supply
         IDebtToken(debtPool.debtToken).burn(
             user,
