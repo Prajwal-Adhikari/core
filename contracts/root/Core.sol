@@ -222,6 +222,7 @@ contract Core is Initializable, ContextUpgradeable {
             string.concat(TAG, ": No enough liquidity")
         );
         ICEToken(pool.ceToken).burn(user, burnAmount);
+        removeToken(user, id);
 
         pool.ceSupply = pool.ceSupply.sub(burnAmount);
         chainLiquidity[chainId][id] -= tokenAmount;
@@ -334,6 +335,7 @@ contract Core is Initializable, ContextUpgradeable {
         chainLiquidity[chainId][id] += tokenAmount;
         totalLiquidity[id] += tokenAmount;
         IDebtToken(params.debtToken).burn(params.user, params.debtAmount);
+        removeToken(user, id);
         pool.debtSupply -= params.debtAmount;
         updateInterestRate(id);
 
@@ -371,6 +373,7 @@ contract Core is Initializable, ContextUpgradeable {
         require(msg.sender == pools[id].ceToken, string.concat(TAG, ": Invalid sender"));
         checkHealth(from);
         addToken(to, id);
+        removeToken(from, id);
     }
 
     function addToken(address user, bytes32 id) internal {
@@ -380,6 +383,20 @@ contract Core is Initializable, ContextUpgradeable {
             }
         }
         users[user].push(id);
+    }
+
+    function removeToken(address user, bytes32 id) internal {
+        Data.PoolData memory pool = pools[id];
+        if(ICEToken(pool.ceToken).balanceOf(user) == 0 && IDebtToken(pool.debtToken).balanceOf(user) == 0) {
+            uint length = users[user].length;
+            for (uint256 i = 0; i < length; i++) {
+                if (users[user][i] == id && i != length - 1) {
+                    users[user][i] = users[user][length - 1];
+                    break;
+                }
+            }
+            users[user].pop();
+        }
     }
 
     function _getValues(

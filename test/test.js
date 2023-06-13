@@ -529,7 +529,7 @@ describe("Ready", function () {
         await printInfo();
 
         console.log("alice withdraw bnb");
-        await pool.connect(alice).withdraw(BNB, MATIC, toTokenAmount(1e5), ethers.utils.hexZeroPad(alice.address, 32), LZO, 0, { value: fees })
+        await pool.connect(alice).withdraw(BNB, MATIC, toTokenAmount(5e5), ethers.utils.hexZeroPad(alice.address, 32), LZO, 0, { value: fees })
         await printInfo();
 
         console.log("alice withdraw matic")
@@ -545,7 +545,6 @@ describe("Ready", function () {
 
         await clientB.connect(alice).repayRequest(FTM, toTokenAmount(200000), LZO, 0, { value: fees })
         await printInfo();
-
 
         console.log("alice deposit matic");
         await clientA.connect(alice).depositRequest(MATIC, toTokenAmount(500000), LZO, 0, { value: fees })
