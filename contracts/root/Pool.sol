@@ -146,7 +146,8 @@ contract Pool is
         uint256 ceAmount,
         bytes32 to,
         bytes32 route,
-        uint256 airdropAmount
+        uint256 airdropAmount,
+        bool all
     ) external payable nonReentrant {
         require(
             !(withdrawPause[id][chainId] || protocolPause),
@@ -156,7 +157,8 @@ contract Pool is
             id,
             chainId,
             ceAmount,
-            _msgSender()
+            _msgSender(),
+            all
         );
         if (feeEnable) {
             uint256 fee = IFeeProvider(feeProvider).getFeeAmount(chainId, id);

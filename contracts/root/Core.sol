@@ -210,13 +210,20 @@ contract Core is Initializable, ContextUpgradeable {
         bytes32 id,
         bytes32 chainId,
         uint256 tokenAmount,
-        address user
+        address user,
+        bool all
     ) external onlyRole(IRoleManager(roleManager).POOL()) returns (uint256) {
         refresh(id);
         Data.PoolData storage pool = pools[id];
         require(pool.enable, string.concat(TAG, ": Not enable now"));
 
-        uint256 burnAmount = tokenAmount.mul(1e18).div(pool.ceScaled);
+        uint256 burnAmount;
+        if(all) {
+            burnAmount = ICEToken(pool.ceToken).balanceBeforeScaled(user);
+            tokenAmount = burnAmount.mul(pool.ceScaled).div(1e18);
+        } else {
+            burnAmount = tokenAmount.mul(1e18).div(pool.ceScaled);
+        } 
         require(
             chainLiquidity[chainId][id] >= tokenAmount,
             string.concat(TAG, ": No enough liquidity")
