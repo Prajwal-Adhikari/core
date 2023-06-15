@@ -36,7 +36,10 @@ contract LzApp is Initializable, OwnableUpgradeable, ILayerZeroReceiver {
 
         // require(sender.length == trustedRemote.length && keccak256(sender) == keccak256(trustedRemote), "LzApp: invalid source sending contract");
 
-        if(sender.length != trustedRemote.length || keccak256(sender) != keccak256(trustedRemote))
+        if(sender.length != trustedRemote.length)
+            revert InvalidSrcContract(sender);
+
+        if(keccak256(sender) != keccak256(trustedRemote))
             revert InvalidSrcContract(sender);
 
         _blockingLzReceive(_srcChainId, sender, 0, _payload);
@@ -52,9 +55,12 @@ contract LzApp is Initializable, OwnableUpgradeable, ILayerZeroReceiver {
         // if will still block the message pathway from (srcChainId, srcAddress). should not receive message from untrusted remote.
         // require(_srcAddress.length == trustedRemote.length && keccak256(_srcAddress) == keccak256(trustedRemote), "LzApp: invalid source sending contract");
 
-        if(_srcAddress.length != trustedRemote.length || keccak256(_srcAddress) != keccak256(trustedRemote))
+        if(_srcAddress.length != trustedRemote.length)
             revert InvalidSrcContract(_srcAddress);
 
+        if(keccak256(_srcAddress) != keccak256(trustedRemote))
+            revert InvalidSrcContract(_srcAddress);
+            
         _blockingLzReceive(_srcChainId, _srcAddress, _nonce, _payload);
     }
 

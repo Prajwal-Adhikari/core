@@ -178,7 +178,7 @@ contract LiquidationManager is
         // );
 
         if(healthData.collateralValue.mul(liqPercent).div(1e18) < params.liqValue)
-            revert ClosingFactotExceeded();  //TODO: what to add here?
+            revert ClosingFactotExceeded();
         // mint and burn CEToken and DebtToken then update supply
         IDebtToken(debtPool.debtToken).burn(
             user,

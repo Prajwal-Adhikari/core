@@ -64,7 +64,10 @@ contract FeeProvider is Initializable, ContextUpgradeable {
         //     string.concat(TAG, ": Arguments number mismatched")
         // );
 
-        if(chainId.length != poolId.length || poolId.length != liquidityFactor.length)
+        if(chainId.length != poolId.length)
+            revert ArgumentsMismatch();
+
+        if(poolId.length != liquidityFactor.length)
             revert ArgumentsMismatch();
 
         for (uint256 i = 0; i < poolId.length; i++) {
@@ -84,7 +87,10 @@ contract FeeProvider is Initializable, ContextUpgradeable {
         //     string.concat(TAG, ": Arguments number mismatched")
         // );
 
-        if(chainId.length != poolId.length || poolId.length != baseFee.length)
+        if(chainId.length != poolId.length)
+            revert ArgumentsMismatch();
+
+        if(poolId.length != baseFee.length)
             revert ArgumentsMismatch();
 
         for (uint256 i = 0; i < poolId.length; i++) {
@@ -102,7 +108,10 @@ contract FeeProvider is Initializable, ContextUpgradeable {
         //     string.concat(TAG, ": Arguments number mismatched")
         // );
 
-        if(chainId.length != poolId.length || poolId.length != maxFee.length)
+        if(chainId.length != poolId.length)
+            revert ArgumentsMismatch();
+
+        if(poolId.length != maxFee.length)
             revert ArgumentsMismatch();
 
         for (uint256 i = 0; i < poolId.length; i++) {

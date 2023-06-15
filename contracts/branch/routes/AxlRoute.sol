@@ -114,7 +114,10 @@ contract AxlRouteBranch is Initializable, AxelarExecutable, ContextUpgradeable {
         if( 
             keccak256(abi.encodePacked(rootChainId)) !=
             keccak256(abi.encodePacked(sourceChain_)) 
-            ||
+        )
+            revert InvalidSource();
+
+        if(
             Address.parseAddr(rootAddress) !=
             Address.parseAddr(sourceAddress_)
         )
