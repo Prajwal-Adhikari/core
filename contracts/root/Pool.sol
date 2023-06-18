@@ -293,7 +293,7 @@ contract Pool is
         } else if (functionType == TYPE_REPAY) {
             _repay(tokenId, chainId, _bytesToAddress(data), amount, route);
         } else {
-            revert(string.concat(TAG, "Unsupport functionType"));
+            revert(string.concat(TAG, ": Unsupport functionType"));
         }
     }
 

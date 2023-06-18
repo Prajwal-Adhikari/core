@@ -67,7 +67,7 @@ contract AdapterBranch is Initializable, ContextUpgradeable {
     ) external payable onlyRole(IRoleManager(roleManager).BRANCH()) {
         require(
             routeExist[router[route]],
-            string.concat(TAG, "No route exists")
+            string.concat(TAG, ": No route exists")
         );
         IRoute(router[route]).send{value: msg.value}(
             payload,

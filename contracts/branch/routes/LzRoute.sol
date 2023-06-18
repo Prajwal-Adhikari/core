@@ -117,7 +117,7 @@ contract LzRouteBranch is Initializable, LzApp {
         uint64,
         bytes memory _payload
     ) internal override {
-        require(rootChainId == _srcId, string.concat(TAG, "Invalid chainId"));
+        require(rootChainId == _srcId, string.concat(TAG, ": Invalid chainId"));
         IAdapter(adapter).execute(_payload);
     }
 
@@ -137,7 +137,7 @@ contract LzRouteBranch is Initializable, LzApp {
         } else if (functionType == TYPE_SWAP) {
             payload = abi.encode(TYPE_SWAP, 1, msg.sender, 1, 1);
         } else {
-            revert(string.concat(TAG, "Unsupport functionType"));
+            revert(string.concat(TAG, ": Unsupport functionType"));
         }
         uint256 fees;
         if (airdropAmount > 0) {

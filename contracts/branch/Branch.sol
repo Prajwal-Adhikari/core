@@ -323,7 +323,7 @@ contract Branch is
         if (token == address(0)) {
             require(
                 msg.value >= payAmount,
-                string.concat(TAG, "Invalid amount")
+                string.concat(TAG, ": Invalid amount")
             );
             IAdapter(adapter).send{value: msg.value.sub(payAmount)}(
                 payload,
