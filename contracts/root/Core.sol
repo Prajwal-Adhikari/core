@@ -162,7 +162,7 @@ contract Core is Initializable, ContextUpgradeable {
         bytes32[] memory ids = users[user];
         if (ids.length > 0) {
             uint256[] memory prices = oracle.getPrices(ids);
-            for (uint256 i = 0; i < ids.length; i++) {
+            for (uint256 i; i < ids.length; i++) {
                 (uint256 collateralValue, uint256 debtValue) = _getValues(
                     user,
                     prices[i],
@@ -384,7 +384,7 @@ contract Core is Initializable, ContextUpgradeable {
     }
 
     function addToken(address user, bytes32 id) internal {
-        for (uint256 i = 0; i < users[user].length; i++) {
+        for (uint256 i; i < users[user].length; i++) {
             if (users[user][i] == id) {
                 return;
             }
@@ -396,7 +396,7 @@ contract Core is Initializable, ContextUpgradeable {
         Data.PoolData memory pool = pools[id];
         if(ICEToken(pool.ceToken).balanceOf(user) == 0 && IDebtToken(pool.debtToken).balanceOf(user) == 0) {
             uint length = users[user].length;
-            for (uint256 i = 0; i < length; i++) {
+            for (uint256 i; i < length; i++) {
                 if (users[user][i] == id && i != length - 1) {
                     users[user][i] = users[user][length - 1];
                     break;

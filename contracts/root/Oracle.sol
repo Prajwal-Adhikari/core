@@ -117,7 +117,7 @@ contract Oracle is Initializable, ContextUpgradeable {
     ) external view returns (uint256[] memory results) {
         results = new uint256[](_symbols.length);
         uint256 price;
-        for (uint256 i = 0; i < _symbols.length; i++) {
+        for (uint256 i; i < _symbols.length; i++) {
             if (fetchFromDex[_symbols[i]]) {
                 if (isStableCoin[_symbols[i]]) {
                     price = 1e18;

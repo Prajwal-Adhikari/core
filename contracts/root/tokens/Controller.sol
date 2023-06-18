@@ -40,7 +40,7 @@ contract Controller is ContextUpgradeable {
     }
 
     function addCEToken(address[] memory _ceTokens) external onlyRole(IRoleManager(roleManager).SET_CONTROLLER_METHOD()) {
-        for (uint256 i = 0; i < _ceTokens.length; i++) {
+        for (uint256 i; i < _ceTokens.length; i++) {
             if (!ceTokenExist[_ceTokens[i]]) {
                 ceTokens.push(_ceTokens[i]);
                 ceTokenExist[_ceTokens[i]] = true;
@@ -50,7 +50,7 @@ contract Controller is ContextUpgradeable {
 
     function removeCEToken(address _ceToken) external onlyRole(IRoleManager(roleManager).SET_CONTROLLER_METHOD()) {
         address lastElement = ceTokens[ceTokens.length - 1];
-        for (uint256 i = 0; i < ceTokens.length; i++) {
+        for (uint256 i; i < ceTokens.length; i++) {
             if (ceTokens[i] == _ceToken) {
                 ceTokens[i] = lastElement;
                 ceTokenExist[_ceToken] = false;
@@ -61,14 +61,14 @@ contract Controller is ContextUpgradeable {
     }
 
     function cageUser(address user) external onlyRole(IRoleManager(roleManager).SET_CONTROLLER_METHOD()) {
-        for (uint256 i = 0; i < ceTokens.length; i++) {
+        for (uint256 i; i < ceTokens.length; i++) {
             ICEToken(ceTokens[i]).setTransferBlockRelease(user, 2 ** 256 - 1);
         }
         emit CagedUser(user);
     }
 
     function releaseCage(address user) external onlyRole(IRoleManager(roleManager).SET_CONTROLLER_METHOD()) {
-        for (uint256 i = 0; i < ceTokens.length; i++) {
+        for (uint256 i; i < ceTokens.length; i++) {
             ICEToken(ceTokens[i]).setTransferBlockRelease(user, block.number);
         }
         emit ReleaseCage(user);
