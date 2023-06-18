@@ -90,6 +90,11 @@ contract AxlRoutePool is Initializable, AxelarExecutable, ContextUpgradeable {
             keccak256(abi.encodePacked(localChainId)) ==
             keccak256(abi.encodePacked(destChain[chainId]))
         ) {
+            if (msg.value > 0) {
+                (bool sent, ) = payable(sender).call{value: msg.value}("");
+                require(sent, string.concat(TAG, ": Failed to refund fees"));
+            }
+            
             IAxelarGateway(StringToAddress.toAddress(destAddress[chainId]))
                 .localReceive(
                     localChainId,

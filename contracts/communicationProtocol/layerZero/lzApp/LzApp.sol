@@ -56,6 +56,10 @@ contract LzApp is Initializable, OwnableUpgradeable, ILayerZeroReceiver {
         bytes memory trustedRemote = trustedRemoteLookup[_dstChainId];
         require(trustedRemote.length != 0, "LzApp: destination chain is not a trusted source");
         if(_dstChainId == localId) {
+            if (gasValue > 0) {
+                (bool sent, ) = _refundAddress.call{value: gasValue}("");
+                require(sent, "LzApp: Failed to refund fees");
+            }
             ILayerZeroReceiver(address(bytes20(trustedRemote))).localReceive(_dstChainId, _payload);
         } else {
             lzEndpoint.send{value: gasValue}(_dstChainId, trustedRemote, _payload, _refundAddress, _zroPaymentAddress, _adapterParams);
