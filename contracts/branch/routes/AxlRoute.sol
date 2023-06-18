@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.9;
+pragma solidity 0.8.17;
 import "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/StringsUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -82,7 +82,7 @@ contract AxlRouteBranch is Initializable, AxelarExecutable, ContextUpgradeable {
                 (bool sent, ) = payable(sender).call{value: msg.value}("");
                 require(sent, string.concat(TAG, ": Failed to refund fees"));
             }
-            
+
             IAxelarGateway(StringToAddress.toAddress(rootAddress)).localReceive(
                 localChainId,
                 AddressToString.toString(address(this)),
