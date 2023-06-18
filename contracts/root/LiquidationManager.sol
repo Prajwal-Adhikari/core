@@ -33,6 +33,7 @@ contract LiquidationManager is
     address public roleManager;
     address public core;
     IOracle public oracle;
+    bool public liquidationPause;
 
     /**
      * @dev Modifier that checks if caller has a specific role.
@@ -67,6 +68,12 @@ contract LiquidationManager is
         IOracle oracleAddress
     ) external onlyRole(IRoleManager(roleManager).SET_LIQUIDATION_METHOD()) {
         oracle = oracleAddress;
+    }
+
+    function setLiquidationPause(
+        bool pause
+    ) external onlyRole(IRoleManager(roleManager).SET_LIQUIDATION_METHOD()) {
+        liquidationPause = pause;
     }
 
     /**
@@ -115,6 +122,11 @@ contract LiquidationManager is
         bytes32 debtId,
         uint256 borrowerCollateral
     ) external nonReentrant {
+        // whether liquidation is enable or not
+        require(
+            !liquidationPause,
+            string.concat(TAG, ": Liquidation is paused")
+        );
         // refresh the pool data
         ICore(core).refresh(collateralId);
         ICore(core).refresh(debtId);
