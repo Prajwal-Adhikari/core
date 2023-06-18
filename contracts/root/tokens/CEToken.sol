@@ -6,8 +6,6 @@ import "@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
 import "../interfaces/IRoleManager.sol";
 import "../interfaces/ICore.sol";
 
-import "hardhat/console.sol";
-
 string constant TAG = "CEToken";
 
 contract CEToken is ERC20Upgradeable {
