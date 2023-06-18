@@ -70,10 +70,12 @@ contract AxlRoutePool is Initializable, AxelarExecutable, ContextUpgradeable {
         destChain[chainId] = name;
         destAddress[chainId] = addr;
         chainKey[keccak256(abi.encodePacked(name))] = chainId;
-        trustedContract[keccak256(abi.encodePacked(name))] = Address.parseAddr(addr);
+        trustedContract[keccak256(abi.encodePacked(name))] = StringToAddress.toAddress(addr);
     }
-    
-    function setRoute(bytes32 routeKey) external onlyRole(IRoleManager(roleManager).SET_ROUTE_METHOD()) {
+
+    function setRoute(
+        bytes32 routeKey
+    ) external onlyRole(IRoleManager(roleManager).SET_ROUTE_METHOD()) {
         route = routeKey;
     }
 
@@ -88,10 +90,12 @@ contract AxlRoutePool is Initializable, AxelarExecutable, ContextUpgradeable {
             keccak256(abi.encodePacked(localChainId)) ==
             keccak256(abi.encodePacked(destChain[chainId]))
         ) {
-            IAxelarGateway(Address.parseAddr(destAddress[chainId]))
-                .localReceive(localChainId, StringsUpgradeable.toHexString(
-                            address(this))
-                        , payload);
+            IAxelarGateway(StringToAddress.toAddress(destAddress[chainId]))
+                .localReceive(
+                    localChainId,
+                    AddressToString.toString(address(this)),
+                    payload
+                );
         } else {
             if (msg.value > 0) {
                 gasService.payNativeGasForContractCall{value: msg.value}(
@@ -113,12 +117,11 @@ contract AxlRoutePool is Initializable, AxelarExecutable, ContextUpgradeable {
         bytes calldata payload_
     ) internal override {
         bytes32 chain = keccak256(abi.encodePacked(sourceChain_));
-        address addr = Address.parseAddr(sourceAddress_);
+        address addr = StringToAddress.toAddress(sourceAddress_);
         require(
             trustedContract[chain] == addr,
             string.concat(TAG, ": Invalid contract")
         );
         IAdapter(adapter).execute(payload_, chainKey[chain], route);
-      
     }
 }

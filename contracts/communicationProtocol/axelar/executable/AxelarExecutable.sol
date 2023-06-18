@@ -27,7 +27,7 @@ contract AxelarExecutable is Initializable, IAxelarExecutable {
         bytes calldata payload_
     ) external {
         require(
-            Address.parseAddr(sourceAddress_) ==  msg.sender,
+            StringToAddress.toAddress(sourceAddress_) ==  msg.sender,
             "AxelarExecutable: Caller is not a trusted contract"
         );
 

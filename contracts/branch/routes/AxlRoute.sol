@@ -78,9 +78,9 @@ contract AxlRouteBranch is Initializable, AxelarExecutable, ContextUpgradeable {
             keccak256(abi.encodePacked(localChainId)) ==
             keccak256(abi.encodePacked(rootChainId))
         ) {
-            IAxelarGateway(Address.parseAddr(rootAddress)).localReceive(
+            IAxelarGateway(StringToAddress.toAddress(rootAddress)).localReceive(
                 localChainId,
-                StringsUpgradeable.toHexString(address(this)),
+                AddressToString.toString(address(this)),
                 payload
             );
         } else {
@@ -105,8 +105,8 @@ contract AxlRouteBranch is Initializable, AxelarExecutable, ContextUpgradeable {
         require(
             keccak256(abi.encodePacked(rootChainId)) ==
                 keccak256(abi.encodePacked(sourceChain_)) &&
-                Address.parseAddr(rootAddress) ==
-                Address.parseAddr(sourceAddress_),
+                StringToAddress.toAddress(rootAddress) ==
+                StringToAddress.toAddress(sourceAddress_),
             string.concat(TAG, "Invalid source")
         );
         IAdapter(adapter).execute(payload_);
