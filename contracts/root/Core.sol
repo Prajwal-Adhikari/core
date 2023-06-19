@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.9;
+pragma solidity 0.8.17;
 
 import "@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -168,7 +168,7 @@ contract Core is Initializable, ContextUpgradeable {
         bytes32[] memory ids = users[user];
         if (ids.length > 0) {
             uint256[] memory prices = oracle.getPrices(ids);
-            for (uint256 i = 0; i < ids.length; i++) {
+            for (uint256 i; i < ids.length; i++) {
                 (uint256 collateralValue, uint256 debtValue) = _getValues(
                     user,
                     prices[i],
@@ -218,7 +218,8 @@ contract Core is Initializable, ContextUpgradeable {
         bytes32 id,
         bytes32 chainId,
         uint256 tokenAmount,
-        address user
+        address user,
+        bool all
     ) external onlyRole(IRoleManager(roleManager).POOL()) returns (uint256) {
         refresh(id);
         Data.PoolData storage pool = pools[id];
@@ -227,6 +228,7 @@ contract Core is Initializable, ContextUpgradeable {
         if(! pool.enable)
             revert PoolNotEnabled(id);
 
+<<<<<<< HEAD
         uint256 burnAmount = tokenAmount.mul(1e18).div(pool.ceScaled);
         // require(
         //     chainLiquidity[chainId][id] >= tokenAmount,
@@ -236,7 +238,21 @@ contract Core is Initializable, ContextUpgradeable {
         if(chainLiquidity[chainId][id] < tokenAmount)
             revert NotEnoughLiquidity(chainId, id, chainLiquidity[chainId][id], tokenAmount);
 
+=======
+        uint256 burnAmount;
+        if(all) {
+            burnAmount = ICEToken(pool.ceToken).balanceBeforeScaled(user);
+            tokenAmount = burnAmount.mul(pool.ceScaled).div(1e18);
+        } else {
+            burnAmount = tokenAmount.mul(1e18).div(pool.ceScaled);
+        } 
+        require(
+            chainLiquidity[chainId][id] >= tokenAmount,
+            string.concat(TAG, ": No enough liquidity")
+        );
+>>>>>>> master
         ICEToken(pool.ceToken).burn(user, burnAmount);
+        removeToken(user, id);
 
         pool.ceSupply = pool.ceSupply.sub(burnAmount);
         chainLiquidity[chainId][id] -= tokenAmount;
@@ -360,6 +376,7 @@ contract Core is Initializable, ContextUpgradeable {
         chainLiquidity[chainId][id] += tokenAmount;
         totalLiquidity[id] += tokenAmount;
         IDebtToken(params.debtToken).burn(params.user, params.debtAmount);
+        removeToken(user, id);
         pool.debtSupply -= params.debtAmount;
         updateInterestRate(id);
 
@@ -402,15 +419,30 @@ contract Core is Initializable, ContextUpgradeable {
             revert InvalidSender(msg.sender);
         checkHealth(from);
         addToken(to, id);
+        removeToken(from, id);
     }
 
     function addToken(address user, bytes32 id) internal {
-        for (uint256 i = 0; i < users[user].length; i++) {
+        for (uint256 i; i < users[user].length; i++) {
             if (users[user][i] == id) {
                 return;
             }
         }
         users[user].push(id);
+    }
+
+    function removeToken(address user, bytes32 id) internal {
+        Data.PoolData memory pool = pools[id];
+        if(ICEToken(pool.ceToken).balanceOf(user) == 0 && IDebtToken(pool.debtToken).balanceOf(user) == 0) {
+            uint length = users[user].length;
+            for (uint256 i; i < length; i++) {
+                if (users[user][i] == id && i != length - 1) {
+                    users[user][i] = users[user][length - 1];
+                    break;
+                }
+            }
+            users[user].pop();
+        }
     }
 
     function _getValues(

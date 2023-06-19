@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.9;
-import "hardhat/console.sol";
+pragma solidity 0.8.17;
+
 import "@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
@@ -33,6 +33,7 @@ contract LiquidationManager is
     address public roleManager;
     address public core;
     IOracle public oracle;
+    bool public liquidationPause;
 
     error CannotLiquidate(uint256 currentHealthFactor);
     error ClosingFactotExceeded();
@@ -69,6 +70,12 @@ contract LiquidationManager is
         IOracle oracleAddress
     ) external onlyRole(IRoleManager(roleManager).SET_LIQUIDATION_METHOD()) {
         oracle = oracleAddress;
+    }
+
+    function setLiquidationPause(
+        bool pause
+    ) external onlyRole(IRoleManager(roleManager).SET_LIQUIDATION_METHOD()) {
+        liquidationPause = pause;
     }
 
     /**
@@ -117,6 +124,11 @@ contract LiquidationManager is
         bytes32 debtId,
         uint256 borrowerCollateral
     ) external nonReentrant {
+        // whether liquidation is enable or not
+        require(
+            !liquidationPause,
+            string.concat(TAG, ": Liquidation is paused")
+        );
         // refresh the pool data
         ICore(core).refresh(collateralId);
         ICore(core).refresh(debtId);

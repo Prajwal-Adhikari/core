@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.9;
+pragma solidity 0.8.17;
 import "@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
@@ -151,7 +151,8 @@ contract Pool is
         uint256 ceAmount,
         bytes32 to,
         bytes32 route,
-        uint256 airdropAmount
+        uint256 airdropAmount,
+        bool all
     ) external payable nonReentrant {
         // require(
         //     !(withdrawPause[id][chainId] || protocolPause),
@@ -168,7 +169,8 @@ contract Pool is
             id,
             chainId,
             ceAmount,
-            _msgSender()
+            _msgSender(),
+            all
         );
         if (feeEnable) {
             uint256 fee = IFeeProvider(feeProvider).getFeeAmount(chainId, id);
@@ -318,7 +320,7 @@ contract Pool is
         } else if (functionType == TYPE_REPAY) {
             _repay(tokenId, chainId, _bytesToAddress(data), amount, route);
         } else {
-            revert(string.concat(TAG, "Unsupport functionType"));
+            revert(string.concat(TAG, ": Unsupport functionType"));
         }
     }
 

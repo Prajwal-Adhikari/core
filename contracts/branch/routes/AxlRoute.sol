@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.9;
+pragma solidity 0.8.17;
 import "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/StringsUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -79,9 +79,14 @@ contract AxlRouteBranch is Initializable, AxelarExecutable, ContextUpgradeable {
             keccak256(abi.encodePacked(localChainId)) ==
             keccak256(abi.encodePacked(rootChainId))
         ) {
-            IAxelarGateway(Address.parseAddr(rootAddress)).localReceive(
+            if (msg.value > 0) {
+                (bool sent, ) = payable(sender).call{value: msg.value}("");
+                require(sent, string.concat(TAG, ": Failed to refund fees"));
+            }
+
+            IAxelarGateway(StringToAddress.toAddress(rootAddress)).localReceive(
                 localChainId,
-                StringsUpgradeable.toHexString(address(this)),
+                AddressToString.toString(address(this)),
                 payload
             );
         } else {
@@ -103,11 +108,12 @@ contract AxlRouteBranch is Initializable, AxelarExecutable, ContextUpgradeable {
         string calldata sourceAddress_,
         bytes calldata payload_
     ) internal override {
+
         // require(
-        //     keccak256(abi.encodePacked(rootChainId)) ==
+        //         keccak256(abi.encodePacked(rootChainId)) ==
         //         keccak256(abi.encodePacked(sourceChain_)) &&
-        //         Address.parseAddr(rootAddress) ==
-        //         Address.parseAddr(sourceAddress_),
+        //         StringToAddress.toAddress(rootAddress) ==
+        //         StringToAddress.toAddress(sourceAddress_),
         //     string.concat(TAG, "Invalid source")
         // );
 
@@ -118,8 +124,8 @@ contract AxlRouteBranch is Initializable, AxelarExecutable, ContextUpgradeable {
             revert InvalidSource();
 
         if(
-            Address.parseAddr(rootAddress) !=
-            Address.parseAddr(sourceAddress_)
+            StringToAddress.toAddress(rootAddress) !=
+            StringToAddress.toAddress(sourceAddress_)
         )
             revert InvalidSource();
 

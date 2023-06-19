@@ -1,34 +1,45 @@
-pragma solidity ^0.8.9;
+// SPDX-License-Identifier: MIT
 
-library Address {
-    
-    function parseAddr(
-        string memory _a
-    ) internal pure returns (address _parsedAddress) {
-        bytes memory tmp = bytes(_a);
-        uint160 iaddr = 0;
-        uint160 b1;
-        uint160 b2;
-        for (uint i = 2; i < 2 + 2 * 20; i += 2) {
-            iaddr *= 256;
-            b1 = uint160(uint8(tmp[i]));
-            b2 = uint160(uint8(tmp[i + 1]));
-            if ((b1 >= 97) && (b1 <= 102)) {
-                b1 -= 87;
-            } else if ((b1 >= 65) && (b1 <= 70)) {
-                b1 -= 55;
-            } else if ((b1 >= 48) && (b1 <= 57)) {
-                b1 -= 48;
-            }
-            if ((b2 >= 97) && (b2 <= 102)) {
-                b2 -= 87;
-            } else if ((b2 >= 65) && (b2 <= 70)) {
-                b2 -= 55;
-            } else if ((b2 >= 48) && (b2 <= 57)) {
-                b2 -= 48;
-            }
-            iaddr += (b1 * 16 + b2);
+pragma solidity ^0.8.0;
+
+library StringToAddress {
+    error InvalidAddressString();
+
+    function toAddress(string memory addressString) internal pure returns (address) {
+        bytes memory stringBytes = bytes(addressString);
+        uint160 addressNumber = 0;
+        uint8 stringByte;
+
+        if (stringBytes.length != 42 || stringBytes[0] != '0' || stringBytes[1] != 'x') revert InvalidAddressString();
+
+        for (uint256 i = 2; i < 42; ++i) {
+            stringByte = uint8(stringBytes[i]);
+
+            if ((stringByte >= 97) && (stringByte <= 102)) stringByte -= 87;
+            else if ((stringByte >= 65) && (stringByte <= 70)) stringByte -= 55;
+            else if ((stringByte >= 48) && (stringByte <= 57)) stringByte -= 48;
+            else revert InvalidAddressString();
+
+            addressNumber |= uint160(uint256(stringByte) << ((41 - i) << 2));
         }
-        return address(iaddr);
+        return address(addressNumber);
+    }
+}
+
+library AddressToString {
+    function toString(address addr) internal pure returns (string memory) {
+        bytes memory addressBytes = abi.encodePacked(addr);
+        uint256 length = addressBytes.length;
+        bytes memory characters = '0123456789abcdef';
+        bytes memory stringBytes = new bytes(2 + addressBytes.length * 2);
+
+        stringBytes[0] = '0';
+        stringBytes[1] = 'x';
+
+        for (uint256 i; i < length; ++i) {
+            stringBytes[2 + i * 2] = characters[uint8(addressBytes[i] >> 4)];
+            stringBytes[3 + i * 2] = characters[uint8(addressBytes[i] & 0x0f)];
+        }
+        return string(stringBytes);
     }
 }

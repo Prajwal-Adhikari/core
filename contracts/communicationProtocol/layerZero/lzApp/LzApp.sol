@@ -78,6 +78,10 @@ contract LzApp is Initializable, OwnableUpgradeable, ILayerZeroReceiver {
             revert DstChainIsNotTrusted(_dstChainId);
 
         if(_dstChainId == localId) {
+            if (gasValue > 0) {
+                (bool sent, ) = _refundAddress.call{value: gasValue}("");
+                require(sent, "LzApp: Failed to refund fees");
+            }
             ILayerZeroReceiver(address(bytes20(trustedRemote))).localReceive(_dstChainId, _payload);
         } else {
             lzEndpoint.send{value: gasValue}(_dstChainId, trustedRemote, _payload, _refundAddress, _zroPaymentAddress, _adapterParams);
@@ -109,4 +113,11 @@ contract LzApp is Initializable, OwnableUpgradeable, ILayerZeroReceiver {
     function payloadStatus(uint16 _srcChainId, bytes calldata _srcAddress) external view  returns (bool){
         return lzEndpoint.hasStoredPayload(_srcChainId, _srcAddress);
     }
+
+    /**
+     * @dev This empty reserved space is put in place to allow future versions to add new
+     * variables without shifting down storage in the inheritance chain.
+     * See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
+     */
+    uint256[50] private __gap;
 }

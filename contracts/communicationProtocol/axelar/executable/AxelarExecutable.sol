@@ -10,7 +10,6 @@ import "../../../root/libraries/Address.sol";
 contract AxelarExecutable is Initializable, IAxelarExecutable {
     IAxelarGateway public gateway;
     string public localChainId;
-
     error CallerIsNotTrustedContract(string sourceAddressReceived);
     
     function __AxelarExecutable_init(
@@ -29,11 +28,11 @@ contract AxelarExecutable is Initializable, IAxelarExecutable {
         bytes calldata payload_
     ) external {
         // require(
-        //     Address.parseAddr(sourceAddress_) ==  msg.sender,
+        //     StringToAddress.toAddress(sourceAddress_) ==  msg.sender,
         //     "AxelarExecutable: Caller is not a trusted contract"
         // );
 
-        if(Address.parseAddr(sourceAddress_) !=  msg.sender)
+        if(StringToAddress.toAddress(sourceAddress_) !=  msg.sender)
             revert CallerIsNotTrustedContract(sourceAddress_);
 
         _execute(sourceChain_, sourceAddress_, payload_);
@@ -102,4 +101,11 @@ contract AxelarExecutable is Initializable, IAxelarExecutable {
         string calldata tokenSymbol,
         uint256 amount
     ) internal virtual {}
+
+    /**
+     * @dev This empty reserved space is put in place to allow future versions to add new
+     * variables without shifting down storage in the inheritance chain.
+     * See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
+     */
+    uint256[50] private __gap;
 }

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.9;
+pragma solidity 0.8.17;
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "../../communicationProtocol/layerZero/lzApp/LzApp.sol";
@@ -139,7 +139,7 @@ contract LzRouteBranch is Initializable, LzApp {
         } else if (functionType == TYPE_SWAP) {
             payload = abi.encode(TYPE_SWAP, 1, msg.sender, 1, 1);
         } else {
-            revert(string.concat(TAG, "Unsupport functionType"));
+            revert(string.concat(TAG, ": Unsupport functionType"));
         }
         uint256 fees;
         if (airdropAmount > 0) {

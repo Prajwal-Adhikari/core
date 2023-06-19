@@ -451,7 +451,7 @@ describe("Ready", function () {
         assert.equal(usdc_balance, 99e6);
 
         console.log("alice withdraw usdc")
-        await pool.connect(alice).withdraw(USDC, FTM, toTokenAmount(0.5), ethers.utils.hexZeroPad(alice.address, 32), LZO, 0, { value: fees })
+        await pool.connect(alice).withdraw(USDC, FTM, toTokenAmount(0.5), ethers.utils.hexZeroPad(alice.address, 32), LZO, 0, false, { value: fees })
         ce_balance = await ceUSDC.balanceOf(alice.address);
         usdc_balance = await usdc.balanceOf(alice.address);
         assert.equal(ce_balance, toTokenAmount(0.5));
@@ -579,14 +579,14 @@ describe("Ready", function () {
         await printInfo();
 
         console.log("alice withdraw matic and get revert");
-        await expect(pool.connect(alice).withdraw(MATIC, FTM, toTokenAmount(5e5), ethers.utils.hexZeroPad(alice.address, 32), LZO, 0, { value: fees })).to.be.revertedWith("Core: Health failed");
+        await expect(pool.connect(alice).withdraw(MATIC, FTM, toTokenAmount(5e5), ethers.utils.hexZeroPad(alice.address, 32), LZO, 0, false, { value: fees })).to.be.revertedWith("Core: Health failed");
 
         console.log("alice withdraw matic");
-        await pool.connect(alice).withdraw(MATIC, FTM, toTokenAmount(1e5), ethers.utils.hexZeroPad(alice.address, 32), LZO, 0, { value: fees })
+        await pool.connect(alice).withdraw(MATIC, FTM, toTokenAmount(1e5), ethers.utils.hexZeroPad(alice.address, 32), LZO, 0, false, { value: fees })
         await printInfo();
 
         console.log("bob withdraw ftm");
-        await pool.connect(bob).withdraw(FTM, BNB, toTokenAmount(1e5), ethers.utils.hexZeroPad(bob.address, 32), LZO, 0, { value: fees })
+        await pool.connect(bob).withdraw(FTM, BNB, toTokenAmount(1e5), ethers.utils.hexZeroPad(bob.address, 32), LZO, 0, false, { value: fees })
         await printInfo();
 
         console.log("alice deposit bnb");
@@ -594,11 +594,11 @@ describe("Ready", function () {
         await printInfo();
 
         console.log("alice withdraw bnb");
-        await pool.connect(alice).withdraw(BNB, MATIC, toTokenAmount(1e5), ethers.utils.hexZeroPad(alice.address, 32), LZO, 0, { value: fees })
+        await pool.connect(alice).withdraw(BNB, MATIC, toTokenAmount(5e5), ethers.utils.hexZeroPad(alice.address, 32), LZO, 0, false, { value: fees })
         await printInfo();
 
         console.log("alice withdraw matic")
-        await pool.connect(alice).withdraw(MATIC, FTM, toTokenAmount(180000), ethers.utils.hexZeroPad(alice.address, 32), LZO, 0, { value: fees })
+        await pool.connect(alice).withdraw(MATIC, FTM, toTokenAmount(180000), ethers.utils.hexZeroPad(alice.address, 32), LZO, 0, false, { value: fees })
         await printInfo();
         // expect(await matic.balanceOf(alice.address)).to.be.equal(toTokenAmount(6e5))
 
@@ -611,6 +611,14 @@ describe("Ready", function () {
         await clientB.connect(alice).repayRequest(FTM, toTokenAmount(200000), LZO, 0, { value: fees })
         await printInfo();
 
+
+        console.log("bob withdraw all ftm");
+        await pool.connect(bob).withdraw(FTM, BNB, toTokenAmount(1e5), ethers.utils.hexZeroPad(bob.address, 32), LZO, 0, true, { value: fees })
+        await printInfo();
+
+        console.log("bob deposit ftm");
+        await clientB.connect(bob).depositRequest(FTM, toTokenAmount(4e5), LZO, 0, { value: fees })
+        await printInfo();
 
         console.log("alice deposit matic");
         await clientA.connect(alice).depositRequest(MATIC, toTokenAmount(500000), LZO, 0, { value: fees })

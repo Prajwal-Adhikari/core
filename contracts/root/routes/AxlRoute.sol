@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.9;
+pragma solidity 0.8.17;
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
@@ -71,10 +71,12 @@ contract AxlRoutePool is Initializable, AxelarExecutable, ContextUpgradeable {
         destChain[chainId] = name;
         destAddress[chainId] = addr;
         chainKey[keccak256(abi.encodePacked(name))] = chainId;
-        trustedContract[keccak256(abi.encodePacked(name))] = Address.parseAddr(addr);
+        trustedContract[keccak256(abi.encodePacked(name))] = StringToAddress.toAddress(addr);
     }
-    
-    function setRoute(bytes32 routeKey) external onlyRole(IRoleManager(roleManager).SET_ROUTE_METHOD()) {
+
+    function setRoute(
+        bytes32 routeKey
+    ) external onlyRole(IRoleManager(roleManager).SET_ROUTE_METHOD()) {
         route = routeKey;
     }
 
@@ -89,10 +91,17 @@ contract AxlRoutePool is Initializable, AxelarExecutable, ContextUpgradeable {
             keccak256(abi.encodePacked(localChainId)) ==
             keccak256(abi.encodePacked(destChain[chainId]))
         ) {
-            IAxelarGateway(Address.parseAddr(destAddress[chainId]))
-                .localReceive(localChainId, StringsUpgradeable.toHexString(
-                            address(this))
-                        , payload);
+            if (msg.value > 0) {
+                (bool sent, ) = payable(sender).call{value: msg.value}("");
+                require(sent, string.concat(TAG, ": Failed to refund fees"));
+            }
+            
+            IAxelarGateway(StringToAddress.toAddress(destAddress[chainId]))
+                .localReceive(
+                    localChainId,
+                    AddressToString.toString(address(this)),
+                    payload
+                );
         } else {
             if (msg.value > 0) {
                 gasService.payNativeGasForContractCall{value: msg.value}(
@@ -114,6 +123,7 @@ contract AxlRoutePool is Initializable, AxelarExecutable, ContextUpgradeable {
         bytes calldata payload_
     ) internal override {
         bytes32 chain = keccak256(abi.encodePacked(sourceChain_));
+<<<<<<< HEAD
         address addr = Address.parseAddr(sourceAddress_);
         // require(
         //     trustedContract[chain] == addr,
@@ -122,7 +132,13 @@ contract AxlRoutePool is Initializable, AxelarExecutable, ContextUpgradeable {
 
         if(trustedContract[chain] != addr)
             revert InvalidContract(addr);
+=======
+        address addr = StringToAddress.toAddress(sourceAddress_);
+        require(
+            trustedContract[chain] == addr,
+            string.concat(TAG, ": Invalid contract")
+        );
+>>>>>>> master
         IAdapter(adapter).execute(payload_, chainKey[chain], route);
-      
     }
 }

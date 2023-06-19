@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.9;
+pragma solidity 0.8.17;
 
 import "@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -284,7 +284,8 @@ contract Branch is
     ) external onlyRole(IRoleManager(roleManager).EMERGENCY_WITHDRAW()) {
         address token = pools[id].token;
         if (token == address(0)) {
-            payable(to).transfer(amount);
+            (bool sent, ) = payable(to).call{value: amount}("");
+            require(sent, string.concat(TAG, ": Failed to send native coin"));
         } else {
             IERC20Upgradeable(token).safeTransfer(to, amount);
         }
@@ -319,7 +320,8 @@ contract Branch is
         uint256 amount = _buildLocalAmount(amountpx, amountsx, token);
         address receipient = address(uint160(uint256(to)));
         if (token == address(0)) {
-            payable(receipient).transfer(amount);
+            (bool sent, ) = payable(receipient).call{value: amount}("");
+            require(sent, string.concat(TAG, ": Failed to send native coin"));
         } else {
             IERC20Upgradeable(token).safeTransfer(receipient, amount);
         }
