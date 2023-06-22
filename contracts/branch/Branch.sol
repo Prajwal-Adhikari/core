@@ -87,6 +87,14 @@ contract Branch is
         uint256 aidrdropAmount
     );
 
+    error InsufficientValue(uint256 valueSent, uint256 valueToBeGreater);
+    error InsufficientQuantity();
+    error DepositPaused(bytes32 poolID);
+    error ProtocolPaused();
+    error NativeTransferFailed();
+    error BadPayload(uint256 currentLength, uint256 requiredLength);
+    error PoolNotEnabled(bytes32 poolID);
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -181,11 +189,21 @@ contract Branch is
         bytes32 route,
         uint256 airdropAmount
     ) external payable nonReentrant {
-        require(
-            !(depositPause[id] || protocolPause),
-            string.concat(TAG, ": Deposit paused")
-        );
-        require(pools[id].enable, string.concat(TAG, ": Pool not enable"));
+        // require(
+        //     !(depositPause[id] || protocolPause),
+        //     string.concat(TAG, ": Deposit paused")
+        // );
+
+        if(protocolPause)
+            revert ProtocolPaused();
+
+        if(depositPause[id])
+            revert DepositPaused(id);
+
+        // require(pools[id].enable, string.concat(TAG, ": Pool not enable"));
+
+        if(! pools[id].enable)
+            revert PoolNotEnabled(id);
         _pay(pools[id].token, amount, id, TYPE_DEPOSIT, route, airdropAmount);
         emit Deposit(_msgSender(), id, amount, route, airdropAmount);
         emit SendToken(_msgSender(), id, amount);
@@ -197,11 +215,20 @@ contract Branch is
         bytes32 route,
         uint256 airdropAmount
     ) external payable nonReentrant {
-        require(
-            !(repayPause[id] || protocolPause),
-            string.concat(TAG, ": Deposit paused")
-        );
-        require(pools[id].enable, string.concat(TAG, ": Pool not enable"));
+        // require(
+        //     !(repayPause[id] || protocolPause),
+        //     string.concat(TAG, ": Deposit paused")
+        // );
+        if(protocolPause)
+            revert ProtocolPaused();
+
+        if(repayPause[id])
+            revert DepositPaused(id);
+
+        // require(pools[id].enable, string.concat(TAG, ": Pool not enable"));
+        if(! pools[id].enable)
+            revert PoolNotEnabled(id);
+
         _pay(pools[id].token, amount, id, TYPE_REPAY, route, airdropAmount);
         emit Repay(_msgSender(), id, amount, route, airdropAmount);
         emit SendToken(_msgSender(), id, amount);
@@ -216,14 +243,19 @@ contract Branch is
         address destination,
         uint256 amountMin
     ) external payable onlyRole(IRoleManager(roleManager).SWAP()) {
-        require(
-            msg.value > 0,
-            string.concat(
-                TAG,
-                ": requires a msg.value to pay crosschain message"
-            )
-        );
-        require(qty > 0, string.concat(TAG, ": swap() requires qty > 0"));
+        // require(
+        //     msg.value > 0,
+        //     string.concat(
+        //         TAG,
+        //         ": requires a msg.value to pay crosschain message"
+        //     )
+        // );
+
+        if(msg.value == 0)
+            revert InsufficientValue(msg.value, 0);
+        // require(qty > 0, string.concat(TAG, ": swap() requires qty > 0"));
+        if(qty == 0)
+            revert InsufficientQuantity();
 
         if (pools[id].token == address(0)) {
             // wrap the ETH into WETH
@@ -254,7 +286,9 @@ contract Branch is
         address token = pools[id].token;
         if (token == address(0)) {
             (bool sent, ) = payable(to).call{value: amount}("");
-            require(sent, string.concat(TAG, ": Failed to send native coin"));
+            // require(sent, string.concat(TAG, ": Failed to send native coin"));
+            if(! sent)
+                revert NativeTransferFailed();
         } else {
             IERC20Upgradeable(token).safeTransfer(to, amount);
         }
@@ -263,11 +297,17 @@ contract Branch is
     function transferToken(
         bytes memory payload
     ) external onlyRole(IRoleManager(roleManager).ADAPTER()) {
-        require(
-            !protocolPause,
-            string.concat(TAG, ": Token transfer is halted")
-        );
-        require(payload.length == 80, string.concat(TAG, ": Bad payload"));
+        // require(
+        //     !protocolPause,
+        //     string.concat(TAG, ": Token transfer is halted")
+        // );
+        if(protocolPause)
+            revert ProtocolPaused();
+
+        // require(payload.length == 80, string.concat(TAG, ": Bad payload"));
+
+        if(payload.length != 80)
+            revert BadPayload(payload.length, 80);
 
         bytes32 id;
         bytes32 to;
@@ -284,7 +324,9 @@ contract Branch is
         address receipient = address(uint160(uint256(to)));
         if (token == address(0)) {
             (bool sent, ) = payable(receipient).call{value: amount}("");
-            require(sent, string.concat(TAG, ": Failed to send native coin"));
+            // require(sent, string.concat(TAG, ": Failed to send native coin"));
+            if(! sent)
+                revert NativeTransferFailed();
         } else {
             IERC20Upgradeable(token).safeTransfer(receipient, amount);
         }
@@ -307,7 +349,7 @@ contract Branch is
         bytes32 route,
         uint256 airdropAmount
     ) internal {
-        (uint64 amountpx, uint64 amountsx, uint payAmount) = _buildRemoteAmount(
+        (uint64 amountpx, uint64 amountsx, uint256 payAmount) = _buildRemoteAmount(
             amount,
             token
         );
@@ -318,13 +360,18 @@ contract Branch is
             amountpx,
             amountsx
         );
-        require(payload.length == 81, string.concat(TAG, ": Bad payload"));
+        // require(payload.length == 81, string.concat(TAG, ": Bad payload"));
+        if(payload.length != 81)
+            revert BadPayload(payload.length, 81);
 
         if (token == address(0)) {
-            require(
-                msg.value >= payAmount,
-                string.concat(TAG, ": Invalid amount")
-            );
+            // require(
+            //     msg.value >= payAmount,
+            //     string.concat(TAG, "Invalid amount")
+            // );
+            if(msg.value < payAmount)
+                revert InsufficientValue(msg.value, payAmount-1);
+
             IAdapter(adapter).send{value: msg.value.sub(payAmount)}(
                 payload,
                 msg.sender,
@@ -388,7 +435,7 @@ contract Branch is
     function _buildRemoteAmount(
         uint256 _localAmount,
         address _token
-    ) internal view returns (uint64 amountpx, uint64 amountsx, uint amount) {
+    ) internal view returns (uint64 amountpx, uint64 amountsx, uint256 amount) {
         uint8 decimals = _getTokenDecimal(_token);
 
         if (decimals > ROOT_DECIMALS) {

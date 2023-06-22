@@ -55,6 +55,11 @@ contract Pool is
 
     bool public feeEnable;
 
+    error ProtocolPaused();
+    error WithdrawPaused(bytes32 chainId, bytes32 id);
+    error BorrowPaused(bytes32 chainId, bytes32 id);
+    error BadPayload(uint256 currentLength, uint256 requiredLength);
+
     /**
      * @dev Modifier that checks if caller has a specific role.
      **/
@@ -149,10 +154,17 @@ contract Pool is
         uint256 airdropAmount,
         bool all
     ) external payable nonReentrant {
-        require(
-            !(withdrawPause[id][chainId] || protocolPause),
-            string.concat(TAG, ": Withdraw paused")
-        );
+        // require(
+        //     !(withdrawPause[id][chainId] || protocolPause),
+        //     string.concat(TAG, ": Withdraw paused")
+        // );
+
+        if(protocolPause)
+            revert ProtocolPaused();
+
+        if(withdrawPause[id][chainId])
+            revert WithdrawPaused(chainId, id);
+
         uint256 tokenAmount = ICore(core).withdraw(
             id,
             chainId,
@@ -171,7 +183,10 @@ contract Pool is
             uint64(tokenAmount / BASE),
             uint64(tokenAmount % BASE)
         );
-        require(payload.length == 80, string.concat(TAG, ": Bad payload"));
+        // require(payload.length == 80, string.concat(TAG, ": Bad payload"));
+        if(payload.length != 80)
+            revert BadPayload(payload.length, 80);
+
         IAdapter(adapter).send{value: msg.value}(
             payload,
             chainId,
@@ -200,10 +215,17 @@ contract Pool is
         bytes32 route,
         uint256 airdropAmount
     ) external payable nonReentrant {
-        require(
-            !(borrowPause[id][chainId] || protocolPause),
-            string.concat(TAG, ": Borrow paused")
-        );
+        // require(
+        //     !(borrowPause[id][chainId] || protocolPause),
+        //     string.concat(TAG, ": Borrow paused")
+        // );
+
+        if(protocolPause)
+            revert ProtocolPaused();
+
+        if(borrowPause[id][chainId])
+            revert BorrowPaused(chainId, id);
+
         uint256 debtAmount = ICore(core).borrow(
             id,
             chainId,
@@ -221,7 +243,10 @@ contract Pool is
             uint64(tokenAmount / BASE),
             uint64(tokenAmount % BASE)
         );
-        require(payload.length == 80, string.concat(TAG, ": Bad payload"));
+        // require(payload.length == 80, string.concat(TAG, ": Bad payload"));
+        if(payload.length != 80)
+            revert BadPayload(payload.length, 80);
+
         IAdapter(adapter).send{value: msg.value}(
             payload,
             chainId,
@@ -277,7 +302,9 @@ contract Pool is
         bytes32 data;
         uint64 amountpx;
         uint64 amountsx;
-        require(_payload.length == 81, string.concat(TAG, ": Bad payload"));
+        // require(_payload.length == 81, string.concat(TAG, ": Bad payload"));
+        if(_payload.length != 81)
+            revert BadPayload(_payload.length, 81);
         
         uint8 functionType = uint8(_payload[0]); // _payload received is encoded in format (uint8, bytes32, bytes32, uint64, uint64)
         assembly {

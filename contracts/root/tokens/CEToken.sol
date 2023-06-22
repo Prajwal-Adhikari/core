@@ -17,6 +17,10 @@ contract CEToken is ERC20Upgradeable {
     uint256 public lockupTriggerAmt; //amount where lockup will kick in after cross-chain transfer
     mapping(address => uint256) public transferBlockRelease; //Block number
 
+    error TransferTooSoonAfterMint(uint256 currentBlock, uint256 expectToExceedBlock);
+    error UserIsCaged(address toUser);
+    error BurnTooSoonAfterMint(uint256 currentBlock, uint256 expectToExceedBlock);
+    
     /**
      * @dev Modifier that checks if caller has a specific role.
      **/
@@ -72,10 +76,14 @@ contract CEToken is ERC20Upgradeable {
         address to,
         uint256 amount
     ) internal override {
-        require(
-            block.number > transferBlockRelease[from],
-            string.concat(TAG,": transfer too soon after cross-chain mint")
-        );
+        // require(
+        //     block.number > transferBlockRelease[from],
+        //     string.concat(TAG,": transfer too soon after cross-chain mint")
+        // );
+
+        if(block.number <= transferBlockRelease[from])
+            revert TransferTooSoonAfterMint(block.number, transferBlockRelease[from]);
+
         uint ceScaled = ICore(core).getCEScaled(poolId);
         super._transfer(from, to, amount.mul(1e18).div(ceScaled));
         ICore(core).handleTransfer(from, to, poolId);
@@ -91,10 +99,14 @@ contract CEToken is ERC20Upgradeable {
     }
 
     function mint(address to, uint256 amount) external onlyRole(IRoleManager(roleManager).MINT_BURN_CE_DEBT_TOKEN()) {
-        require(
-            transferBlockRelease[to] != 2 ** 256 - 1,
-            string.concat(TAG,": User is already caged")
-        );
+        // require(
+        //     transferBlockRelease[to] != 2 ** 256 - 1,
+        //     string.concat(TAG,": User is already caged")
+        // );
+
+        if( transferBlockRelease[to] == 2 ** 256 - 1)
+            revert UserIsCaged(to);
+
         if (amount > lockupTriggerAmt) {
             transferBlockRelease[to] = block.number + transferBlockWait;
         }
@@ -102,10 +114,13 @@ contract CEToken is ERC20Upgradeable {
     }
 
     function burn(address from, uint256 amount) external onlyRole(IRoleManager(roleManager).MINT_BURN_CE_DEBT_TOKEN()) {
-        require(
-            block.number > transferBlockRelease[from],
-            string.concat(TAG,": burn too soon after cross-chain mint")
-        );
+        // require(
+        //     block.number > transferBlockRelease[from],
+        //     string.concat(TAG,": burn too soon after cross-chain mint")
+        // );
+        if(block.number <= transferBlockRelease[from])
+            revert BurnTooSoonAfterMint(block.number, transferBlockRelease[from]);
+
         _burn(from, amount);
     }
 

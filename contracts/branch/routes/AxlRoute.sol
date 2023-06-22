@@ -10,7 +10,7 @@ import "../interfaces/IAdapter.sol";
 import "../interfaces/IRoleManager.sol";
 import "../../root/libraries/Address.sol";
 
-string constant TAG = "AxlRouteBranch";
+// string constant TAG = "AxlRouteBranch";
 
 contract AxlRouteBranch is Initializable, AxelarExecutable, ContextUpgradeable {
     //Axelar's chain id of the chain where root is deployed
@@ -24,7 +24,8 @@ contract AxlRouteBranch is Initializable, AxelarExecutable, ContextUpgradeable {
     IAxelarGasService gasService;
 
     event Executed();
-
+    error InvalidSource();
+    error FeeRefundFailed();
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -80,7 +81,9 @@ contract AxlRouteBranch is Initializable, AxelarExecutable, ContextUpgradeable {
         ) {
             if (msg.value > 0) {
                 (bool sent, ) = payable(sender).call{value: msg.value}("");
-                require(sent, string.concat(TAG, ": Failed to refund fees"));
+                // require(sent, string.concat(TAG, ": Failed to refund fees"));
+                if(! sent)
+                    revert FeeRefundFailed();
             }
 
             IAxelarGateway(StringToAddress.toAddress(rootAddress)).localReceive(
@@ -107,15 +110,28 @@ contract AxlRouteBranch is Initializable, AxelarExecutable, ContextUpgradeable {
         string calldata sourceAddress_,
         bytes calldata payload_
     ) internal override {
-        require(
-            keccak256(abi.encodePacked(rootChainId)) ==
-                keccak256(abi.encodePacked(sourceChain_)) &&
-                StringToAddress.toAddress(rootAddress) ==
-                StringToAddress.toAddress(sourceAddress_),
-            string.concat(TAG, "Invalid source")
-        );
-        IAdapter(adapter).execute(payload_);
 
+        // require(
+        //         keccak256(abi.encodePacked(rootChainId)) ==
+        //         keccak256(abi.encodePacked(sourceChain_)) &&
+        //         StringToAddress.toAddress(rootAddress) ==
+        //         StringToAddress.toAddress(sourceAddress_),
+        //     string.concat(TAG, "Invalid source")
+        // );
+
+        if( 
+            keccak256(abi.encodePacked(rootChainId)) !=
+            keccak256(abi.encodePacked(sourceChain_)) 
+        )
+            revert InvalidSource();
+
+        if(
+            StringToAddress.toAddress(rootAddress) !=
+            StringToAddress.toAddress(sourceAddress_)
+        )
+            revert InvalidSource();
+
+        IAdapter(adapter).execute(payload_);
         emit Executed();
     }
 }

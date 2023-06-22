@@ -20,6 +20,11 @@ contract LzApp is Initializable, OwnableUpgradeable, ILayerZeroReceiver {
 
     event SetTrustedRemote(uint16 _srcChainId, bytes _srcAddress);
 
+    error InvalidSrcContract(bytes srcContract);
+    error InvalidEndpointCaller(address srcContract);
+    error DstChainIsNotTrusted(uint16 dstChainID);
+    error FeeRefundFailed();
+
     function __LzApp_init(address _endpoint, uint16 _localId) internal onlyInitializing {
         lzEndpoint = ILayerZeroEndpoint(_endpoint);
         localId = _localId;
@@ -30,19 +35,33 @@ contract LzApp is Initializable, OwnableUpgradeable, ILayerZeroReceiver {
         bytes memory trustedRemote = trustedRemoteLookup[_srcChainId];
         bytes memory sender = abi.encodePacked(msg.sender, address(this));
 
-        require(sender.length == trustedRemote.length && keccak256(sender) == keccak256(trustedRemote), "LzApp: invalid source sending contract");
+        // require(sender.length == trustedRemote.length && keccak256(sender) == keccak256(trustedRemote), "LzApp: invalid source sending contract");
+
+        if(sender.length != trustedRemote.length)
+            revert InvalidSrcContract(sender);
+
+        if(keccak256(sender) != keccak256(trustedRemote))
+            revert InvalidSrcContract(sender);
 
         _blockingLzReceive(_srcChainId, sender, 0, _payload);
     }
 
     function lzReceive(uint16 _srcChainId, bytes memory _srcAddress, uint64 _nonce, bytes memory _payload) public virtual override {
         // lzReceive must be called by the endpoint for security
-        require(_msgSender() == address(lzEndpoint), "LzApp: invalid endpoint caller");
+        // require(_msgSender() == address(lzEndpoint), "LzApp: invalid endpoint caller");
+        if(_msgSender() != address(lzEndpoint))
+            revert InvalidEndpointCaller(_msgSender());
 
         bytes memory trustedRemote = trustedRemoteLookup[_srcChainId];
         // if will still block the message pathway from (srcChainId, srcAddress). should not receive message from untrusted remote.
-        require(_srcAddress.length == trustedRemote.length && keccak256(_srcAddress) == keccak256(trustedRemote), "LzApp: invalid source sending contract");
+        // require(_srcAddress.length == trustedRemote.length && keccak256(_srcAddress) == keccak256(trustedRemote), "LzApp: invalid source sending contract");
 
+        if(_srcAddress.length != trustedRemote.length)
+            revert InvalidSrcContract(_srcAddress);
+
+        if(keccak256(_srcAddress) != keccak256(trustedRemote))
+            revert InvalidSrcContract(_srcAddress);
+            
         _blockingLzReceive(_srcChainId, _srcAddress, _nonce, _payload);
     }
 
@@ -54,11 +73,17 @@ contract LzApp is Initializable, OwnableUpgradeable, ILayerZeroReceiver {
 
     function _lzSend(uint16 _dstChainId, bytes memory _payload, address payable _refundAddress, address _zroPaymentAddress, bytes memory _adapterParams, uint gasValue) internal virtual {
         bytes memory trustedRemote = trustedRemoteLookup[_dstChainId];
-        require(trustedRemote.length != 0, "LzApp: destination chain is not a trusted source");
+        // require(trustedRemote.length != 0, "LzApp: destination chain is not a trusted source");
+
+        if(trustedRemote.length == 0)
+            revert DstChainIsNotTrusted(_dstChainId);
+
         if(_dstChainId == localId) {
             if (gasValue > 0) {
                 (bool sent, ) = _refundAddress.call{value: gasValue}("");
-                require(sent, "LzApp: Failed to refund fees");
+                // require(sent, "LzApp: Failed to refund fees");
+                if(! sent)
+                    revert FeeRefundFailed();
             }
             ILayerZeroReceiver(address(bytes20(trustedRemote))).localReceive(_dstChainId, _payload);
         } else {

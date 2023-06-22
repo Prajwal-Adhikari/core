@@ -35,6 +35,9 @@ contract LiquidationManager is
     IOracle public oracle;
     bool public liquidationPause;
 
+    error CannotLiquidate(uint256 currentHealthFactor);
+    error ClosingFactotExceeded();
+    error LiquidationPaused();
     /**
      * @dev Modifier that checks if caller has a specific role.
      **/
@@ -123,10 +126,14 @@ contract LiquidationManager is
         uint256 borrowerCollateral
     ) external nonReentrant {
         // whether liquidation is enable or not
-        require(
-            !liquidationPause,
-            string.concat(TAG, ": Liquidation is paused")
-        );
+        // require(
+        //     !liquidationPause,
+        //     string.concat(TAG, ": Liquidation is paused")
+        // );
+
+        if(liquidationPause)
+            revert LiquidationPaused();
+
         // refresh the pool data
         ICore(core).refresh(collateralId);
         ICore(core).refresh(debtId);
@@ -136,10 +143,13 @@ contract LiquidationManager is
         Data.ConfigData memory config = ICore(core).configs(collateralId);
 
         // whether borrower can be liquidated
-        require(
-            healthData.factor >= MAX_HEALTH_FACTOR,
-            string.concat(TAG, ": Cannot liquidate now")
-        );
+        // require(
+        //     healthData.factor >= MAX_HEALTH_FACTOR,
+        //     string.concat(TAG, ": Cannot liquidate now")
+        // );
+
+        if(healthData.factor < MAX_HEALTH_FACTOR)
+            revert CannotLiquidate(healthData.factor);
 
         // calculate LTV, and using formula to calculate liquidate discount and closing factor
         uint256 currentLTV = healthData.debtValue.mul(1e18).div(
@@ -178,12 +188,14 @@ contract LiquidationManager is
             borrowerCollateral,
             discount
         );
-        require(
-            healthData.collateralValue.mul(liqPercent).div(1e18) >=
-                params.liqValue,
-            "Closing factor exceed"
-        );
+        // require(
+        //     healthData.collateralValue.mul(liqPercent).div(1e18) >=
+        //         params.liqValue,
+        //     "Closing factor exceed"
+        // );
 
+        if(healthData.collateralValue.mul(liqPercent).div(1e18) < params.liqValue)
+            revert ClosingFactotExceeded();
         // mint and burn CEToken and DebtToken then update supply
         IDebtToken(debtPool.debtToken).burn(
             user,

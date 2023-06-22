@@ -10,7 +10,8 @@ import "../../../root/libraries/Address.sol";
 contract AxelarExecutable is Initializable, IAxelarExecutable {
     IAxelarGateway public gateway;
     string public localChainId;
-
+    error CallerIsNotTrustedContract(string sourceAddressReceived);
+    
     function __AxelarExecutable_init(
         address gateway_,
         string calldata _localChainId
@@ -26,10 +27,13 @@ contract AxelarExecutable is Initializable, IAxelarExecutable {
         string calldata sourceAddress_,
         bytes calldata payload_
     ) external {
-        require(
-            StringToAddress.toAddress(sourceAddress_) ==  msg.sender,
-            "AxelarExecutable: Caller is not a trusted contract"
-        );
+        // require(
+        //     StringToAddress.toAddress(sourceAddress_) ==  msg.sender,
+        //     "AxelarExecutable: Caller is not a trusted contract"
+        // );
+
+        if(StringToAddress.toAddress(sourceAddress_) !=  msg.sender)
+            revert CallerIsNotTrustedContract(sourceAddress_);
 
         _execute(sourceChain_, sourceAddress_, payload_);
     }
