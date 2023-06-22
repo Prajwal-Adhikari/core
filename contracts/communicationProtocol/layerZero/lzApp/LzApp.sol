@@ -75,7 +75,7 @@ contract LzApp is Initializable, OwnableUpgradeable, ILayerZeroReceiver {
         bytes memory trustedRemote = trustedRemoteLookup[_dstChainId];
         // require(trustedRemote.length != 0, "LzApp: destination chain is not a trusted source");
 
-        if(! (trustedRemote.length != 0))
+        if(trustedRemote.length == 0)
             revert DstChainIsNotTrusted(_dstChainId);
 
         if(_dstChainId == localId) {
