@@ -188,7 +188,7 @@ contract Oracle is Initializable, ContextUpgradeable {
 
         uint8 quoteDecimals = AggregatorV3Interface(aggregator[_symbol])
             .decimals();
-        uint256 quotePrice = scalePrice(
+        uint256 quotePrice = _scalePrice(
             uint256(basePrice),
             quoteDecimals,
             ROOT_DECIMALS
@@ -221,7 +221,7 @@ contract Oracle is Initializable, ContextUpgradeable {
         );
 
         uint8 quoteDecimals = IERC20( assetAddress[stableCoinId[_symbol]]).decimals();
-        uint256 quotePrice = scalePrice(
+        uint256 quotePrice = _scalePrice(
             amountOut,
             quoteDecimals,
             ROOT_DECIMALS
@@ -235,7 +235,7 @@ contract Oracle is Initializable, ContextUpgradeable {
 
     }
 
-    function scalePrice(
+    function _scalePrice(
         uint256 _price,
         uint8 _priceDecimals,
         uint8 _decimals
