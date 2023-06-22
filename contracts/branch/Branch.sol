@@ -91,6 +91,7 @@ contract Branch is
     error InsufficientQuantity();
     error DepositPaused(bytes32 poolID);
     error ProtocolPaused();
+    error NativeTransferFailed();
     error BadPayload(uint256 currentLength, uint256 requiredLength);
     error PoolNotEnabled(bytes32 poolID);
 
@@ -285,7 +286,9 @@ contract Branch is
         address token = pools[id].token;
         if (token == address(0)) {
             (bool sent, ) = payable(to).call{value: amount}("");
-            require(sent, string.concat(TAG, ": Failed to send native coin"));
+            // require(sent, string.concat(TAG, ": Failed to send native coin"));
+            if(! sent)
+                revert NativeTransferFailed();
         } else {
             IERC20Upgradeable(token).safeTransfer(to, amount);
         }
@@ -321,7 +324,9 @@ contract Branch is
         address receipient = address(uint160(uint256(to)));
         if (token == address(0)) {
             (bool sent, ) = payable(receipient).call{value: amount}("");
-            require(sent, string.concat(TAG, ": Failed to send native coin"));
+            // require(sent, string.concat(TAG, ": Failed to send native coin"));
+            if(! sent)
+                revert NativeTransferFailed();
         } else {
             IERC20Upgradeable(token).safeTransfer(receipient, amount);
         }

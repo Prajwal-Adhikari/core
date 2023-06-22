@@ -23,6 +23,7 @@ contract LzApp is Initializable, OwnableUpgradeable, ILayerZeroReceiver {
     error InvalidSrcContract(bytes srcContract);
     error InvalidEndpointCaller(address srcContract);
     error DstChainIsNotTrusted(uint16 dstChainID);
+    error FeeRefundFailed();
 
     function __LzApp_init(address _endpoint, uint16 _localId) internal onlyInitializing {
         lzEndpoint = ILayerZeroEndpoint(_endpoint);
@@ -74,13 +75,15 @@ contract LzApp is Initializable, OwnableUpgradeable, ILayerZeroReceiver {
         bytes memory trustedRemote = trustedRemoteLookup[_dstChainId];
         // require(trustedRemote.length != 0, "LzApp: destination chain is not a trusted source");
 
-        if(trustedRemote.length != 0)
+        if(! (trustedRemote.length != 0))
             revert DstChainIsNotTrusted(_dstChainId);
 
         if(_dstChainId == localId) {
             if (gasValue > 0) {
                 (bool sent, ) = _refundAddress.call{value: gasValue}("");
-                require(sent, "LzApp: Failed to refund fees");
+                // require(sent, "LzApp: Failed to refund fees");
+                if(! sent)
+                    revert FeeRefundFailed();
             }
             ILayerZeroReceiver(address(bytes20(trustedRemote))).localReceive(_dstChainId, _payload);
         } else {

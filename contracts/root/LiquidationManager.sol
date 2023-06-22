@@ -37,6 +37,7 @@ contract LiquidationManager is
 
     error CannotLiquidate(uint256 currentHealthFactor);
     error ClosingFactotExceeded();
+    error LiquidationPaused();
     /**
      * @dev Modifier that checks if caller has a specific role.
      **/
@@ -125,10 +126,14 @@ contract LiquidationManager is
         uint256 borrowerCollateral
     ) external nonReentrant {
         // whether liquidation is enable or not
-        require(
-            !liquidationPause,
-            string.concat(TAG, ": Liquidation is paused")
-        );
+        // require(
+        //     !liquidationPause,
+        //     string.concat(TAG, ": Liquidation is paused")
+        // );
+
+        if(liquidationPause)
+            revert LiquidationPaused();
+
         // refresh the pool data
         ICore(core).refresh(collateralId);
         ICore(core).refresh(debtId);

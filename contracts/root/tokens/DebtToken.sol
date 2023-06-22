@@ -66,8 +66,7 @@ contract DebtToken is ERC20Upgradeable {
     ) internal pure override {
         (from, to, amount);
         // require(false, string.concat(TAG,": Cannot transfer debt token"));
-        if(true)
-            revert CannotTransferDebtToken();
+        revert CannotTransferDebtToken();
     }
 
     function mint(address to, uint256 amount) external onlyRole(IRoleManager(roleManager).MINT_BURN_CE_DEBT_TOKEN()) {

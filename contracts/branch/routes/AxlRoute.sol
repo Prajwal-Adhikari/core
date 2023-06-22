@@ -25,7 +25,7 @@ contract AxlRouteBranch is Initializable, AxelarExecutable, ContextUpgradeable {
 
     event Executed();
     error InvalidSource();
-
+    error FeeRefundFailed();
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -81,7 +81,9 @@ contract AxlRouteBranch is Initializable, AxelarExecutable, ContextUpgradeable {
         ) {
             if (msg.value > 0) {
                 (bool sent, ) = payable(sender).call{value: msg.value}("");
-                require(sent, string.concat(TAG, ": Failed to refund fees"));
+                // require(sent, string.concat(TAG, ": Failed to refund fees"));
+                if(! sent)
+                    revert FeeRefundFailed();
             }
 
             IAxelarGateway(StringToAddress.toAddress(rootAddress)).localReceive(

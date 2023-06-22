@@ -228,17 +228,6 @@ contract Core is Initializable, ContextUpgradeable {
         if(! pool.enable)
             revert PoolNotEnabled(id);
 
-<<<<<<< HEAD
-        uint256 burnAmount = tokenAmount.mul(1e18).div(pool.ceScaled);
-        // require(
-        //     chainLiquidity[chainId][id] >= tokenAmount,
-        //     string.concat(TAG, ": No enough liquidity")
-        // );
-
-        if(chainLiquidity[chainId][id] < tokenAmount)
-            revert NotEnoughLiquidity(chainId, id, chainLiquidity[chainId][id], tokenAmount);
-
-=======
         uint256 burnAmount;
         if(all) {
             burnAmount = ICEToken(pool.ceToken).balanceBeforeScaled(user);
@@ -246,11 +235,13 @@ contract Core is Initializable, ContextUpgradeable {
         } else {
             burnAmount = tokenAmount.mul(1e18).div(pool.ceScaled);
         } 
-        require(
-            chainLiquidity[chainId][id] >= tokenAmount,
-            string.concat(TAG, ": No enough liquidity")
-        );
->>>>>>> master
+        // require(
+        //     chainLiquidity[chainId][id] >= tokenAmount,
+        //     string.concat(TAG, ": No enough liquidity")
+        // );
+        if(chainLiquidity[chainId][id] < tokenAmount)
+            revert NotEnoughLiquidity(chainId, id, chainLiquidity[chainId][id], tokenAmount);
+
         ICEToken(pool.ceToken).burn(user, burnAmount);
         removeToken(user, id);
 
