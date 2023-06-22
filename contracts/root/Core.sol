@@ -209,7 +209,7 @@ contract Core is Initializable, ContextUpgradeable {
         chainLiquidity[chainId][id] += tokenAmount;
         totalLiquidity[id] += tokenAmount;
         updateInterestRate(id);
-        addToken(user, id);
+        _addToken(user, id);
        
         return ceAmount;
     }
@@ -243,7 +243,7 @@ contract Core is Initializable, ContextUpgradeable {
             revert NotEnoughLiquidity(chainId, id, chainLiquidity[chainId][id], tokenAmount);
 
         ICEToken(pool.ceToken).burn(user, burnAmount);
-        removeToken(user, id);
+        _removeToken(user, id);
 
         pool.ceSupply = pool.ceSupply.sub(burnAmount);
         chainLiquidity[chainId][id] -= tokenAmount;
@@ -281,7 +281,7 @@ contract Core is Initializable, ContextUpgradeable {
             chainId,
             tokenAmount
         );
-        addToken(user, id);
+        _addToken(user, id);
 
         // require(
         //     params.liquidity >= tokenAmount,
@@ -367,7 +367,7 @@ contract Core is Initializable, ContextUpgradeable {
         chainLiquidity[chainId][id] += tokenAmount;
         totalLiquidity[id] += tokenAmount;
         IDebtToken(params.debtToken).burn(params.user, params.debtAmount);
-        removeToken(user, id);
+        _removeToken(user, id);
         pool.debtSupply -= params.debtAmount;
         updateInterestRate(id);
 
@@ -409,11 +409,11 @@ contract Core is Initializable, ContextUpgradeable {
         if(msg.sender != pools[id].ceToken)
             revert InvalidSender(msg.sender);
         checkHealth(from);
-        addToken(to, id);
-        removeToken(from, id);
+        _addToken(to, id);
+        _removeToken(from, id);
     }
 
-    function addToken(address user, bytes32 id) internal {
+    function _addToken(address user, bytes32 id) internal {
         for (uint256 i; i < users[user].length; i++) {
             if (users[user][i] == id) {
                 return;
@@ -422,7 +422,11 @@ contract Core is Initializable, ContextUpgradeable {
         users[user].push(id);
     }
 
-    function removeToken(address user, bytes32 id) internal {
+    function addTokenForLiquidator(address user, bytes32 id) external onlyRole(IRoleManager(roleManager).LIQUIDATION_MANAGER()){
+        _addToken(user, id);
+    }
+
+    function _removeToken(address user, bytes32 id) internal {
         Data.PoolData memory pool = pools[id];
         if(ICEToken(pool.ceToken).balanceOf(user) == 0 && IDebtToken(pool.debtToken).balanceOf(user) == 0) {
             uint length = users[user].length;

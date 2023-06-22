@@ -132,6 +132,14 @@ interface ICore {
         uint256 tokenAmountInDest
     ) external;
 
+     /**
+     * @notice Adds pool id to liquidator's token list
+     * This function can only be accessed by account with role LIQUIDATION_MANAGER.
+     * @param user - address of the liquidator
+     * @param id - pool id of the asset.
+     **/
+    function addTokenForLiquidator(address user, bytes32 id) external;
+
     /**
      * @notice Refreshes the parameters of the pool.
      * This function is public.
