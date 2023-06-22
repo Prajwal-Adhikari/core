@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.9;
+pragma solidity 0.8.17;
 import "@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -42,7 +42,9 @@ contract FeeProvider is Initializable, ContextUpgradeable {
     }
 
     // Set contract addresses
-    function setRoleManager(address roleManagerAddress) external onlyRole(IRoleManager(roleManager).DEFAULT_ADMIN_ROLE()) {
+    function setRoleManager(
+        address roleManagerAddress
+    ) external onlyRole(IRoleManager(roleManager).DEFAULT_ADMIN_ROLE()) {
         roleManager = roleManagerAddress;
     }
 
@@ -128,21 +130,21 @@ contract FeeProvider is Initializable, ContextUpgradeable {
             poolId
         );
 
-        uint256 optimalGlobalLiquidityFactor = OPTIMAL_GLOBAL_LIQUIDITY_FACTOR[
-            chainId
-        ][poolId];
+        uint256 optimalGlobalLiquidityFactor = OPTIMAL_GLOBAL_LIQUIDITY_FACTOR[chainId][poolId];
 
         uint256 initialFee;
         if (globalLiquidityFactor > 0) {
-            initialFee = BASE_FEE[chainId][poolId].add(
-                (optimalGlobalLiquidityFactor.sub(globalLiquidityFactor))
-                    .mul(optimalGlobalLiquidityFactor)
-                    .div(globalLiquidityFactor)
-            );
-        }
-
-        if (initialFee < 0) {
-            initialFee = 0;
+            if (globalLiquidityFactor < optimalGlobalLiquidityFactor) {
+                initialFee = BASE_FEE[chainId][poolId].add(
+                    (optimalGlobalLiquidityFactor.sub(globalLiquidityFactor))
+                        .mul(optimalGlobalLiquidityFactor)
+                        .div(globalLiquidityFactor)
+                );
+            } else {
+                initialFee = BASE_FEE[chainId][poolId];
+            }
+        } else {
+            initialFee = MAX_FEE[chainId][poolId];
         }
 
         uint256 maxFee = MAX_FEE[chainId][poolId];
@@ -160,8 +162,6 @@ contract FeeProvider is Initializable, ContextUpgradeable {
     ) internal view returns (uint256) {
         uint256 totalLiquidity = ICore(core).totalLiquidity(poolId);
         return
-            totalLiquidity > 0
-                ? ICore(core).getLiquidity(chainId, poolId).div(totalLiquidity)
-                : 0;
+            totalLiquidity > 0 ? ICore(core).getLiquidity(chainId, poolId).mul(1e18).div(totalLiquidity) : 0;
     }
 }
