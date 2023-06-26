@@ -297,14 +297,8 @@ contract Branch is
     function transferToken(
         bytes memory payload
     ) external onlyRole(IRoleManager(roleManager).ADAPTER()) {
-        // require(
-        //     !protocolPause,
-        //     string.concat(TAG, ": Token transfer is halted")
-        // );
         if(protocolPause)
             revert ProtocolPaused();
-
-        // require(payload.length == 80, string.concat(TAG, ": Bad payload"));
 
         if(payload.length != 80)
             revert BadPayload(payload.length, 80);
@@ -324,7 +318,6 @@ contract Branch is
         address receipient = address(uint160(uint256(to)));
         if (token == address(0)) {
             (bool sent, ) = payable(receipient).call{value: amount}("");
-            // require(sent, string.concat(TAG, ": Failed to send native coin"));
             if(! sent)
                 revert NativeTransferFailed();
         } else {
@@ -349,9 +342,30 @@ contract Branch is
         bytes32 route,
         uint256 airdropAmount
     ) internal {
-        (uint64 amountpx, uint64 amountsx, uint256 payAmount) = _buildRemoteAmount(
+        
+        uint256 payAmount = _getPayAmount(
             amount,
             token
+        );
+        uint256 buildAmount;
+        if (token == address(0)) {
+            if(msg.value < payAmount)
+                revert InsufficientValue(msg.value, payAmount-1);
+
+            buildAmount = amount;
+        } else {
+            uint256 tokenBalanceBefore = IERC20Upgradeable(token).balanceOf(address(this));
+            IERC20Upgradeable(token).safeTransferFrom(
+                _msgSender(),
+                address(this),
+                payAmount
+            );
+            uint256 tokenBalanceAfter = IERC20Upgradeable(token).balanceOf(address(this));
+            buildAmount = tokenBalanceAfter.sub(tokenBalanceBefore);
+        }
+        (uint64 amountpx, uint64 amountsx) = _buildRemoteAmount(
+                buildAmount,
+                token
         );
         bytes memory payload = abi.encodePacked(
             functionType,
@@ -360,18 +374,10 @@ contract Branch is
             amountpx,
             amountsx
         );
-        // require(payload.length == 81, string.concat(TAG, ": Bad payload"));
         if(payload.length != 81)
             revert BadPayload(payload.length, 81);
 
         if (token == address(0)) {
-            // require(
-            //     msg.value >= payAmount,
-            //     string.concat(TAG, "Invalid amount")
-            // );
-            if(msg.value < payAmount)
-                revert InsufficientValue(msg.value, payAmount-1);
-
             IAdapter(adapter).send{value: msg.value.sub(payAmount)}(
                 payload,
                 msg.sender,
@@ -379,11 +385,6 @@ contract Branch is
                 route
             );
         } else {
-            IERC20Upgradeable(token).safeTransferFrom(
-                _msgSender(),
-                address(this),
-                payAmount
-            );
             IAdapter(adapter).send{value: msg.value}(
                 payload,
                 msg.sender,
@@ -435,7 +436,23 @@ contract Branch is
     function _buildRemoteAmount(
         uint256 _localAmount,
         address _token
-    ) internal view returns (uint64 amountpx, uint64 amountsx, uint256 amount) {
+    ) internal view returns (uint64 amountpx, uint64 amountsx) {
+        uint8 decimals = _getTokenDecimal(_token);
+
+        if (decimals > ROOT_DECIMALS) {
+            _localAmount = _localAmount / (10 ** (decimals - ROOT_DECIMALS));
+        } else {
+            _localAmount = _localAmount * (10 ** (ROOT_DECIMALS - decimals));
+        }
+
+        amountpx = uint64(_localAmount / BASE);
+        amountsx = uint64(_localAmount % BASE);
+    }
+
+    function _getPayAmount(
+        uint256 _localAmount,
+        address _token 
+    ) internal view returns (uint256 amount) {
         uint8 decimals = _getTokenDecimal(_token);
 
         if (decimals > ROOT_DECIMALS) {
@@ -443,13 +460,8 @@ contract Branch is
             amount =
                 (_localAmount / (10 ** (decimals - ROOT_DECIMALS))) *
                 10 ** (decimals - ROOT_DECIMALS);
-            _localAmount = _localAmount / (10 ** (decimals - ROOT_DECIMALS));
         } else {
             amount = _localAmount;
-            _localAmount = _localAmount * (10 ** (ROOT_DECIMALS - decimals));
         }
-
-        amountpx = uint64(_localAmount / BASE);
-        amountsx = uint64(_localAmount % BASE);
     }
 }

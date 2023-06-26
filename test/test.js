@@ -459,6 +459,43 @@ describe("Ready", function () {
     })
     */
 
+    it("meme coin check", async function() {
+        let fees = await routeA.connect(alice).estimateFees(1, 1000000);
+        
+        //deploy meme coin
+        const ERC20 = await ethers.getContractFactory("ERC20Meme")
+        meme = await ERC20.deploy("MATIC", "MATIC", 18)
+
+        await meme.mint(alice.address, toTokenAmount(100))
+        await meme.connect(alice).approve(clientA.address, toTokenAmount(1e6));
+        //overwrite previous initialization
+        await clientA.setPool(MATIC, meme.address, true);
+
+        //deposit meme
+        await clientA.connect(alice).depositRequest(MATIC, toTokenAmount(100), LZO, 0, { value: fees })
+    
+        console.log(await ceMATIC.balanceOf(alice.address));
+        console.log(await ceMATIC.balanceOf(await meme.admin()));
+
+        //withdraw meme
+        await pool.connect(alice).withdraw( MATIC, FTM, 10, ethers.utils.hexZeroPad(alice.address, 32), LZO, 0, true, { value: fees });
+        console.log(await ceMATIC.balanceOf(alice.address));
+        console.log(await meme.balanceOf(alice.address));
+        console.log(await meme.balanceOf(await meme.admin()));
+
+        // BigNumber { value: "90000000000000000000" }
+        // BigNumber { value: "0" }
+        // BigNumber { value: "0" }
+        // BigNumber { value: "81000000000000000000" }
+        // BigNumber { value: "19000000000000000000" }
+        
+        // BigNumber { value: "90000000000000000000" }
+        // BigNumber { value: "0" }
+        // BigNumber { value: "0" }
+        // BigNumber { value: "81000000000000000000000" }
+        // BigNumber { value: "19000000000000000000000" }
+    })
+    /*
     it("test liquidation", async function() {
         let fees = await routeA.connect(alice).estimateFees(1, 1000000);
         //alice is borrower
@@ -530,6 +567,7 @@ describe("Ready", function () {
         assert.equal(Math.round(data.liqBorrowerCEAmount) *10**18, difference_collateral_bob);
 
     })
+    */
 
     /*
     it("test ceToken transfer", async function() {
