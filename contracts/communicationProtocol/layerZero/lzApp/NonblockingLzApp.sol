@@ -18,9 +18,9 @@ abstract contract NonblockingLzApp is LzApp {
 
     event MessageFailed(uint16 _srcChainId, bytes _srcAddress, uint64 _nonce, bytes _payload);
 
-    error CallerNotLzApp(address caller);
-    error NoStoredMessage();
-    error InvalidPayload();
+    error CallerNotLzApp(uint contractCode, address caller);
+    error NoStoredMessage(uint contractCode);
+    error InvalidPayload(uint contractCode);
 
     // overriding the virtual function in LzReceiver
     function _blockingLzReceive(uint16 _srcChainId, bytes memory _srcAddress, uint64 _nonce, bytes memory _payload) internal virtual override {
@@ -36,9 +36,8 @@ abstract contract NonblockingLzApp is LzApp {
 
     function nonblockingLzReceive(uint16 _srcChainId, bytes memory _srcAddress, uint64 _nonce, bytes memory _payload) public virtual {
         // only internal transaction
-        // require(_msgSender() == address(this), "NonblockingLzApp: caller must be LzApp");
         if(_msgSender() != address(this))
-            revert CallerNotLzApp(_msgSender());
+            revert CallerNotLzApp(6, _msgSender());
         _nonblockingLzReceive(_srcChainId, _srcAddress, _nonce, _payload);
     }
 
@@ -48,14 +47,12 @@ abstract contract NonblockingLzApp is LzApp {
     function retryMessage(uint16 _srcChainId, bytes memory _srcAddress, uint64 _nonce, bytes memory _payload) public payable virtual {
         // assert there is message to retry
         bytes32 payloadHash = failedMessages[_srcChainId][_srcAddress][_nonce];
-        // require(payloadHash != bytes32(0), "NonblockingLzApp: no stored message");
-        // require(keccak256(_payload) == payloadHash, "NonblockingLzApp: invalid payload");
 
         if(payloadHash == bytes32(0))
-            revert NoStoredMessage();
+            revert NoStoredMessage(6);
 
         if(keccak256(_payload) != payloadHash)
-            revert InvalidPayload();
+            revert InvalidPayload(6);
         
         // clear the stored message
         failedMessages[_srcChainId][_srcAddress][_nonce] = bytes32(0);

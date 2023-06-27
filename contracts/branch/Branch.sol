@@ -87,13 +87,13 @@ contract Branch is
         uint256 aidrdropAmount
     );
 
-    error InsufficientValue(uint256 valueSent, uint256 valueToBeGreater);
-    error InsufficientQuantity();
-    error DepositPaused(bytes32 poolID);
-    error ProtocolPaused();
-    error NativeTransferFailed();
-    error BadPayload(uint256 currentLength, uint256 requiredLength);
-    error PoolNotEnabled(bytes32 poolID);
+    error InsufficientValue(uint contractCode, uint256 valueSent, uint256 valueToBeGreater);
+    error InsufficientQuantity(uint contractCode);
+    error DepositPaused(uint contractCode, bytes32 poolID);
+    error ProtocolPaused(uint contractCode);
+    error NativeTransferFailed(uint contractCode);
+    error BadPayload(uint contractCode, uint256 currentLength, uint256 requiredLength);
+    error PoolNotEnabled(uint contractCode, bytes32 poolID);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -189,21 +189,12 @@ contract Branch is
         bytes32 route,
         uint256 airdropAmount
     ) external payable nonReentrant {
-        // require(
-        //     !(depositPause[id] || protocolPause),
-        //     string.concat(TAG, ": Deposit paused")
-        // );
-
         if(protocolPause)
-            revert ProtocolPaused();
-
+            revert ProtocolPaused(3);
         if(depositPause[id])
-            revert DepositPaused(id);
-
-        // require(pools[id].enable, string.concat(TAG, ": Pool not enable"));
-
+            revert DepositPaused(3, id);
         if(! pools[id].enable)
-            revert PoolNotEnabled(id);
+            revert PoolNotEnabled(3, id);
         _pay(pools[id].token, amount, id, TYPE_DEPOSIT, route, airdropAmount);
         emit Deposit(_msgSender(), id, amount, route, airdropAmount);
         emit SendToken(_msgSender(), id, amount);
@@ -215,20 +206,12 @@ contract Branch is
         bytes32 route,
         uint256 airdropAmount
     ) external payable nonReentrant {
-        // require(
-        //     !(repayPause[id] || protocolPause),
-        //     string.concat(TAG, ": Deposit paused")
-        // );
         if(protocolPause)
-            revert ProtocolPaused();
-
+            revert ProtocolPaused(3);
         if(repayPause[id])
-            revert DepositPaused(id);
-
-        // require(pools[id].enable, string.concat(TAG, ": Pool not enable"));
+            revert DepositPaused(3, id);
         if(! pools[id].enable)
-            revert PoolNotEnabled(id);
-
+            revert PoolNotEnabled(3, id);
         _pay(pools[id].token, amount, id, TYPE_REPAY, route, airdropAmount);
         emit Repay(_msgSender(), id, amount, route, airdropAmount);
         emit SendToken(_msgSender(), id, amount);
@@ -243,19 +226,10 @@ contract Branch is
         address destination,
         uint256 amountMin
     ) external payable onlyRole(IRoleManager(roleManager).SWAP()) {
-        // require(
-        //     msg.value > 0,
-        //     string.concat(
-        //         TAG,
-        //         ": requires a msg.value to pay crosschain message"
-        //     )
-        // );
-
         if(msg.value == 0)
-            revert InsufficientValue(msg.value, 0);
-        // require(qty > 0, string.concat(TAG, ": swap() requires qty > 0"));
+            revert InsufficientValue(3, msg.value, 0);
         if(qty == 0)
-            revert InsufficientQuantity();
+            revert InsufficientQuantity(3);
 
         if (pools[id].token == address(0)) {
             // wrap the ETH into WETH
@@ -286,9 +260,8 @@ contract Branch is
         address token = pools[id].token;
         if (token == address(0)) {
             (bool sent, ) = payable(to).call{value: amount}("");
-            // require(sent, string.concat(TAG, ": Failed to send native coin"));
             if(! sent)
-                revert NativeTransferFailed();
+                revert NativeTransferFailed(3);
         } else {
             IERC20Upgradeable(token).safeTransfer(to, amount);
         }
@@ -298,10 +271,10 @@ contract Branch is
         bytes memory payload
     ) external onlyRole(IRoleManager(roleManager).ADAPTER()) {
         if(protocolPause)
-            revert ProtocolPaused();
+            revert ProtocolPaused(3);
 
         if(payload.length != 80)
-            revert BadPayload(payload.length, 80);
+            revert BadPayload(3, payload.length, 80);
 
         bytes32 id;
         bytes32 to;
@@ -319,7 +292,7 @@ contract Branch is
         if (token == address(0)) {
             (bool sent, ) = payable(receipient).call{value: amount}("");
             if(! sent)
-                revert NativeTransferFailed();
+                revert NativeTransferFailed(3);
         } else {
             IERC20Upgradeable(token).safeTransfer(receipient, amount);
         }
@@ -350,7 +323,7 @@ contract Branch is
         uint256 buildAmount;
         if (token == address(0)) {
             if(msg.value < payAmount)
-                revert InsufficientValue(msg.value, payAmount-1);
+                revert InsufficientValue(3, msg.value, payAmount-1);
 
             buildAmount = amount;
         } else {
@@ -375,7 +348,7 @@ contract Branch is
             amountsx
         );
         if(payload.length != 81)
-            revert BadPayload(payload.length, 81);
+            revert BadPayload(3, payload.length, 81);
 
         if (token == address(0)) {
             IAdapter(adapter).send{value: msg.value.sub(payAmount)}(

@@ -1,8 +1,7 @@
-
 let deployed = require("../../deployed2.json");
 const FTM = ethers.utils.formatBytes32String("FTM");
 const LZO = ethers.utils.formatBytes32String("LZO");
-const owner = "0x5BA85D71ef9aE0EdC180a6bf5e65F0a749f062DC";
+const owner = "0x68321A81bbF81c173c40add0d875B996480429A5";
 
 let BN = require("bignumber.js");
 
@@ -20,7 +19,7 @@ async function main() {
   console.log("Before balance of matic pool", balance_matic_client.toString(), this.branch.address);
   balance_matic_client = await this.ftm.balanceOf(owner);
   console.log("Before balance of owner", balance_matic_client.toString(), owner);
-  await(await this.branch.depositRequest(FTM, toTokenAmount(500), LZO, 0, {value: fees})).wait();
+  await(await this.branch.depositRequest(FTM, toTokenAmount(10), LZO, 0, {value: fees})).wait();
   console.log("complete");
 }
 

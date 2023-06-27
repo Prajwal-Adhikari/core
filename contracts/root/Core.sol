@@ -40,11 +40,11 @@ contract Core is Initializable, ContextUpgradeable {
 
     mapping(address => bytes32[]) public users; // Stores poolIds of collateral or borrowed assets by a user
 
-    error PoolNotEnabled(bytes32 id);
-    error NotEnoughLiquidity(bytes32 chainId, bytes32 poolId, uint256 poolLiquidity, uint256 sentAmount);
-    error LTVCheckFailed(bytes32 chainId, bytes32 poolId, uint256 tokenAmount);
-    error HealthFactorCheckFailed(address user);
-    error InvalidSender(address sender);
+    error PoolNotEnabled(uint contractCode, bytes32 id);
+    error NotEnoughLiquidity(uint contractCode, bytes32 chainId, bytes32 poolId, uint256 poolLiquidity, uint256 sentAmount);
+    error LTVCheckFailed(uint contractCode, bytes32 chainId, bytes32 poolId, uint256 tokenAmount);
+    error HealthFactorCheckFailed(uint contractCode, address user);
+    error InvalidSender(uint contractCode, address sender);
 
     /**
      * @dev Modifier that checks if caller has a specific role.
@@ -199,9 +199,8 @@ contract Core is Initializable, ContextUpgradeable {
     ) external onlyRole(IRoleManager(roleManager).POOL()) returns (uint256) {
         refresh(id);
         Data.PoolData storage pool = pools[id];
-        // require(pool.enable, string.concat(TAG, ": Not enable now"));
         if(! pool.enable)
-            revert PoolNotEnabled(id);
+            revert PoolNotEnabled(9, id);
 
         uint256 ceAmount = tokenAmount.mul(1e18).div(pool.ceScaled);
         ICEToken(pool.ceToken).mint(user, ceAmount);
@@ -223,10 +222,8 @@ contract Core is Initializable, ContextUpgradeable {
     ) external onlyRole(IRoleManager(roleManager).POOL()) returns (uint256) {
         refresh(id);
         Data.PoolData storage pool = pools[id];
-        // require(pool.enable, string.concat(TAG, ": Not enable now"));
-
         if(! pool.enable)
-            revert PoolNotEnabled(id);
+            revert PoolNotEnabled(9, id);
 
         uint256 burnAmount;
         if(all) {
@@ -235,12 +232,8 @@ contract Core is Initializable, ContextUpgradeable {
         } else {
             burnAmount = tokenAmount.mul(1e18).div(pool.ceScaled);
         } 
-        // require(
-        //     chainLiquidity[chainId][id] >= tokenAmount,
-        //     string.concat(TAG, ": No enough liquidity")
-        // );
         if(chainLiquidity[chainId][id] < tokenAmount)
-            revert NotEnoughLiquidity(chainId, id, chainLiquidity[chainId][id], tokenAmount);
+            revert NotEnoughLiquidity(9, chainId, id, chainLiquidity[chainId][id], tokenAmount);
 
         ICEToken(pool.ceToken).burn(user, burnAmount);
         _removeToken(user, id);
@@ -283,13 +276,8 @@ contract Core is Initializable, ContextUpgradeable {
         );
         _addToken(user, id);
 
-        // require(
-        //     params.liquidity >= tokenAmount,
-        //     string.concat(TAG, ": No enough liquidity")
-        // );
-
         if(params.liquidity < tokenAmount)
-            revert NotEnoughLiquidity(chainId, id, params.liquidity, tokenAmount);
+            revert NotEnoughLiquidity(9, chainId, id, params.liquidity, tokenAmount);
 
         IDebtToken(params.debtToken).mint(user, params.debtAmount);
         pools[id].debtSupply += params.debtAmount;
@@ -298,20 +286,12 @@ contract Core is Initializable, ContextUpgradeable {
         totalLiquidity[id] -= tokenAmount;
 
         Data.HealthData memory healthData = healthFactor(user);
-        // require(
-        //     healthData.collateralValue.mul(params.ltv).div(1e18) >=
-        //         healthData.debtValue.add(
-        //             tokenAmount.mul(params.price).div(1e18)
-        //         ),
-        //     "LTV check failed"
-        // );
-
         if(
             healthData.collateralValue.mul(params.ltv).div(1e18) <
                 healthData.debtValue.add(
                     tokenAmount.mul(params.price).div(1e18))
         )
-            revert LTVCheckFailed(chainId, id, tokenAmount);
+            revert LTVCheckFailed(9, chainId, id, tokenAmount);
 
         return params.debtAmount;
     }
@@ -395,19 +375,13 @@ contract Core is Initializable, ContextUpgradeable {
     }
 
     function checkHealth(address user) public view {
-        // require(
-        //     healthFactor(user).factor < MAX_HEALTH_FACTOR,
-        //     string.concat(TAG, ": Health failed")
-        // );
-
         if(healthFactor(user).factor >= MAX_HEALTH_FACTOR)
-            revert HealthFactorCheckFailed(user);
+            revert HealthFactorCheckFailed(9, user);
     }
 
     function handleTransfer(address from, address to, bytes32 id) external {
-        // require(msg.sender == pools[id].ceToken, string.concat(TAG, ": Invalid sender")); //msgSender() ?
         if(msg.sender != pools[id].ceToken)
-            revert InvalidSender(msg.sender);
+            revert InvalidSender(9, msg.sender);
         checkHealth(from);
         _addToken(to, id);
         _removeToken(from, id);

@@ -25,7 +25,8 @@ contract LzRouteBranch is Initializable, LzApp {
     uint8 internal constant TYPE_SWAP = 3;
 
     uint256 public gasUsage;
-    error InvalidChainId(uint16 chainIdReceived);
+    error InvalidChainId(uint contractCode, uint16 chainIdReceived);
+    error UnsupportedFunctionType(uint contractCode, uint8 functionType);
     /**
      * @dev Modifier that checks if caller has a specific role.
      **/
@@ -117,9 +118,8 @@ contract LzRouteBranch is Initializable, LzApp {
         uint64,
         bytes memory _payload
     ) internal override {
-        // require(rootChainId == _srcId, string.concat(TAG, "Invalid chainId"));
         if(rootChainId != _srcId)
-            revert InvalidChainId(_srcId);
+            revert InvalidChainId(1, _srcId);
         IAdapter(adapter).execute(_payload);
     }
 
@@ -139,7 +139,7 @@ contract LzRouteBranch is Initializable, LzApp {
         } else if (functionType == TYPE_SWAP) {
             payload = abi.encode(TYPE_SWAP, 1, msg.sender, 1, 1);
         } else {
-            revert(string.concat(TAG, ": Unsupport functionType"));
+            revert UnsupportedFunctionType(1, functionType);
         }
         uint256 fees;
         if (airdropAmount > 0) {

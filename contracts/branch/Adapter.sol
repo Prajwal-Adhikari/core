@@ -24,7 +24,7 @@ contract AdapterBranch is Initializable, ContextUpgradeable {
     mapping(bytes32 => address) public router;
     mapping(address => bool) public routeExist;
 
-    error NoRouteExists(bytes32 route);
+    error NoRouteExists(uint contractCode, bytes32 route);
     /**
      * @dev Modifier that checks if caller has a specific role.
      **/
@@ -66,12 +66,8 @@ contract AdapterBranch is Initializable, ContextUpgradeable {
         uint256 airdropAmount,
         bytes32 route
     ) external payable onlyRole(IRoleManager(roleManager).BRANCH()) {
-        // require(
-        //     routeExist[router[route]],
-        //     string.concat(TAG, "No route exists")
-        // );
         if(! routeExist[router[route]])
-            revert NoRouteExists(route);
+            revert NoRouteExists(2, route);
         IRoute(router[route]).send{value: msg.value}(
             payload,
             sender,

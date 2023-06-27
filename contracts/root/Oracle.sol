@@ -38,11 +38,11 @@ contract Oracle is Initializable, ContextUpgradeable {
 
     event SetPrice(bytes32 symbol, uint256 price);
 
-    error PriceNotSet(bytes32 symbol);
-    error ChainlinkMalfunction(bytes32 symbol);
-    error RoundNotComplete(bytes32 symbol);
-    error StaleData(bytes32 symbol);
-    error PoolNotExist(bytes32 symbol);
+    error PriceNotSet(uint contractCode, bytes32 symbol);
+    error ChainlinkMalfunction(uint contractCode, bytes32 symbol);
+    error RoundNotComplete(uint contractCode, bytes32 symbol);
+    error StaleData(uint contractCode, bytes32 symbol);
+    error PoolNotExist(uint contractCode, bytes32 symbol);
     /**
      * @dev Modifier that checks if caller has a specific role.
      **/
@@ -132,9 +132,8 @@ contract Oracle is Initializable, ContextUpgradeable {
             } else {
                 price = getPriceFromChainlink(_symbols[i]);
             }
-            // require(price > 0, string.concat(TAG, ": Price not set up"));
             if(price == 0)
-                revert PriceNotSet(_symbols[i]);
+                revert PriceNotSet(12, _symbols[i]);
             results[i] = price;
         }
     }
@@ -151,9 +150,8 @@ contract Oracle is Initializable, ContextUpgradeable {
             } else {
                 result = getPriceFromChainlink(_symbol);
             }
-            // require(result > 0, string.concat(TAG, ": Price not set up"));
             if(result == 0)
-                revert PriceNotSet(_symbol);
+                revert PriceNotSet(12, _symbol);
             
         }
     
@@ -173,18 +171,14 @@ contract Oracle is Initializable, ContextUpgradeable {
             aggregator[_symbol]
         ).latestRoundData();
 
-        // require(basePrice != 0, string.concat(TAG, ": Chainlink Malfunction"));
-        // require(timeStamp != 0, string.concat(TAG, ": Round is not complete"));
-        // require(answeredInRound >= roundID, string.concat(TAG, ": Stale data"));
-
         if(basePrice == 0)
-            revert ChainlinkMalfunction(_symbol);
+            revert ChainlinkMalfunction(12, _symbol);
 
         if(timeStamp == 0)
-            revert RoundNotComplete(_symbol);
+            revert RoundNotComplete(12, _symbol);
 
         if(answeredInRound < roundID)
-            revert StaleData(_symbol);
+            revert StaleData(12, _symbol);
 
         uint8 quoteDecimals = AggregatorV3Interface(aggregator[_symbol])
             .decimals();
@@ -206,9 +200,8 @@ contract Oracle is Initializable, ContextUpgradeable {
             assetAddress[stableCoinId[_symbol]],
             fee[_symbol]
         );
-        // require(pool != address(0), string.concat(TAG, ": Pool doesn't exist"));
         if(pool == address(0))
-            revert PoolNotExist(_symbol);
+            revert PoolNotExist(12, _symbol);
 
         int24 tick = OracleLibrary.consult(pool, timeInterval[_symbol]);
 

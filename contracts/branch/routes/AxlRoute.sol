@@ -24,8 +24,8 @@ contract AxlRouteBranch is Initializable, AxelarExecutable, ContextUpgradeable {
     IAxelarGasService gasService;
 
     event Executed();
-    error InvalidSource();
-    error FeeRefundFailed();
+    error InvalidSource(uint contractCode);
+    error FeeRefundFailed(uint contractCode);
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -81,11 +81,9 @@ contract AxlRouteBranch is Initializable, AxelarExecutable, ContextUpgradeable {
         ) {
             if (msg.value > 0) {
                 (bool sent, ) = payable(sender).call{value: msg.value}("");
-                // require(sent, string.concat(TAG, ": Failed to refund fees"));
                 if(! sent)
-                    revert FeeRefundFailed();
+                    revert FeeRefundFailed(0);
             }
-
             IAxelarGateway(StringToAddress.toAddress(rootAddress)).localReceive(
                 localChainId,
                 AddressToString.toString(address(this)),
@@ -110,26 +108,16 @@ contract AxlRouteBranch is Initializable, AxelarExecutable, ContextUpgradeable {
         string calldata sourceAddress_,
         bytes calldata payload_
     ) internal override {
-
-        // require(
-        //         keccak256(abi.encodePacked(rootChainId)) ==
-        //         keccak256(abi.encodePacked(sourceChain_)) &&
-        //         StringToAddress.toAddress(rootAddress) ==
-        //         StringToAddress.toAddress(sourceAddress_),
-        //     string.concat(TAG, "Invalid source")
-        // );
-
         if( 
             keccak256(abi.encodePacked(rootChainId)) !=
             keccak256(abi.encodePacked(sourceChain_)) 
         )
-            revert InvalidSource();
-
+            revert InvalidSource(0);
         if(
             StringToAddress.toAddress(rootAddress) !=
             StringToAddress.toAddress(sourceAddress_)
         )
-            revert InvalidSource();
+            revert InvalidSource(0);
 
         IAdapter(adapter).execute(payload_);
         emit Executed();

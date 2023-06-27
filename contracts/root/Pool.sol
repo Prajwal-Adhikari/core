@@ -55,10 +55,11 @@ contract Pool is
 
     bool public feeEnable;
 
-    error ProtocolPaused();
-    error WithdrawPaused(bytes32 chainId, bytes32 id);
-    error BorrowPaused(bytes32 chainId, bytes32 id);
-    error BadPayload(uint256 currentLength, uint256 requiredLength);
+    error ProtocolPaused(uint contractCode);
+    error UnsupportedFunctionType(uint contractCode, uint8 functionType);
+    error WithdrawPaused(uint contractCode, bytes32 chainId, bytes32 id);
+    error BorrowPaused(uint contractCode, bytes32 chainId, bytes32 id);
+    error BadPayload(uint contractCode, uint256 currentLength, uint256 requiredLength);
 
     /**
      * @dev Modifier that checks if caller has a specific role.
@@ -154,16 +155,12 @@ contract Pool is
         uint256 airdropAmount,
         bool all
     ) external payable nonReentrant {
-        // require(
-        //     !(withdrawPause[id][chainId] || protocolPause),
-        //     string.concat(TAG, ": Withdraw paused")
-        // );
-
+  
         if(protocolPause)
-            revert ProtocolPaused();
+            revert ProtocolPaused(13);
 
         if(withdrawPause[id][chainId])
-            revert WithdrawPaused(chainId, id);
+            revert WithdrawPaused(13, chainId, id);
 
         uint256 tokenAmount = ICore(core).withdraw(
             id,
@@ -183,9 +180,8 @@ contract Pool is
             uint64(tokenAmount / BASE),
             uint64(tokenAmount % BASE)
         );
-        // require(payload.length == 80, string.concat(TAG, ": Bad payload"));
         if(payload.length != 80)
-            revert BadPayload(payload.length, 80);
+            revert BadPayload(13, payload.length, 80);
 
         IAdapter(adapter).send{value: msg.value}(
             payload,
@@ -215,16 +211,11 @@ contract Pool is
         bytes32 route,
         uint256 airdropAmount
     ) external payable nonReentrant {
-        // require(
-        //     !(borrowPause[id][chainId] || protocolPause),
-        //     string.concat(TAG, ": Borrow paused")
-        // );
-
         if(protocolPause)
-            revert ProtocolPaused();
+            revert ProtocolPaused(13);
 
         if(borrowPause[id][chainId])
-            revert BorrowPaused(chainId, id);
+            revert BorrowPaused(13, chainId, id);
 
         uint256 debtAmount = ICore(core).borrow(
             id,
@@ -243,9 +234,8 @@ contract Pool is
             uint64(tokenAmount / BASE),
             uint64(tokenAmount % BASE)
         );
-        // require(payload.length == 80, string.concat(TAG, ": Bad payload"));
         if(payload.length != 80)
-            revert BadPayload(payload.length, 80);
+            revert BadPayload(13, payload.length, 80);
 
         IAdapter(adapter).send{value: msg.value}(
             payload,
@@ -302,9 +292,8 @@ contract Pool is
         bytes32 data;
         uint64 amountpx;
         uint64 amountsx;
-        // require(_payload.length == 81, string.concat(TAG, ": Bad payload"));
         if(_payload.length != 81)
-            revert BadPayload(_payload.length, 81);
+            revert BadPayload(13, _payload.length, 81);
         
         uint8 functionType = uint8(_payload[0]); // _payload received is encoded in format (uint8, bytes32, bytes32, uint64, uint64)
         assembly {
@@ -320,7 +309,7 @@ contract Pool is
         } else if (functionType == TYPE_REPAY) {
             _repay(tokenId, chainId, _bytesToAddress(data), amount, route);
         } else {
-            revert(string.concat(TAG, ": Unsupport functionType"));
+            revert UnsupportedFunctionType(13, functionType);
         }
     }
 

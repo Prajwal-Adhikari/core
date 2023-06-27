@@ -10,13 +10,13 @@ import "../../../root/libraries/Address.sol";
 contract AxelarExecutable is Initializable, IAxelarExecutable {
     IAxelarGateway public gateway;
     string public localChainId;
-    error CallerIsNotTrustedContract(string sourceAddressReceived);
+    error CallerIsNotTrustedContract(uint contractCode, string sourceAddressReceived);
     
     function __AxelarExecutable_init(
         address gateway_,
         string calldata _localChainId
     ) internal onlyInitializing {
-        if (gateway_ == address(0)) revert InvalidAddress();
+        if (gateway_ == address(0)) revert InvalidAddress(4);
 
         gateway = IAxelarGateway(gateway_);
         localChainId = _localChainId;
@@ -27,13 +27,8 @@ contract AxelarExecutable is Initializable, IAxelarExecutable {
         string calldata sourceAddress_,
         bytes calldata payload_
     ) external {
-        // require(
-        //     StringToAddress.toAddress(sourceAddress_) ==  msg.sender,
-        //     "AxelarExecutable: Caller is not a trusted contract"
-        // );
-
         if(StringToAddress.toAddress(sourceAddress_) !=  msg.sender)
-            revert CallerIsNotTrustedContract(sourceAddress_);
+            revert CallerIsNotTrustedContract(4, sourceAddress_);
 
         _execute(sourceChain_, sourceAddress_, payload_);
     }
@@ -53,7 +48,7 @@ contract AxelarExecutable is Initializable, IAxelarExecutable {
                 sourceAddress,
                 payloadHash
             )
-        ) revert NotApprovedByGateway();
+        ) revert NotApprovedByGateway(4);
 
         _execute(sourceChain, sourceAddress, payload);
     }
@@ -77,7 +72,7 @@ contract AxelarExecutable is Initializable, IAxelarExecutable {
                 tokenSymbol,
                 amount
             )
-        ) revert NotApprovedByGateway();
+        ) revert NotApprovedByGateway(4);
 
         _executeWithToken(
             sourceChain,

@@ -4,7 +4,7 @@ const { ethers } = require("hardhat");
 const FTM = ethers.utils.formatBytes32String("FTM");
 const LZO = ethers.utils.formatBytes32String("LZO");
 
-const owner = "0x5BA85D71ef9aE0EdC180a6bf5e65F0a749f062DC";
+const owner = "0x68321A81bbF81c173c40add0d875B996480429A5";
 
 let BN = require("bignumber.js");
 
@@ -19,7 +19,7 @@ async function main() {
   let fees = await this.route.estimateFees(FTM, 1);
   console.log(fees);
 
-  await this.pool.withdraw(FTM, FTM, toTokenAmount(100), ethers.utils.hexZeroPad(ethers.utils.getAddress( owner ), 32),LZO,0, {value: fees});
+  await this.pool.withdraw(FTM, FTM, toTokenAmount(5), ethers.utils.hexZeroPad(ethers.utils.getAddress( owner ), 32),LZO,0, {value: fees});
 
   console.log("complete");
 }
