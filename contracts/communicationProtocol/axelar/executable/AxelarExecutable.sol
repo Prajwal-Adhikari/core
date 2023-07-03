@@ -22,6 +22,12 @@ contract AxelarExecutable is Initializable, IAxelarExecutable {
         localChainId = _localChainId;
     }
 
+    /**
+     * @dev Receives a payload for execution.
+     * @param sourceChain_ The source chainID.
+     * @param sourceAddress_ The source address.
+     * @param payload_ The payload sent from source chain.
+     **/
     function localReceive(
         string calldata sourceChain_,
         string calldata sourceAddress_,
@@ -33,6 +39,13 @@ contract AxelarExecutable is Initializable, IAxelarExecutable {
         _execute(sourceChain_, sourceAddress_, payload_);
     }
 
+    /**
+     * @dev Receives a payload for execution.
+     * @param commandId The source chainID.
+     * @param sourceChain The source chainID.
+     * @param sourceAddress The source address.
+     * @param payload The payload sent from source chain.
+     **/
     function execute(
         bytes32 commandId,
         string calldata sourceChain,
@@ -53,6 +66,15 @@ contract AxelarExecutable is Initializable, IAxelarExecutable {
         _execute(sourceChain, sourceAddress, payload);
     }
 
+    /**
+     * @dev Receives a payload for execution.
+     * @param commandId The source chainID.
+     * @param sourceChain The source chainID.
+     * @param sourceAddress The source address.
+     * @param payload The payload sent from source chain.
+     * @param tokenSymbol The tokenSymbol.
+     * @param amount The amount of token.
+     **/
     function executeWithToken(
         bytes32 commandId,
         string calldata sourceChain,

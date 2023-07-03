@@ -10,12 +10,10 @@ import "./interfaces/IOracle.sol";
 import "./interfaces/IRoleManager.sol";
 import "./libraries/Data.sol";
 
-string constant TAG = "Core";
-
 /**
- * Title Core
- * Core stores all the global data
- * Most of the lending and borrowing logic like interest rate calculation, checks, etc. is in Core.
+ * @title Core
+ * @notice Core stores all the global data
+ * @notice Most of the lending and borrowing logic like interest rate calculation, checks, is in Core.
  **/
 contract Core is Initializable, ContextUpgradeable {
     using SafeMathUpgradeable for uint256;
@@ -27,15 +25,17 @@ contract Core is Initializable, ContextUpgradeable {
     uint256 public constant MAX_HEALTH_FACTOR = 1e18;
     uint256 public constant YEAR = 365 * 86400;
 
-    // key: poolId
-    // Example poolId = keccak256("USDC")
+    /** @notice key: poolId
+    * @notice example poolId = keccak256("USDC")
+    */
     mapping(bytes32 => Data.PoolData) public pools;
     mapping(bytes32 => Data.ConfigData) public configs;
     mapping(bytes32 => uint256) public totalLiquidity; // Stores total liquidity within pool
 
-    // key : [chainId][poolId]
-    // chainId = keccak256("FTM")
-    // poolId = keccak256("USDC")
+    /** @notice key : [chainId][poolId]
+    * @notice chainId = keccak256("FTM")
+    * @notice poolId = keccak256("USDC")
+    */
     mapping(bytes32 => mapping(bytes32 => uint256)) public chainLiquidity; // Stores liquidity of pool across chain
 
     mapping(address => bytes32[]) public users; // Stores poolIds of collateral or borrowed assets by a user
@@ -59,23 +59,45 @@ contract Core is Initializable, ContextUpgradeable {
         _disableInitializers();
     }
 
+    /**
+     * @notice Initilize the contract.
+     * @param treasuryAddress - The address of treasury contract.
+     * @param roleManagerAddress - The EOA of role manager.
+     **/
     function initialize(address treasuryAddress, address roleManagerAddress) public initializer {
         treasury = treasuryAddress;
         roleManager = roleManagerAddress;
         
     }
 
-    // Set contract addresses
+    /**
+     * @notice Configures role manager address
+     * This function can only be accessed by the account with role DEFAULT_ADMIN_ROLE.
+     * @param roleManagerAddress - address of the roleManager contract.
+     **/
     function setRoleManager(address roleManagerAddress) external onlyRole(IRoleManager(roleManager).DEFAULT_ADMIN_ROLE()) {
         roleManager = roleManagerAddress;
     }
 
+    /**
+     * @notice Sets the oracle address.
+     * This function can only be accessed by the account with role SET_CORE_METHOD.
+     * @param _oracle - Oracle address.
+     **/
     function setOracle(
         IOracle _oracle
     ) external onlyRole(IRoleManager(roleManager).SET_CORE_METHOD()) {
         oracle = _oracle;
     }
 
+    /**
+     * @notice Registers a new pool in the protocol.
+     * This function can only be accessed by account with role INIT_POOL.
+     * @param id - id of the pool to be created
+     * @param config - a ConfigData struct containing the interest rate and liqudation variables.
+     * @param _ceToken - address to the ceToken smart contract for this pool.
+     * @param _debtToken - address to the debtToken smart contract for this pool.
+     **/
     function initPool(
         bytes32 id,
         Data.ConfigData memory config,
@@ -91,6 +113,12 @@ contract Core is Initializable, ContextUpgradeable {
         pool.dtScaled = 1e18;
     }
 
+    /**
+     * @notice Freezes/Unfreezes a pool with pool id `id`.
+     * This function can only be accessed by account with role POOL_STATUS.
+     * @param id - id of the pool to freeze/unfreeze
+     * @param enable - bool to freeze/unfreeze
+     **/
     function changePoolStatus(
         bytes32 id,
         bool enable
@@ -99,6 +127,11 @@ contract Core is Initializable, ContextUpgradeable {
         emit Data.ChangePoolStatus(id, enable);
     }
 
+    /**
+     * @notice Updates the interest rate and utilization ratio of the pool.
+     * This function is public.
+     * @param id - pool id
+     **/
     function updateInterestRate(bytes32 id) public {
         Data.PoolData storage pool = pools[id];
         Data.ConfigData memory config = configs[id];
@@ -128,6 +161,11 @@ contract Core is Initializable, ContextUpgradeable {
         }
     }
 
+    /**
+     * @notice Refreshes the parameters of the pool.
+     * This function is public.
+     * @param id - pool id
+     **/
     function refresh(bytes32 id) public {
         Data.PoolData storage pool = pools[id];
         if (pool.ceSupply > 0) {
@@ -162,6 +200,10 @@ contract Core is Initializable, ContextUpgradeable {
         // _;
     }
 
+    /**
+     * @notice Returns the health factor of the address `user`.
+     * @param user - wallet address for which the health factor is calculated.
+     **/
     function healthFactor(
         address user
     ) public view returns (Data.HealthData memory health) {
@@ -191,6 +233,16 @@ contract Core is Initializable, ContextUpgradeable {
         }
     }
 
+    /**
+     * @notice Updates the global protocol states after receiving deposit information
+     * of amount `tokenAmount` from address `user` for pool with pool id 'id' from
+     * chain with chain id `chainId`.
+     * This function can only be accessed by account with role POOL.
+     * @param id - pool id of pool where amount was deposited to
+     * @param chainId -  chain id of chain deposited to
+     * @param user - deposit address
+     * @param tokenAmount - amount deposited
+     **/
     function deposit(
         bytes32 id,
         bytes32 chainId,
@@ -213,6 +265,16 @@ contract Core is Initializable, ContextUpgradeable {
         return ceAmount;
     }
 
+    /**
+     * @notice Sends a withdraw request of amount `ceAmount` to address `user` from pool with pool id `id`
+     * in chain with chain id `chainId`.
+     * This function can only be accessed by account with role POOL.
+     * @param id - pool id of pool to withdraw from
+     * @param chainId - chain id of chain to withdraw from
+     * @param tokenAmount - amount to withdraw
+     * @param user - withdraw address
+     * @param all - withdraw all
+     **/
     function withdraw(
         bytes32 id,
         bytes32 chainId,
@@ -262,6 +324,15 @@ contract Core is Initializable, ContextUpgradeable {
         params.debtToken = pool.debtToken;
     }
 
+    /**
+     * @notice Sends a borrow request of amount `tokenAmount` to address `user` from pool with pool id `id`
+     * in chain with chain id `chainId`.
+     * This function can only be accessed by account with role POOL.
+     * @param id - pool id of pool to borrow from
+     * @param chainId - chain id of chain to borrow from
+     * @param tokenAmount - amount to borrow
+     * @param user - borrow address
+     **/
     function borrow(
         bytes32 id,
         bytes32 chainId,
@@ -312,6 +383,15 @@ contract Core is Initializable, ContextUpgradeable {
         params.user = user;
     }
 
+    /**
+     * @notice Updates the global protocol states after receiving repay information
+     * of amount `tokenAmount` from address `user` for pool with pool id 'id' from
+     * chain with chain id `chainId`.
+     * @param id - pool id of pool where amount was repaid to
+     * @param chainId - chain id of chain repaid from
+     * @param user - repay address
+     * @param tokenAmount - amount repaid
+     **/
     function repay(
         bytes32 id,
         bytes32 chainId,
@@ -354,6 +434,13 @@ contract Core is Initializable, ContextUpgradeable {
         return (params.repayAmount, params.debtAmount, ceAmount);
     }
 
+    /**
+     * @notice Updates ceSupply and debtSupply of the pool
+     * This function can only be accessed by account with role LIQUIDATION_MANAGER.
+     * @param id - id of the pool
+     * @param ceAmount - amount of ceSupply
+     * @param debtAmount - amount of debtSupply
+     **/
     function updateCeAndDebtSupply(
         bytes32 id,
         uint256 ceAmount,
@@ -363,6 +450,15 @@ contract Core is Initializable, ContextUpgradeable {
         pools[id].debtSupply = debtAmount;
     }
 
+    /**
+     * @notice Swaps liquidity amount from one chain to another
+     * This function can only be accessed by account with role POOL.
+     * @param id - pool id of the asset.
+     * @param srcChainId - chain id of the source chain
+     * @param destChainId - chain id of the destination chain
+     * @param tokenAmountInSrc - liquidity amount sent from source chain
+     * @param tokenAmountInDest - liquidity amount received to destination chain
+     **/
     function swap(
         bytes32 id,
         bytes32 srcChainId,
@@ -374,11 +470,21 @@ contract Core is Initializable, ContextUpgradeable {
         chainLiquidity[destChainId][id] += tokenAmountInDest;
     }
 
+    /**
+     * @notice Check the health factor for a users borrow.
+     * @param user - The user's address .
+     **/
     function checkHealth(address user) public view {
         if(healthFactor(user).factor >= MAX_HEALTH_FACTOR)
             revert HealthFactorCheckFailed(9, user);
     }
 
+    /**
+     * @notice Reverts if the health factor is not less than MAX_HEALTH_FACTOR, then add the pool to user as collateral
+     * @param from - wallet address the user send ceToken.
+     * @param to - wallet address the user receive ceToken.
+     * * @param to - pool id.
+     **/
     function handleTransfer(address from, address to, bytes32 id) external {
         if(msg.sender != pools[id].ceToken)
             revert InvalidSender(9, msg.sender);
@@ -396,6 +502,12 @@ contract Core is Initializable, ContextUpgradeable {
         users[user].push(id);
     }
 
+    /**
+     * @notice Adds pool id to liquidator's token list
+     * This function can only be accessed by account with role LIQUIDATION_MANAGER.
+     * @param user - address of the liquidator
+     * @param id - pool id of the asset.
+     **/
     function addTokenForLiquidator(address user, bytes32 id) external onlyRole(IRoleManager(roleManager).LIQUIDATION_MANAGER()){
         _addToken(user, id);
     }
@@ -451,6 +563,10 @@ contract Core is Initializable, ContextUpgradeable {
             .div(1e18);
     }
 
+    /**
+     * @notice Get the CE scaled amount.
+     * @param _poolId - The pool id .
+     **/
     function getCEScaled(bytes32 _poolId) public view returns (uint256)  {
         Data.PoolData memory pool = pools[_poolId];
         uint256 increasedDebt = block
@@ -467,6 +583,10 @@ contract Core is Initializable, ContextUpgradeable {
         );
     }
 
+    /**
+     * @notice Get the DT scaled amount.
+     * @param _poolId - The pool id .
+     **/
     function getDTScaled(bytes32 _poolId) public view returns (uint256) {
         Data.PoolData memory pool = pools[_poolId];
         uint256 increasedDebt = block
@@ -477,6 +597,11 @@ contract Core is Initializable, ContextUpgradeable {
         return pool.dtScaled.add(increasedDebt);
     }
     
+    /**
+     * @notice Returns liquidity of an asset for a chain
+     * @param _chainId - id of the chain.
+     * @param _poolId - id of the pool.
+     **/
     function getLiquidity(
         bytes32 _chainId,
         bytes32 _poolId

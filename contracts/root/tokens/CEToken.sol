@@ -6,8 +6,11 @@ import "@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
 import "../interfaces/IRoleManager.sol";
 import "../interfaces/ICore.sol";
 
-string constant TAG = "CEToken";
-
+/**
+ * @title CE Token
+ * @notice Each token that is deposited will have it's own CE Token.
+ * @notice CE Token is the equivalent to Liquidity Pool(LP) Token.
+ **/
 contract CEToken is ERC20Upgradeable {
     using SafeMathUpgradeable for uint256;
     address public core;
@@ -34,6 +37,12 @@ contract CEToken is ERC20Upgradeable {
         _disableInitializers();
     }
 
+    /**
+     * @notice Initilize the contract.
+     * @param name_ - The token name.
+     * @param symbol_ - The token symbol.
+     * @param roleManagerAddress - The EOA of role manager.
+     **/
     function initialize(
         string memory name_,
         string memory symbol_,
@@ -43,10 +52,20 @@ contract CEToken is ERC20Upgradeable {
         roleManager = roleManagerAddress;
     }
 
+    /**
+     * @notice Configures role manager address
+     * This function can only be accessed by the account with role DEFAULT_ADMIN_ROLE.
+     * @param roleManagerAddress - address of the roleManager contract.
+     **/
     function setRoleManager(address roleManagerAddress) external onlyRole(IRoleManager(roleManager).DEFAULT_ADMIN_ROLE()) {
         roleManager = roleManagerAddress;
     }
 
+    /**
+     * @notice Configures core address
+     * This function can only be accessed by the account with role SET_CE_TOKEN_METHOD.
+     * @param coreAddress - address of the roleManager contract.
+     **/
     function setCore(
         address coreAddress,
         bytes32 id
@@ -55,11 +74,22 @@ contract CEToken is ERC20Upgradeable {
         poolId = id;
     }
 
-
+    /**
+     * @notice Configures a waiting period before transfer if
+     * the mint amount exceeds lockup trigger amount
+     * This function can only be accessed by the account with role SET_CE_TOKEN_METHOD.
+     * @param num - number of blocks to wait.
+     **/
     function setTransferBlockWait(uint256 num) external onlyRole(IRoleManager(roleManager).SET_CE_TOKEN_METHOD()) {
         transferBlockWait = num;
     }
 
+    /**
+     * @notice Configures the release period for user before transfer
+     * This function can only be accessed by the account with role CONTROLLER.
+     * @param user - address of a user
+     * @param blockNumber - number of the block upto which transfer is freezed
+     **/
     function setTransferBlockRelease(
         address user,
         uint256 blockNumber
@@ -67,20 +97,26 @@ contract CEToken is ERC20Upgradeable {
         transferBlockRelease[user] = blockNumber;
     }
 
+    /**
+     * @notice Configures amount when exceeded triggers the lock up.
+     * This function can only be accessed by the account with role SET_CE_TOKEN_METHOD.
+     * @param amount - amount of the token.
+     **/
     function setLockupTriggerAmount(uint256 amount) external onlyRole(IRoleManager(roleManager).SET_CE_TOKEN_METHOD()) {
         lockupTriggerAmt = amount;
     }
 
+    /**
+     * @dev Transfer CE token.
+     * @param from - The address of sender.
+     * @param to - The address of receiver.
+     * @param amount - The transfer amount.
+     **/
     function _transfer(
         address from,
         address to,
         uint256 amount
     ) internal override {
-        // require(
-        //     block.number > transferBlockRelease[from],
-        //     string.concat(TAG,": transfer too soon after cross-chain mint")
-        // );
-
         if(block.number <= transferBlockRelease[from])
             revert TransferTooSoonAfterMint(block.number, transferBlockRelease[from]);
 
@@ -89,21 +125,30 @@ contract CEToken is ERC20Upgradeable {
         ICore(core).handleTransfer(from, to, poolId);
     }
 
+    /**
+     * @notice Get the balance from address `user` before scaled.
+     * @param user - address of the user
+     **/
     function balanceBeforeScaled(address user) external view returns (uint256) {
         return super.balanceOf(user);
     }
 
+    /**
+     * @dev Gets the sclaed CE token balance of user.
+     * @param user - The address of user.
+     **/
     function balanceOf(address user) public view override returns (uint256) {
         uint ceScaled = ICore(core).getCEScaled(poolId);
         return super.balanceOf(user) * ceScaled / 1e18;
     }
 
+    /**
+     * @notice Mints ceToken to address `to`.
+     * This function can only be accessed by the account with role MINT_BURN_CE_DEBT_TOKEN.
+     * @param to - address of the receipient.
+     * @param amount - amount of the token.
+     **/
     function mint(address to, uint256 amount) external onlyRole(IRoleManager(roleManager).MINT_BURN_CE_DEBT_TOKEN()) {
-        // require(
-        //     transferBlockRelease[to] != 2 ** 256 - 1,
-        //     string.concat(TAG,": User is already caged")
-        // );
-
         if( transferBlockRelease[to] == 2 ** 256 - 1)
             revert UserIsCaged(to);
 
@@ -113,11 +158,13 @@ contract CEToken is ERC20Upgradeable {
         _mint(to, amount);
     }
 
+    /**
+     * @notice Burns ceToken from address `from`.
+     * This function can only be accessed by the account with role MINT_BURN_CE_DEBT_TOKEN.
+     * @param from - address of the sender.
+     * @param amount - amount of the token.
+     **/
     function burn(address from, uint256 amount) external onlyRole(IRoleManager(roleManager).MINT_BURN_CE_DEBT_TOKEN()) {
-        // require(
-        //     block.number > transferBlockRelease[from],
-        //     string.concat(TAG,": burn too soon after cross-chain mint")
-        // );
         if(block.number <= transferBlockRelease[from])
             revert BurnTooSoonAfterMint(block.number, transferBlockRelease[from]);
 

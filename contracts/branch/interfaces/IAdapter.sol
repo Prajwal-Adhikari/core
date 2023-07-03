@@ -21,9 +21,9 @@ interface IAdapter {
     /**
      * @notice Configures branch contract.
      * This function can only be accessed by account with role SET_ADAPTER_METHOD.
-     * @param _branchAddress - address of the branch contract.
+     * @param branchAddress - address of the branch contract.
      **/
-    function setBranch(address _branchAddress) external;
+    function setBranch(address branchAddress) external;
 
     /**
      * @notice Sends payload from branch to selected route.

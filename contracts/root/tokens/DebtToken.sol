@@ -6,8 +6,10 @@ import "@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
 import "../interfaces/IRoleManager.sol";
 import "../interfaces/ICore.sol";
 
-string constant TAG = "DebtToken";
-
+/**
+ * @title Debt (DT) Token
+ * @notice Each token that is deposited will have it's own DT Token.
+ **/
 contract DebtToken is ERC20Upgradeable {
     using SafeMathUpgradeable for uint256;
 
@@ -21,6 +23,12 @@ contract DebtToken is ERC20Upgradeable {
         _disableInitializers();
     }
     
+    /**
+     * @notice Initilize the contract.
+     * @param name_ - The token name.
+     * @param symbol_ - The token symbol.
+     * @param roleManagerAddress - The EOA of role manager.
+     **/
     function initialize(
         string memory name_,
         string memory symbol_,
@@ -38,6 +46,12 @@ contract DebtToken is ERC20Upgradeable {
         _;
     }
 
+    /**
+     * @notice Configures core address
+     * This function can only be accessed by the account with role SET_CE_TOKEN_METHOD.
+     * @param coreAddress - address of the roleManager contract.
+     * @param id - The pool id.
+     **/
     function setCore(
         address coreAddress,
         bytes32 id
@@ -46,19 +60,38 @@ contract DebtToken is ERC20Upgradeable {
         poolId = id;
     }
 
+    /**
+     * @notice Configures role manager address
+     * This function can only be accessed by the account with role DEFAULT_ADMIN_ROLE.
+     * @param roleManagerAddress - address of the roleManager contract.
+     **/
     function setRoleManager(address roleManagerAddress) external onlyRole(IRoleManager(roleManager).DEFAULT_ADMIN_ROLE()) {
         roleManager = roleManagerAddress;
     }
 
+    /**
+     * @notice Get the balance from address `user` before scaled.
+     * @param user - address of the user
+     **/
     function balanceBeforeScaled(address user) external view returns (uint256) {
         return super.balanceOf(user);
     }
 
+    /**
+     * @dev Gets the sclaed DT token balance.
+     * @param user - The address of user.
+     **/
     function balanceOf(address user) public view override returns (uint256) {
         uint dtScaled = ICore(core).getDTScaled(poolId);
         return super.balanceOf(user).mul(dtScaled).div(1e18);
     }
 
+    /**
+     * @dev Transfer DT token.
+     * @param from - The address of sender.
+     * @param to - The address of receiver.
+     * @param amount - The transfer amount.
+     **/
     function _transfer(
         address from,
         address to,
@@ -69,10 +102,22 @@ contract DebtToken is ERC20Upgradeable {
         revert CannotTransferDebtToken();
     }
 
+    /**
+     * @notice Mints debtToken to address `to`.
+     * This function can only be accessed by account with role MINT_BURN_CE_DEBT_TOKEN.
+     * @param to - address of the receipient.
+     * @param amount - amount of the token.
+     **/
     function mint(address to, uint256 amount) external onlyRole(IRoleManager(roleManager).MINT_BURN_CE_DEBT_TOKEN()) {
         _mint(to, amount);
     }
 
+    /**
+     * @notice Burns debtToken from address `from`.
+     * This function can only be accessed by account with role MINT_BURN_CE_DEBT_TOKEN.
+     * @param from - address of the sender.
+     * @param amount - amount of the token.
+     **/
     function burn(address from, uint256 amount) external onlyRole(IRoleManager(roleManager).MINT_BURN_CE_DEBT_TOKEN()) {
         _burn(from, amount);
     }

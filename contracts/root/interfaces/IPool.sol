@@ -59,9 +59,8 @@ interface IPool {
      * @param chainId - chain id of chain to borrow from
      * @param tokenAmount - amount to borrow
      * @param to - borrow address
-      * @param route - communication protocol
+     * @param route - communication protocol
      * @param airdropAmount - amount to be airdropped to destination chain
-    
      **/
     function borrow(
         bytes32 id,

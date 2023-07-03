@@ -4,8 +4,10 @@ pragma solidity 0.8.17;
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
-string constant TAG = "RoleManagerBranch";
-
+/**
+ * @title RoleManagerBranch
+ * @notice RoleManager is used to grant roles to EOAs.
+ **/
 contract RoleManagerBranch is Initializable, AccessControlUpgradeable {
     bytes32 public constant SET_BRANCH_METHOD = keccak256("SET_BRANCH_METHOD");
     bytes32 public constant SET_ADAPTER_METHOD =
@@ -34,6 +36,11 @@ contract RoleManagerBranch is Initializable, AccessControlUpgradeable {
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
     }
 
+    /**
+     * @dev Set the admin role for a particular role.
+     * @param role The role to set.
+     * @param adminRole The admin role.
+     **/
     function setRoleAdmin(
         bytes32 role,
         bytes32 adminRole
@@ -41,6 +48,11 @@ contract RoleManagerBranch is Initializable, AccessControlUpgradeable {
         _setRoleAdmin(role, adminRole);
     }
 
+    /**
+     * @dev Checks role.
+     * @param role The role to set.
+     * @param account The address to check role.
+     **/
     function checkRole(bytes32 role, address account) public view {
         _checkRole(role, account);
     }

@@ -13,12 +13,9 @@ import "./interfaces/ICore.sol";
 import "./interfaces/IRoleManager.sol";
 import "./libraries/Data.sol";
 
-string constant TAG = "LiquidationManager";
-
 /** 
-* Title LiquidationManager
-
-* Users interact with LiquidationManager for Liquidate actions.
+* @title LiquidationManager
+* @notice Users interact with LiquidationManager for Liquidate actions.
 **/
 
 contract LiquidationManager is
@@ -51,28 +48,50 @@ contract LiquidationManager is
         _disableInitializers();
     }
 
+    /**
+     * @notice Initilize the contract.
+     * @param roleManagerAddress - The EOA of role manager.
+     **/
     function initialize(address roleManagerAddress) public initializer {
         __ReentrancyGuard_init();
         roleManager = roleManagerAddress;
     }
 
-    // Set contract addresses
+    /**
+     * @notice Configures role manager address
+     * This function can only be accessed by the account with role DEFAULT_ADMIN_ROLE.
+     * @param roleManagerAddress - address of the roleManager contract.
+     **/     
     function setRoleManager(address roleManagerAddress) external onlyRole(IRoleManager(roleManager).DEFAULT_ADMIN_ROLE()) {
         roleManager = roleManagerAddress;
     }
 
+    /**
+     * @notice Configures core contract.
+     * This function can only be accessed by the account with role SET_LIQUIDATION_METHOD
+     * @param coreAddress - address of the core contract.
+     **/
     function setCore(
         address coreAddress
     ) external onlyRole(IRoleManager(roleManager).SET_LIQUIDATION_METHOD()) {
         core = coreAddress;
     }
 
+    /**
+     * @notice Configures Oracle contract.
+     * This function can only be accessed by the account with role SET_LIQUIDATION_METHOD
+     * @param oracleAddress - address of the oracle contract.
+     **/
     function setOracle(
         IOracle oracleAddress
     ) external onlyRole(IRoleManager(roleManager).SET_LIQUIDATION_METHOD()) {
         oracle = oracleAddress;
     }
 
+    /**
+     * @dev Set status for liquidation pause.
+     * @param pause - Status for liquidation pause.
+     **/
     function setLiquidationPause(
         bool pause
     ) external onlyRole(IRoleManager(roleManager).SET_LIQUIDATION_METHOD()) {
@@ -119,6 +138,13 @@ contract LiquidationManager is
         );
     }
 
+    /**
+     * @notice Liquidates the position of address `user`.
+     * @param user - borrower address whose position is to be liquidated
+     * @param collateralId - the pool id of the collateral asset of borrower
+     * @param debtId - the pool id of the borrowed asset of borrower
+     * @param borrowerCollateral - amount of collateral of collateralId, the liquidator wants to liquidate
+     **/
     function liquidate(
         address user,
         bytes32 collateralId,

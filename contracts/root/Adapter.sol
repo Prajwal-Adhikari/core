@@ -7,12 +7,10 @@ import "./interfaces/IRoute.sol";
 import "./interfaces/IPool.sol";
 import "./interfaces/IRoleManager.sol";
 
-string constant TAG = "AdapterPool";
-
 /**
- * Title AdapterPool
- * Pool interact with Adapter pass message through desired route
- * Route interact with Adapter to call methods of Branch.
+ * @title AdapterPool
+ * @notice Pool interact with Adapter pass message through desired route
+ * @notice Route interact with Adapter to call methods of Branch.
  **/
 contract AdapterPool is Initializable, ContextUpgradeable {
     using SafeMathUpgradeable for uint256;
@@ -37,34 +35,53 @@ contract AdapterPool is Initializable, ContextUpgradeable {
         _disableInitializers();
     }
 
+    /**
+     * @notice Sets the roleManager address.
+     * @param roleManagerAddress - Role manager address.
+     **/
     function initialize(address roleManagerAddress) public initializer {
         roleManager = roleManagerAddress;
     }
 
+    /**
+     * @notice Configures role manager.
+     * This function can only be accessed by account with role DEFAULT_ADMIN_ROLE
+     * @param roleManagerAddress - address of the role manager contract
+     **/
     function setRoleManager(address roleManagerAddress) external onlyRole(IRoleManager(roleManager).DEFAULT_ADMIN_ROLE()) {
         roleManager = roleManagerAddress;
     }
 
     /**
-     * @dev Configures pool contract.
-     * This function can only be accessed by the contract owner.
-     * @param _poolAddress address of the pool contract.
+     * @notice Configures pool contract.
+     * This function can only be accessed by account with role SET_ADAPTER_METHOD.
+     * @param _poolAddress - address of the pool contract.
      **/
     function setPool(address _poolAddress) external onlyRole(IRoleManager(roleManager).SET_ADAPTER_METHOD()) {
         pool = _poolAddress;
     }
 
     /**
-     * @dev Configures route.
-     * This function can only be accessed by the contract owner.
-     * @param route name of the route
-     * @param routeAddress address of the route contract.
+     * @notice Configures route.
+     * This function can only be accessed by account with role SET_ADAPTER_METHOD.
+     * @param route - name of the route
+     * @param routeAddress - address of the route contract.
      **/
     function setRoute(bytes32 route, address routeAddress) external onlyRole(IRoleManager(roleManager).SET_ADAPTER_METHOD()) {
         routeExist[routeAddress] = true;
         router[route] = routeAddress;
     }
 
+    /**
+     * @notice Sends swap information from adapter to route
+     * This function can only be accessed by account with role POOL.
+     * @param payload - information containing receipient address, pool id and token amount
+     * @param chainId - chain id of the destination chain
+     * @param sender - user address
+     * @param airdropAmount - amount to be airdropped to destination chain
+     * @param airdropReceiver - receiver of the airdrop
+     * @param route - communication protocol
+     **/
     function send(
         bytes memory payload,
         bytes32 chainId,
@@ -84,6 +101,13 @@ contract AdapterPool is Initializable, ContextUpgradeable {
         );
     }
 
+    /**
+     * @notice Sends payload to the pool contract.
+     * This function can only be accessed by account with role ROUTE.
+     * @param payload - information containing data , pool id and token amount
+     * @param chainId - chain id of the source chain
+     * @param route - communication protocol through which payload is received
+     **/
     function execute(
         bytes memory payload,
         bytes32 chainId,

@@ -4,8 +4,10 @@ pragma solidity 0.8.17;
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
-string constant TAG = "RoleManagerPool";
-
+/**
+ * @title RoleManagerBranch
+ * @notice RoleManager is used to grant roles to EOAs.
+ **/
 contract RoleManagerPool is Initializable, AccessControlUpgradeable {
     bytes32 public constant SET_POOL_METHOD = keccak256("SET_POOL_METHOD");
     bytes32 public constant SET_CORE_METHOD = keccak256("SET_CORE_METHOD");
@@ -50,6 +52,12 @@ contract RoleManagerPool is Initializable, AccessControlUpgradeable {
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
     }
 
+    /**
+     * @notice Sets new adminRole for a role
+     * This function can be called by the account having adminRole for the `role`
+     * @param role - particular role 
+     * @param adminRole - new role to be assigned as admin
+     **/
     function setRoleAdmin(
         bytes32 role,
         bytes32 adminRole
@@ -57,6 +65,12 @@ contract RoleManagerPool is Initializable, AccessControlUpgradeable {
         _setRoleAdmin(role, adminRole);
     }
 
+    /**
+     * @notice Checks role for an account
+     * Reverts if the account doesnt have permission of the role
+     * @param role - role of contract.
+     * @param account - address of user.
+     **/
     function checkRole(bytes32 role, address account) public view {
         _checkRole(role, account);
     }

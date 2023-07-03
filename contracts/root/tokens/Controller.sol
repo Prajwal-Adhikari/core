@@ -5,8 +5,10 @@ import "../interfaces/ICEToken.sol";
 import "../interfaces/IRoleManager.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
 
-string constant TAG = "Controller";
-
+/**
+ * @title Controller
+ * @notice Controller is used to store all the CE tokens addresses.
+ **/
 contract Controller is ContextUpgradeable {
     address public roleManager;
     address[] public ceTokens;
@@ -28,6 +30,10 @@ contract Controller is ContextUpgradeable {
         _disableInitializers();
     }
 
+    /**
+     * @notice Initilize the contract.
+     * @param roleManagerAddress - The EOA of role manager.
+     **/
     function initialize(
         address roleManagerAddress
     ) public initializer {
@@ -35,10 +41,18 @@ contract Controller is ContextUpgradeable {
         roleManager = roleManagerAddress;
     }
 
+    /**
+     * @notice Sets the roleManager address.
+     * @param roleManagerAddress - Role manager address.
+     **/
     function setRoleManager(address roleManagerAddress) external onlyRole(IRoleManager(roleManager).DEFAULT_ADMIN_ROLE()) {
         roleManager = roleManagerAddress;
     }
 
+    /**
+     * @notice Adds CE token to the array.
+     * @param _ceTokens - Arrays of CE token.
+     **/
     function addCEToken(address[] memory _ceTokens) external onlyRole(IRoleManager(roleManager).SET_CONTROLLER_METHOD()) {
         for (uint256 i; i < _ceTokens.length; i++) {
             if (!ceTokenExist[_ceTokens[i]]) {
@@ -48,6 +62,10 @@ contract Controller is ContextUpgradeable {
         }
     }
 
+    /**
+     * @notice Remove CE token from the array.
+     * @param _ceToken - Address of CE token.
+     **/
     function removeCEToken(address _ceToken) external onlyRole(IRoleManager(roleManager).SET_CONTROLLER_METHOD()) {
         address lastElement = ceTokens[ceTokens.length - 1];
         for (uint256 i; i < ceTokens.length; i++) {
@@ -60,6 +78,10 @@ contract Controller is ContextUpgradeable {
         }
     }
 
+    /**
+     * @notice Delay user's token tranfer.
+     * @param user - Address of user.
+     **/
     function cageUser(address user) external onlyRole(IRoleManager(roleManager).SET_CONTROLLER_METHOD()) {
         for (uint256 i; i < ceTokens.length; i++) {
             ICEToken(ceTokens[i]).setTransferBlockRelease(user, 2 ** 256 - 1);
@@ -67,6 +89,10 @@ contract Controller is ContextUpgradeable {
         emit CagedUser(user);
     }
 
+    /**
+     * @notice Remove the delay on user's token tranfer.
+     * @param user - Address of user.
+     **/
     function releaseCage(address user) external onlyRole(IRoleManager(roleManager).SET_CONTROLLER_METHOD()) {
         for (uint256 i; i < ceTokens.length; i++) {
             ICEToken(ceTokens[i]).setTransferBlockRelease(user, block.number);

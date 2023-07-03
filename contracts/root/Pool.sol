@@ -15,14 +15,11 @@ import "./interfaces/IRoleManager.sol";
 import "./libraries/Data.sol";
 import "../utils/ERC2771ContextUpgradeable.sol";
 
-string constant TAG = "Pool";
-
 /**
- * Title Pool
- * Pool is deployed on a single chain
- * All the Branches are connected to Pool, all of which sends deposit and repay information
- * to Pool
- * Users interact with Pool for Borrow, Withdraw, and Liquidate actions
+ * @title Pool
+ * @notice Pool is deployed on a single chain
+ * @notice All the Branches are connected to Pool, all of which sends deposit and repay information to Pool
+ * @notice Users interact with Pool for Borrow, Withdraw, and Liquidate actions
  **/
 contract Pool is
     Initializable,
@@ -43,14 +40,16 @@ contract Pool is
     address public adapter;
     address public roleManager;
 
-    // key: [poolId][chainId]
-    // poolId = keccak256("USDC")
-    // chainId = keccak256("FTM")
-    // Pool and chain level pause
+    /** 
+    * @notice key: [poolId][chainId]
+    * @notice poolId = keccak256("USDC")
+    * @notice chainId = keccak256("FTM")
+    * @notice Pool and chain level pause
+    */
     mapping(bytes32 => mapping(bytes32 => bool)) public withdrawPause;
     mapping(bytes32 => mapping(bytes32 => bool)) public borrowPause;
 
-    // Protocol level pause for all pools and chains
+    //Protocol level pause for all pools and chains
     bool public protocolPause;
 
     bool public feeEnable;
@@ -74,6 +73,11 @@ contract Pool is
         _disableInitializers();
     }
 
+    /**
+     * @notice Initilize the contract.
+     * @param forwarder - The address of forwarder contract.
+     * @param roleManagerAddress - The EOA of role manager.
+     **/
     function initialize(
         address forwarder,
         address roleManagerAddress
@@ -83,38 +87,67 @@ contract Pool is
         roleManager = roleManagerAddress;
     }
 
-    // Set contract addresses
+    /**
+     * @notice Configures role manager address
+     * This function can only be accessed by account with role DEFAULT_ADMIN_ROLE.
+     * @param roleManagerAddress - address of the roleManager contract.
+     **/    
     function setRoleManager(
         address roleManagerAddress
     ) external onlyRole(IRoleManager(roleManager).DEFAULT_ADMIN_ROLE()) {
         roleManager = roleManagerAddress;
     }
 
+    /**
+     * @notice Configures fee provider contract.
+     * This function can only be accessed by the account with role SET_POOL_METHOD
+     * @param feeProviderAddress - address of the fee provider contract.
+     **/
     function setFeeProvider(
         address feeProviderAddress
     ) external onlyRole(IRoleManager(roleManager).SET_POOL_METHOD()) {
         feeProvider = feeProviderAddress;
     }
 
+    /**
+     * @notice Configures core contract.
+     * This function can only be accessed by the account with role SET_POOL_METHOD
+     * @param coreAddress - address of the fee provider contract.
+     **/
     function setCore(
         address coreAddress
     ) external onlyRole(IRoleManager(roleManager).SET_POOL_METHOD()) {
         core = coreAddress;
     }
 
+    /**
+     * @notice Configures adapter contract.
+     * This function can only be accessed by the account with role SET_POOL_METHOD
+     * @param adapterAddress - address of the adapter contract.
+     **/
     function setAdapter(
         address adapterAddress
     ) external onlyRole(IRoleManager(roleManager).SET_POOL_METHOD()) {
         adapter = adapterAddress;
     }
 
+    /**
+     * @notice Sets the forwarder address.
+     * @param forwarderAddress - Forwarder address.
+     **/
     function setForwarder(
         address forwarderAddress
     ) external onlyRole(IRoleManager(roleManager).SET_POOL_METHOD()) {
         _setTrustedForwarder(forwarderAddress);
     }
 
-    // Pausing methods
+    /**
+     * @notice Configures pool status for withdraw
+     * This function can only be accessed by the account with role PROTOCOL_PAUSE
+     * @param id - pool id of the asset.
+     * @param chainId - id of the chain to withdraw asset from.
+     * @param status - status of the pool.
+     **/    
     function setWithdrawPause(
         bytes32 id,
         bytes32 chainId,
@@ -123,6 +156,13 @@ contract Pool is
         withdrawPause[id][chainId] = status;
     }
 
+    /**
+     * @notice Configures pool status for borrow
+     * This function can only be accessed by the account with role PROTOCOL_PAUSE
+     * @param id - pool id of the asset.
+     * @param chainId - id of the chain to borrow asset from.
+     * @param status - status of the pool.
+     **/  
     function setBorrowPause(
         bytes32 id,
         bytes32 chainId,
@@ -131,6 +171,10 @@ contract Pool is
         borrowPause[id][chainId] = status;
     }
 
+    /**
+     * @notice Toggles the status of the protocol on and off.
+     * This function can only be accessed by the account with role PROTOCOL_PAUSE
+     **/ 
     function toggleProtocolStatus()
         external
         onlyRole(IRoleManager(roleManager).PROTOCOL_PAUSE())
@@ -138,7 +182,10 @@ contract Pool is
         protocolPause = !protocolPause;
     }
 
-    // Enable fee for borrow and withdraw tx
+    /**
+     * @notice Configures fee status.
+     * This function can only be accessed by the account with role SET_POOL_METHOD
+     **/ 
     function toggleFeeEnable()
         external
         onlyRole(IRoleManager(roleManager).SET_POOL_METHOD())
@@ -146,6 +193,17 @@ contract Pool is
         feeEnable = !feeEnable;
     }
 
+    /**
+     * @notice Sends a withdraw request of amount `ceAmount` to address `to` from pool with pool id `id`
+     * in chain with chain id `chainId` to core contract
+     * This function can be accessed by anyone
+     * @param id - pool id of pool to withdraw from
+     * @param chainId - chain id of chain to withdraw from
+     * @param ceAmount - amount to withdraw
+     * @param to - withdraw address
+     * @param route - communication protocol
+     * @param airdropAmount - amount to be airdropped to destination chain
+     **/
     function withdraw(
         bytes32 id,
         bytes32 chainId,
@@ -203,6 +261,17 @@ contract Pool is
         emit Data.SendToken(_bytesToAddress(to), id, tokenAmount);
     }
 
+    /**
+     * @notice Sends a borrow request of amount `tokenAmount` to address `to` from pool with pool id `id`
+     * in chain with chain id `chainId` to core contract
+     * This function can be accessed by anyone
+     * @param id - pool id of pool to borrow from
+     * @param chainId - chain id of chain to borrow from
+     * @param tokenAmount - amount to borrow
+     * @param to - borrow address
+     * @param route - communication protocol
+     * @param airdropAmount - amount to be airdropped to destination chain
+     **/
     function borrow(
         bytes32 id,
         bytes32 chainId,
@@ -257,6 +326,14 @@ contract Pool is
         emit Data.SendToken(_bytesToAddress(to), id, tokenAmount);
     }
 
+    /**
+     * @notice Used to repay a borrowed asset.
+     * @param id - The pool id.
+     * @param chainId - The chainid of the branch contract.
+     * @param user - The repayer's address.
+     * @param tokenAmount - The repay amount.
+     * @param route - The route to use.
+     **/
     function _repay(
         bytes32 id,
         bytes32 chainId,
@@ -271,6 +348,14 @@ contract Pool is
         emit Data.ReceiveToken(user, id, tokenAmount);
     }
 
+    /**
+     * @notice Used to deposit asset to the pool.
+     * @param id - The pool id.
+     * @param chainId - The chainid of the branch contract.
+     * @param user - The depositors address.
+     * @param tokenAmount - The deposit amount.
+     * @param route - The route to use.
+     **/
     function _deposit(
         bytes32 id,
         bytes32 chainId,
@@ -283,6 +368,13 @@ contract Pool is
         emit Data.ReceiveToken(user, id, tokenAmount);
     }
 
+    /**
+     * @notice Executes the function according to the request type in the payload
+     * This function can only be accessed by the account with role ADAPTER
+     * @param _payload - information of pool id, user and token amount
+     * @param chainId - chain id of the source chain
+     * @param route - communication protocol through which payload is received
+     **/
     function execute(
         bytes memory _payload,
         bytes32 chainId,
@@ -313,6 +405,10 @@ contract Pool is
         }
     }
 
+    /**
+     * @notice Converts bytes32 to address
+     * @param bys - The bytes32 data
+    **/
     function _bytesToAddress(bytes32 bys) private pure returns (address addr) {
         return address(uint160(uint256(bys)));
     }

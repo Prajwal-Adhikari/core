@@ -12,8 +12,6 @@ interface IERC20 {
     function decimals() external view returns (uint8);
 }
 
-string constant TAG = "Oracle";
-
 interface DexRouter {
     function getAmountsOut(
         uint amountIn,
@@ -21,6 +19,10 @@ interface DexRouter {
     ) external view returns (uint[] memory amounts);
 }
 
+/**
+* @title Oracle contract
+* @notice Used to get real time price of an asset
+**/
 contract Oracle is Initializable, ContextUpgradeable {
     uint8 public constant ROOT_DECIMALS = 18;
 
@@ -56,16 +58,31 @@ contract Oracle is Initializable, ContextUpgradeable {
         _disableInitializers();
     }
 
+    /**
+     * @notice Initilize the contract.
+     * @param roleManagerAddress - The EOA of role manager.
+     **/
     function initialize(address roleManagerAddress) public initializer {
         roleManager = roleManagerAddress;
     }
 
+    /**
+     * @notice Configures role manager address
+     * This function can only be accessed by the account with role DEFAULT_ADMIN_ROLE.
+     * @param roleManagerAddress - address of the roleManager contract.
+     **/
     function setRoleManager(
         address roleManagerAddress
     ) external onlyRole(IRoleManager(roleManager).DEFAULT_ADMIN_ROLE()) {
         roleManager = roleManagerAddress;
     }
 
+    /**
+     * @notice Configures aggregator address for a asset `_id` managed by Chainlink
+     * This function can only be accessed by the account with role SET_ORACLE_METHOD.
+     * @param _id - pool id of the asset
+     * @param _aggregator - address of the aggregator
+     **/
     function setAggregator(
         bytes32 _id,
         address _aggregator
@@ -73,6 +90,12 @@ contract Oracle is Initializable, ContextUpgradeable {
         aggregator[_id] = _aggregator;
     }
 
+    /**
+    * @notice Configures token address for asset with pool id `_id` 
+    * This function can only be accessed by the account with role SET_ORACLE_METHOD.
+    * @param _id - pool id of the asset
+    * @param _assetAddress - address of the token
+    **/
     function setAssetAddress(
         bytes32 _id,
         address _assetAddress
@@ -80,6 +103,13 @@ contract Oracle is Initializable, ContextUpgradeable {
         assetAddress[_id] = _assetAddress;
     }
 
+    /**
+    * @notice Configures stable coin id to be assosciated with asset with pool id `id` 
+    * which will be used as a pair for calculating price of that asset from the dex
+    * This function can only be accessed by the account with role SET_ORACLE_METHOD.
+    * @param _id - pool id of the asset
+    * @param _stable - pool id of the stable coin.
+    **/
     function setStableCoinId(
         bytes32 _id,
         bytes32 _stable
@@ -87,6 +117,12 @@ contract Oracle is Initializable, ContextUpgradeable {
         stableCoinId[_id] = _stable;
     }
 
+    /**
+    * @notice Configures if the asset is a stable coin or not
+    * This function can only be accessed by the account with role SET_ORACLE_METHOD.
+    * @param _id - pool id of the asset
+    * @param _status - true if its a stable coin
+    **/
     function setStableCoinStatus(
         bytes32 _id,
         bool _status
@@ -94,12 +130,23 @@ contract Oracle is Initializable, ContextUpgradeable {
         isStableCoin[_id] = _status;
     }
 
+    /**
+     * @notice Configures router address of the dex
+     * This function can only be accessed by the account with role SET_ORACLE_METHOD.
+     * @param _dexFactoryAddress - address of the dex factory contract.
+     **/
     function setDexFactoryAddress(
         address _dexFactoryAddress
     ) external onlyRole(IRoleManager(roleManager).SET_ORACLE_METHOD()) {
         dexFactoryAddress = _dexFactoryAddress;
     }
 
+    /**
+     * @notice Sets fee and time interval.
+     * @param _id - Pool id of the asset.
+     * @param _fee - Fee.
+     * @param _timeInterval - Time interval.
+     **/
     function setFeeAndTimeInterval(
         bytes32 _id,
         uint24 _fee,
@@ -110,6 +157,12 @@ contract Oracle is Initializable, ContextUpgradeable {
         timeInterval[_id] = _timeInterval;
     }
 
+    /**
+    * @notice Configures if the asset's price is to be fetched from dex or chainlink
+    * This function can only be accessed by the account with role SET_ORACLE_METHOD.
+    * @param _id - pool id of the asset
+    * @param _status - true if to be fetched from dex
+    **/
     function setPriceSource(
         bytes32 _id,
         bool _status
@@ -117,6 +170,10 @@ contract Oracle is Initializable, ContextUpgradeable {
         fetchFromDex[_id] = _status;
     }
 
+    /**
+    * @notice Returns price of assets
+    * @param _symbols - list of the asset's pool id
+    **/
     function getPrices(
         bytes32[] memory _symbols
     ) external view returns (uint256[] memory results) {
@@ -138,6 +195,10 @@ contract Oracle is Initializable, ContextUpgradeable {
         }
     }
 
+    /**
+    * @notice Returns price of an asset
+    * @param _symbol - pool id of the asset
+    **/
     function getSinglePrice(
         bytes32 _symbol
     ) external view returns (uint256 result) {
@@ -155,7 +216,10 @@ contract Oracle is Initializable, ContextUpgradeable {
             
         }
     
-
+    /**
+    * @notice Returns price of the asset fetched from chainlink aggregator
+    * @param _symbol - pool id of the asset
+    **/
     function getPriceFromChainlink(
         bytes32 _symbol
     ) public view returns (uint256) {
@@ -191,6 +255,10 @@ contract Oracle is Initializable, ContextUpgradeable {
         return quotePrice;
     }
 
+    /**
+    * @notice Returns price of the asset fetched from dex
+    * @param _symbol - pool id of the asset
+    **/
     function getPriceFromDex(
         bytes32 _symbol
     ) public view returns (uint256) {

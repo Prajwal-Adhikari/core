@@ -15,7 +15,6 @@ async function main() {
     this.route = await hre.ethers.getContractAt("LzRoutePool", deployed.route);
     let fees = await this.route.estimateFees(FTM,1);
     console.log(fees);
-    
     await this.pool.borrow(FTM, FTM, toTokenAmount(2), ethers.utils.hexZeroPad(ethers.utils.getAddress( owner ), 32), LZO, 0, {value: fees});
 
 }

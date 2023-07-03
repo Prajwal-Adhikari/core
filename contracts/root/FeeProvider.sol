@@ -6,11 +6,9 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "./interfaces/ICore.sol";
 import "./interfaces/IRoleManager.sol";
 
-string constant TAG = "FeeProvider";
-
 /**
- * Title FeeProvider
- * Pool interact with FeeProvider for getting fee and reward amount.
+ * @title FeeProvider
+ * @notice Pool interact with FeeProvider for getting fee and reward amount.
  **/
 contract FeeProvider is Initializable, ContextUpgradeable {
     using SafeMathUpgradeable for uint256;
@@ -37,24 +35,43 @@ contract FeeProvider is Initializable, ContextUpgradeable {
         _disableInitializers();
     }
 
+    /**
+     * @notice Initilize the contract.
+     * @param roleManagerAddress - The EOA of role manager.
+     **/
     function initialize(address roleManagerAddress) public initializer {
         roleManager = roleManagerAddress;
     }
 
-    // Set contract addresses
+    /**
+     * @notice Configures role manager address
+     * This function can only be accessed by the account with role DEFAULT_ADMIN_ROLE.
+     * @param roleManagerAddress - address of the roleManager contract.
+     **/   
     function setRoleManager(
         address roleManagerAddress
     ) external onlyRole(IRoleManager(roleManager).DEFAULT_ADMIN_ROLE()) {
         roleManager = roleManagerAddress;
     }
 
+    /**
+     * @notice Sets core contract.
+     * This function can only be accessed by the account with role SET_FEEPROVIDER_METHOD.
+     * @param coreAddress address of the core.
+     **/
     function setCore(
         address coreAddress
     ) external onlyRole(IRoleManager(roleManager).SET_FEEPROVIDER_METHOD()) {
         core = coreAddress;
     }
 
-    // Set different factors
+    /**
+     * @notice Configures Optimal Global Liquidity Factor.
+     * This function can only be accessed by the account with role SET_FEEPROVIDER_METHOD.
+     * @param chainId - ids of the chain.
+     * @param poolId - ids of the pool.
+     * @param liquidityFactor - optimal global liquidity factor for each pool in diff chain.
+     **/
     function configureOptimalGlobalLiquidityFactor(
         bytes32[] memory chainId,
         bytes32[] memory poolId,
@@ -73,6 +90,13 @@ contract FeeProvider is Initializable, ContextUpgradeable {
         }
     }
 
+    /**
+     * @notice Configures Base Global Liquidity Factor.
+     * This function can only be accessed by the account with role SET_FEEPROVIDER_METHOD.
+     * @param chainId - ids of the chain.
+     * @param poolId - ids of the pool.
+     * @param baseFee - base fee for each pool in diff chain.
+     **/
     function configureBaseFee(
         bytes32[] memory chainId,
         bytes32[] memory poolId,
@@ -89,6 +113,13 @@ contract FeeProvider is Initializable, ContextUpgradeable {
         }
     }
 
+    /**
+    * @notice Configures upper limit of the fee for withdraw. 
+    * This function can only be accessed by the account with role SET_FEEPROVIDER_METHOD.
+    * @param chainId - ids of the chain.
+    * @param poolId - ids of the pool.
+    * @param maxFee - upper limit of fee for each pool in diff chain.
+    **/
     function configureMaxFee(
         bytes32[] memory chainId,
         bytes32[] memory poolId,
@@ -105,6 +136,11 @@ contract FeeProvider is Initializable, ContextUpgradeable {
         }
     }
 
+    /**
+     * @notice Returns the amount of fee while withdrawing/borrowing an asset from a chain
+     * @param chainId - id of the chain.
+     * @param poolId - id of the pool.
+     **/
     function getFeeAmount(
         bytes32 chainId,
         bytes32 poolId

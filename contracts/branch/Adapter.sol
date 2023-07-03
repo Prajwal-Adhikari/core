@@ -6,12 +6,10 @@ import "./interfaces/IRoute.sol";
 import "./interfaces/IBranch.sol";
 import "./interfaces/IRoleManager.sol";
 
-string constant TAG = "Adapter";
-
 /**
- * Title AdapterBranch
- * Branch interact with Adapter pass message through desired route
- * Route interact with Adapter to call methods of Branch.
+ * @title AdapterBranch
+ * @notice Branch interact with Adapter pass message through desired route
+ * @notice Route interact with Adapter to call methods of Branch.
  **/
 contract AdapterBranch is Initializable, ContextUpgradeable {
 
@@ -38,20 +36,40 @@ contract AdapterBranch is Initializable, ContextUpgradeable {
         _disableInitializers();
     }
 
+    /**
+     * @notice Sets the roleManager address.
+     * @param roleManagerAddress - Role manager address.
+     **/
     function initialize(address roleManagerAddress) public initializer {
         roleManager = roleManagerAddress;
     }
 
+    /**
+     * @notice Configures role manager address
+     * This function can only be accessed by the account with role DEFAULT_ADMIN_ROLE.
+     * @param roleManagerAddress - address of the roleManager contract.
+     **/
     function setRoleManager(address roleManagerAddress) external onlyRole(IRoleManager(roleManager).DEFAULT_ADMIN_ROLE()){
         roleManager = roleManagerAddress;
     }
 
+    /**
+     * @notice Configures branch contract.
+     * This function can only be accessed by account with role SET_ADAPTER_METHOD.
+     * @param branchAddress - address of the branch contract.
+     **/
     function setBranch(
         address branchAddress
     ) external onlyRole(IRoleManager(roleManager).SET_ADAPTER_METHOD()) {
         branch = branchAddress;
     }
 
+    /**
+     * @notice Configures route address for corresponding route.
+     * This function can only be accessed by account with role SET_ADAPTER_METHOD.
+     * @param route - name of the route
+     * @param routeAddress - address of the route contract.
+     **/
     function setRoute(
         bytes32 route,
         address routeAddress
@@ -60,6 +78,14 @@ contract AdapterBranch is Initializable, ContextUpgradeable {
         router[route] = routeAddress;
     }
 
+    /**
+     * @notice Sends payload from branch to selected route.
+     * This function can only be accessed by account with role BRANCH.
+     * @param payload - information to be passed
+     * @param sender - address of the user
+     * @param airdropAmount - amount to be sent to the destination chain
+     * @param route - communication protocol
+     **/
     function send(
         bytes memory payload,
         address sender,
@@ -75,6 +101,11 @@ contract AdapterBranch is Initializable, ContextUpgradeable {
         );
     }
 
+    /**
+     * @notice Sends payload from route to branch.
+     * This function can only be accessed by account with role ROUTE.
+     * @param payload - information of token amount and receipient.
+     **/
     function execute(
         bytes memory payload
     ) external onlyRole(IRoleManager(roleManager).ROUTE()) {

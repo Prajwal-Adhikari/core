@@ -12,17 +12,13 @@ import "./interfaces/IStargateEthVault.sol";
 import "./interfaces/IRoleManager.sol";
 import "../utils/ERC2771ContextUpgradeable.sol";
 
-string constant TAG = "Branch";
-
 /**
- * Title Branch
- * Branch is deployed on all the chains Cedro supports.
- * It hosts the liquidity pools for all the pools listed in Cedro on that chain.
- * All the Branches are connected to Root, all of which sends deposit and repay information
- * to Root.
- * Users interact with Branch for Deposit and Repay actions.
+ * @title Branch
+ * @notice Branch is deployed on all the chains Cedro supports.
+ * @notice It hosts the liquidity pools for all the pools listed in Cedro on that chain.
+ * @notice All the Branches are connected to Root, all of which sends deposit and repay information to Root.
+ * @notice Users interact with Branch for Deposit and Repay actions.
  **/
-
 contract Branch is
     Initializable,
     ReentrancyGuardUpgradeable,
@@ -64,12 +60,6 @@ contract Branch is
     // Protocol level pause for all pools
     bool public protocolPause;
 
-    /**
-     * Mapping LayerZero's chain id to Cedro's chain id for a chain
-     * Example: 10112 ->  keccak256("FTM")
-     **/
-    mapping(uint16 => bytes32) public chainId;
-
     event SendToken(address user, bytes32 id, uint256 tokenAmount);
     event ReceiveToken(address user, bytes32 id, uint256 tokenAmount);
     event Deposit(
@@ -100,6 +90,11 @@ contract Branch is
         _disableInitializers();
     }
 
+    /**
+     * @notice Sets the roleManager address.
+     * @param forwarder - Address of the forwarder.
+     * @param roleManagerAddress - Role manager address.
+     **/
     function initialize(
         address forwarder,
         address roleManagerAddress
@@ -117,19 +112,34 @@ contract Branch is
         _;
     }
 
-    // Set contract addresses
+    /**
+     * @notice Configures role manager address
+     * This function can only be accessed by the account with role DEFAULT_ADMIN_ROLE.
+     * @param roleManagerAddress - address of the roleManager contract.
+     **/
     function setRoleManager(
         address roleManagerAddress
     ) external onlyRole(IRoleManager(roleManager).DEFAULT_ADMIN_ROLE()) {
         roleManager = roleManagerAddress;
     }
 
+    /**
+     * @notice Configures adapter contract.
+     * This function can only be accessed by account with role SET_BRANCH_METHOD.
+     * @param adapterAddress - address of the adapter contract.
+     **/
     function setAdapter(
         address adapterAddress
     ) external onlyRole(IRoleManager(roleManager).SET_BRANCH_METHOD()) {
         adapter = adapterAddress;
     }
 
+    /**
+     * @notice Configures router address for swap.
+     * This function can only be accessed by account with role SET_BRANCH_METHOD.
+     * @param routerAddress - address of the  Stargate router contract.
+     * @param vaultAddress - address of the  Stargate vault contract.
+     **/
     function setStargateRouterAndVault(
         address routerAddress,
         address vaultAddress
@@ -138,12 +148,23 @@ contract Branch is
         stargateEthVault = vaultAddress;
     }
 
+    /**
+     * @notice Sets the forwarder address.
+     * @param forwarderAddress - Forwarder address.
+     **/
     function setForwarder(
         address forwarderAddress
     ) external onlyRole(IRoleManager(roleManager).SET_BRANCH_METHOD()) {
         _setTrustedForwarder(forwarderAddress);
     }
 
+    /**
+     * @notice Configures pool for an asset
+     * This function can only be accessed by account with role SET_POOL.
+     * @param id - pool id for the asset.
+     * @param token - address of the asset.
+     * @param enable - status of the pool
+     **/
     function setPool(
         bytes32 id,
         address token,
@@ -154,7 +175,12 @@ contract Branch is
         pool.token = token;
     }
 
-    // Methods to set pause
+    /**
+     * @notice Configures pool status for deposit
+     * This function can only be accessed by account with role PROTOCOL_PAUSE.
+     * @param id - pool id of the asset.
+     * @param status - status of the pool.
+     **/    
     function setDepositPause(
         bytes32 id,
         bool status
@@ -162,6 +188,12 @@ contract Branch is
         depositPause[id] = status;
     }
 
+    /**
+     * @notice Configures pool status for repay
+     * This function can only be accessed by account with role PROTOCOL_PAUSE.
+     * @param id - pool id of the asset.
+     * @param status - status of the pool.
+     **/
     function setRepayPause(
         bytes32 id,
         bool status
@@ -169,6 +201,10 @@ contract Branch is
         repayPause[id] = status;
     }
 
+    /**
+     * @notice Toggles the status of the protocol on and off.
+     * This function can only be accessed by account with role PROTOCOL_PAUSE.
+     **/
     function toggleProtocolStatus()
         external
         onlyRole(IRoleManager(roleManager).PROTOCOL_PAUSE())
@@ -176,13 +212,14 @@ contract Branch is
         protocolPause = !protocolPause;
     }
 
-    function setChainId(
-        bytes32 chainID, // Cedro's chain id
-        uint16 id // LayerZero chain id
-    ) external onlyRole(IRoleManager(roleManager).SET_BRANCH_METHOD()) {
-        chainId[id] = chainID;
-    }
-
+    /**
+     * @notice Sends deposit information message to the Root.
+     * This function can be accessed by the user.
+     * @param id - pool id of the pool of the deposited amount
+     * @param amount - amount deposited in the pool
+     * @param route - communication protocol
+     * @param  airdropAmount - amount to be airdropped to destination chain
+     **/ 
     function depositRequest(
         bytes32 id,
         uint256 amount,
@@ -200,6 +237,14 @@ contract Branch is
         emit SendToken(_msgSender(), id, amount);
     }
 
+    /**
+     * @notice Sends repay information message to the Root.
+     * This function can be accessed by the user.
+     * @param id - pool id of the pool of the repaid amount
+     * @param amount - amount repaid in the pool
+     * @param route - communication protocol
+     * @param  airdropAmount - amount to be airdropped to destination chain
+     **/  
     function repayRequest(
         bytes32 id,
         uint256 amount,
@@ -217,6 +262,17 @@ contract Branch is
         emit SendToken(_msgSender(), id, amount);
     }
 
+   /**
+     * @notice Swaps liquidity across chain
+     * This function can only be accessed by account with role SWAP.
+     * @param qty - amount to be swapped
+     * @param id - id of the pool
+     * @param dstChainId - chain id of destination
+     * @param srcPoolId - pool id of source token in Stargate
+     * @param dstPoolId - pool id of destination token in Stargate
+     * @param destination - address of the receiver     
+     * @param amountMin - The minimum amount to receive.
+     **/  
     function swapRequest(
         uint256 qty,
         bytes32 id,
@@ -252,6 +308,13 @@ contract Branch is
         );
     }
 
+    /**
+     * @notice Emergency function to withdraw liquidity if case of any exploit
+     * This function can only be accessed by account with role EMERGENCY_WITHDRAW.
+     * @param id - token address to withdraw
+     * @param amount - amount of token to withdraw
+     * @param to - receipient address
+     **/ 
     function emergencyWithdraw(
         bytes32 id,
         uint256 amount,
@@ -267,6 +330,11 @@ contract Branch is
         }
     }
 
+    /**
+     * @notice Transfers token to the user.
+     * This function can only be accessed by account with role ADAPTER.
+     * @param payload - information containing token amount and receipient.
+     **/
     function transferToken(
         bytes memory payload
     ) external onlyRole(IRoleManager(roleManager).ADAPTER()) {
@@ -367,6 +435,10 @@ contract Branch is
         }
     }
 
+    /**
+     * @notice Converts address to bytes32
+     * @param addr - token address to withdraw
+     **/
     function addressToBytes32(address addr) public pure returns (bytes32) {
         bytes32 result;
         assembly {
@@ -388,6 +460,12 @@ contract Branch is
         }
     }
 
+    /**
+     * @dev Combines the amount sent from the payload.
+     * @param _amountpx The amount sent from payload.
+     * @param _amountsx The amount sent from payload.
+     * @param _token The token address.
+     **/
     function _buildLocalAmount(
         uint256 _amountpx,
         uint256 _amountsx,
@@ -422,6 +500,11 @@ contract Branch is
         amountsx = uint64(_localAmount % BASE);
     }
 
+    /**
+     * @dev Get the amount to transfer in cross chain transactions.
+     * @param _localAmount the amount to transfer in source chain.
+     * @param _token the token to transfer.
+     **/
     function _getPayAmount(
         uint256 _localAmount,
         address _token 

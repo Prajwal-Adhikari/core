@@ -9,6 +9,7 @@ interface IBranch {
      * This function can only be accessed by the account with role DEFAULT_ADMIN_ROLE.
      * @param roleManagerAddress - address of the roleManager contract.
      **/
+    function setRoleManager(address roleManagerAddress) external;
 
     /**
      * @notice Configures pool for an asset
