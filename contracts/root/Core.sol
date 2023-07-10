@@ -359,8 +359,7 @@ contract Core is Initializable, ContextUpgradeable {
         Data.HealthData memory healthData = healthFactor(user);
         if(
             healthData.collateralValue.mul(params.ltv).div(1e18) <
-                healthData.debtValue.add(
-                    tokenAmount.mul(params.price).div(1e18))
+                healthData.debtValue
         )
             revert LTVCheckFailed(9, chainId, id, tokenAmount);
 
