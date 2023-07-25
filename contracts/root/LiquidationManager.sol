@@ -173,7 +173,7 @@ contract LiquidationManager is
         );
 
         uint256 discount;
-        uint256 liqPercent = 0;
+        uint256 liqPercent = 1e18;
         if (currentLTV < 1e18) {
             discount = 1e36 / currentLTV - 999000000000000000;
             if (discount > config.liqMaxDiscount) {
