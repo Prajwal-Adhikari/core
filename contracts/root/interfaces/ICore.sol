@@ -44,19 +44,37 @@ interface ICore {
     ) external returns (uint256);
 
     /**
-     * @notice Sends a withdraw request of amount `ceAmount` to address `user` from pool with pool id `id`
-     * in chain with chain id `chainId`.
+     * @notice Sends a withdraw request of amount `tokenAmount` to address `user` from pool with pool id `id`
+     * in chain with chain id `chainId` 
      * This function can only be accessed by account with role POOL.
      * @param id - pool id of pool to withdraw from
      * @param chainId - chain id of chain to withdraw from
-     * @param ceAmount - amount to withdraw
+     * @param tokenAmount - amount to withdraw
      * @param user - withdraw address
      * @param all - withdraw all
      **/
     function withdraw(
         bytes32 id,
         bytes32 chainId,
-        uint256 ceAmount,
+        uint256 tokenAmount,
+        address user,
+        bool all
+    ) external returns (uint256);
+
+    /**
+     * @notice Sends a withdraw request of amount `tokenAmount` of dead tokens to address `user` from pool with pool id `id`
+     * in chain with chain id `chainId`
+     * This function can only be accessed by account with role POOL.
+     * @param id - pool id of pool to withdraw from
+     * @param chainId - chain id of chain to withdraw from
+     * @param tokenAmount - amount to withdraw
+     * @param user - withdraw address
+     * @param all - withdraw all
+     **/
+    function withdrawDeadTokens(
+        bytes32 id,
+        bytes32 chainId,
+        uint256 tokenAmount,
         address user,
         bool all
     ) external returns (uint256);

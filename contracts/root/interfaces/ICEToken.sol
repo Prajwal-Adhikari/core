@@ -55,6 +55,15 @@ interface ICEToken is IERC20 {
     function mint(address to, uint256 amount) external;
 
     /**
+     * @notice Mints ceToken to address `to`.
+     * This function can only be accessed by the account with role MINT_BURN_CE_DEBT_TOKEN.
+     * @param to - address of the receipient.
+     * @param amount - amount of the token.
+     * @param chainId - key for the chain
+     **/
+    function mintInChain(address to, uint256 amount, bytes32 chainId) external;
+
+    /**
      * @notice Burns ceToken from address `from`.
      * This function can only be accessed by the account with role MINT_BURN_CE_DEBT_TOKEN.
      * @param from - address of the sender.
@@ -63,8 +72,45 @@ interface ICEToken is IERC20 {
     function burn(address from, uint256 amount) external;
 
     /**
+     * @notice Burns ceToken to address `from`.
+     * This function can only be accessed by the account with role MINT_BURN_CE_DEBT_TOKEN.
+     * @param from - address of the sender.
+     * @param amount - amount of the token.
+     * @param chainId - key for the chain
+     **/
+    function burnFromChain(address from, uint256 amount, bytes32 chainId) external;
+
+    /**
+     * @notice Burns ceToken from address `from` i.e borrower and mints to `to` i.e liquidator
+     * This function can only be accessed by the account with role LIQUIDATION_MANAGER.
+     * @param from - address of the borrower.
+     * @param to - address of liquidator
+     * @param amount - amount of the token.
+     **/
+    function liquidate(address from, address to, uint256 amount) external;
+
+    /**
      * @notice Get the balance from address `user` before scaled.
      * @param user - address of the user
      **/
     function balanceBeforeScaled(address user) external view returns (uint256);
+
+    /**
+     * @notice Get the balance from address `user` before scaled deducting the dead token balance.
+     * @param user - address of the user
+     **/
+    function balanceBeforeScaledExcludingDeadTokens(address user) external view returns (uint256);
+
+    /**
+     * @notice Get the balance of ceToken from address `user` in a particular chain
+     * @param user - address of the user
+     * @param chainId - key for the chain
+     **/
+    function balancePerChain(address user, bytes32 chainId) external view returns (uint256);
+
+    /**
+     * @notice Get the status of the chain
+     * @param chainId - key for the chain
+     **/
+    function isChainDead(bytes32 chainId) external view returns (bool);
 }

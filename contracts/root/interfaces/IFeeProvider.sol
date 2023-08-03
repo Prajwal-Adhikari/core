@@ -61,9 +61,11 @@ interface IFeeProvider {
      * @notice Returns the amount of fee while withdrawing/borrowing an asset from a chain
      * @param _chainId - id of the chain.
      * @param _poolId - id of the pool.
+     * @param _amount - amount of tokens deposited or withdrawn
      **/
     function getFeeAmount(
         bytes32 _chainId,
-        bytes32 _poolId
+        bytes32 _poolId,
+        uint256 _amount
     ) external view returns (uint256);
 }

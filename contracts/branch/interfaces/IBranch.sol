@@ -62,14 +62,6 @@ interface IBranch {
     function toggleProtocolStatus() external;
 
     /**
-     * @notice Toggles the status of the swap through Stargate
-     * This function can only be accessed by account with role SWAP.
-
-     **/
-
-    function toggleSwapStatus() external;
-
-    /**
      * @notice Configures name of the chain corresponding to chain id.
      * This function can only be accessed by account with role SET_BRANCH_METHOD.
      * @param chainID - Cedro's chain id
@@ -116,8 +108,7 @@ interface IBranch {
      * @param srcPoolId - pool id of source token in Stargate
      * @param dstPoolId - pool id of destination token in Stargate
      * @param destination - address of the receiver
-     * @param route - communication protocol
-     * @param fee - communication protocol fee
+     * @param amountMin - minimum amount to be received on destination chain
      **/
     function swapRequest(
         uint256 qty,
@@ -126,8 +117,7 @@ interface IBranch {
         uint16 srcPoolId,
         uint16 dstPoolId,
         address destination,
-        bytes32 route,
-        uint256 fee
+        uint256 amountMin
     ) external payable;
 
     /**

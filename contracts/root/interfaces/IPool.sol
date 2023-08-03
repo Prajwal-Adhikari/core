@@ -37,7 +37,7 @@ interface IPool {
      * This function can be accessed by anyone
      * @param id - pool id of pool to withdraw from
      * @param chainId - chain id of chain to withdraw from
-     * @param ceAmount - amount to withdraw
+     * @param tokenAmount - amount to withdraw
      * @param to - withdraw address
      * @param route - communication protocol
      * @param airdropAmount - amount to be airdropped to destination chain
@@ -45,7 +45,7 @@ interface IPool {
     function withdraw(
         bytes32 id,
         bytes32 chainId,
-        uint256 ceAmount,
+        uint256 tokenAmount,
         bytes32 to,
         bytes32 route,
         uint256 airdropAmount
