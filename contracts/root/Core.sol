@@ -42,9 +42,10 @@ contract Core is Initializable, ContextUpgradeable {
 
     error PoolNotEnabled(uint contractCode, bytes32 id);
     error NotEnoughLiquidity(uint contractCode, bytes32 chainId, bytes32 poolId, uint256 poolLiquidity, uint256 sentAmount);
-    error LTVCheckFailed(uint contractCode, bytes32 chainId, bytes32 poolId, uint256 tokenAmount);
+    error LTVCheckFailed(uint contractCode, bytes32 poolId, uint256 tokenAmount, uint256 collateralValue, uint256 debtValue);
     error HealthFactorCheckFailed(uint contractCode, address user);
     error InvalidSender(uint contractCode, address sender);
+    error ChainNotDead(uint contractCode, bytes32 chainId);
 
     /**
      * @dev Modifier that checks if caller has a specific role.
@@ -196,8 +197,6 @@ contract Core is Initializable, ContextUpgradeable {
             emit Data.MintToTreasury(id, tokenAmountTreasury, ceAmountTreasury);
         }
         pool.lastUpdateTime = block.timestamp;
-
-        // _;
     }
 
     /**
@@ -230,8 +229,8 @@ contract Core is Initializable, ContextUpgradeable {
             } else if(health.debtValue > 0) {
                 health.factor = MAX_HEALTH_FACTOR;
             }
-        }
-    }
+        } 
+    }  
 
     /**
      * @notice Updates the global protocol states after receiving deposit information
@@ -255,7 +254,7 @@ contract Core is Initializable, ContextUpgradeable {
             revert PoolNotEnabled(9, id);
 
         uint256 ceAmount = tokenAmount.mul(1e18).div(pool.ceScaled);
-        ICEToken(pool.ceToken).mint(user, ceAmount);
+        ICEToken(pool.ceToken).mintInChain(user, ceAmount, chainId);
         pool.ceSupply = pool.ceSupply.add(ceAmount);
         chainLiquidity[chainId][id] += tokenAmount;
         totalLiquidity[id] += tokenAmount;
@@ -289,7 +288,7 @@ contract Core is Initializable, ContextUpgradeable {
 
         uint256 burnAmount;
         if(all) {
-            burnAmount = ICEToken(pool.ceToken).balanceBeforeScaled(user);
+            burnAmount = ICEToken(pool.ceToken).balanceBeforeScaledExcludingDeadTokens(user);
             tokenAmount = burnAmount.mul(pool.ceScaled).div(1e18);
         } else {
             burnAmount = tokenAmount.mul(1e18).div(pool.ceScaled);
@@ -297,7 +296,14 @@ contract Core is Initializable, ContextUpgradeable {
         if(chainLiquidity[chainId][id] < tokenAmount)
             revert NotEnoughLiquidity(9, chainId, id, chainLiquidity[chainId][id], tokenAmount);
 
-        ICEToken(pool.ceToken).burn(user, burnAmount);
+        uint256 balanceInChainId = ICEToken(pool.ceToken).balancePerChain(user, chainId);
+        if (balanceInChainId >= burnAmount) {
+            ICEToken(pool.ceToken).burnFromChain(user, burnAmount, chainId);
+        } else {
+            ICEToken(pool.ceToken).burnFromChain(user, balanceInChainId, chainId);
+            ICEToken(pool.ceToken).burn(user, burnAmount - balanceInChainId);
+
+        }
         _removeToken(user, id);
 
         pool.ceSupply = pool.ceSupply.sub(burnAmount);
@@ -306,7 +312,55 @@ contract Core is Initializable, ContextUpgradeable {
         updateInterestRate(id);
         checkHealth(user);
         
-        return (tokenAmount);
+        return (burnAmount);
+    }
+
+    function withdrawDeadTokens(
+        bytes32 id,
+        bytes32 chainId,
+        uint256 tokenAmount,
+        address user,
+        bool all
+    ) external onlyRole(IRoleManager(roleManager).POOL()) returns (uint256) {
+        refresh(id);
+        Data.PoolData storage pool = pools[id];
+        // require(pool.enable, string.concat(TAG, ": Not enable now"));
+
+        if (! ICEToken(pool.ceToken).isChainDead(chainId))
+            revert ChainNotDead(9, chainId); 
+
+        if(! pool.enable)
+            revert PoolNotEnabled(9, id);
+
+        uint256 burnAmount;
+        uint256 balanceInChainId = ICEToken(pool.ceToken).balancePerChain(user, chainId);
+        if(all) {
+            burnAmount = balanceInChainId;
+            tokenAmount = burnAmount.mul(pool.ceScaled).div(1e18);
+        } else {
+            burnAmount = tokenAmount.mul(1e18).div(pool.ceScaled); 
+            if( balanceInChainId < burnAmount)
+            revert NotEnoughLiquidity(9, chainId, id, balanceInChainId, burnAmount);
+        }
+        // require(
+        //     chainLiquidity[chainId][id] >= tokenAmount,
+        //     string.concat(TAG, ": No enough liquidity")
+        // );
+
+        if(chainLiquidity[chainId][id] < tokenAmount)
+            revert NotEnoughLiquidity(9, chainId, id, chainLiquidity[chainId][id], tokenAmount);
+
+        ICEToken(pool.ceToken).burnFromChain(user, burnAmount, chainId);
+
+        _removeToken(user, id);
+
+        pool.ceSupply = pool.ceSupply.sub(burnAmount);
+        chainLiquidity[chainId][id] -= tokenAmount;
+        totalLiquidity[id] -= tokenAmount;
+        updateInterestRate(id);
+        checkHealth(user);
+        
+        return (burnAmount);
     }
 
     // avoid stack too deep error
@@ -319,7 +373,7 @@ contract Core is Initializable, ContextUpgradeable {
         Data.ConfigData memory config = configs[id];
         params.liquidity = chainLiquidity[chainId][id];
         params.debtAmount = tokenAmount.mul(1e18).div(pool.dtScaled);
-        params.price = oracle.getSinglePrice(id).div(1e18);
+        params.price = oracle.getSinglePrice(id);
         params.ltv = config.ltv;
         params.debtToken = pool.debtToken;
     }
@@ -357,11 +411,18 @@ contract Core is Initializable, ContextUpgradeable {
         totalLiquidity[id] -= tokenAmount;
 
         Data.HealthData memory healthData = healthFactor(user);
-        if(
-            healthData.collateralValue.mul(params.ltv).div(1e18) <
-                healthData.debtValue
-        )
-            revert LTVCheckFailed(9, chainId, id, tokenAmount);
+        // require(
+        //     healthData.collateralValue.mul(params.ltv).div(1e18) >=
+        //         healthData.debtValue.add(
+        //             tokenAmount.mul(params.price).div(1e18)
+        //         ),
+        //     "LTV check failed"
+        // );
+
+        uint256 collateral = healthData.collateralValue.mul(params.ltv).div(1e18);
+        uint256 debt =  healthData.debtValue;
+        if( collateral < debt)
+            revert LTVCheckFailed(9, id, tokenAmount, collateral, debt);
 
         return params.debtAmount;
     }
@@ -516,12 +577,13 @@ contract Core is Initializable, ContextUpgradeable {
         if(ICEToken(pool.ceToken).balanceOf(user) == 0 && IDebtToken(pool.debtToken).balanceOf(user) == 0) {
             uint length = users[user].length;
             for (uint256 i; i < length; i++) {
-                if (users[user][i] == id && i != length - 1) {
+                if (users[user][i] == id) {
                     users[user][i] = users[user][length - 1];
+                    users[user].pop();
                     break;
                 }
             }
-            users[user].pop();
+           
         }
     }
 
@@ -548,7 +610,7 @@ contract Core is Initializable, ContextUpgradeable {
         );
 
         collateralValue = ICEToken(pool.ceToken)
-            .balanceBeforeScaled(_user)
+            .balanceBeforeScaledExcludingDeadTokens(_user)
             .mul(ceScaled)
             .div(1e18)
             .mul(price)

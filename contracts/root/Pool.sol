@@ -199,7 +199,7 @@ contract Pool is
      * This function can be accessed by anyone
      * @param id - pool id of pool to withdraw from
      * @param chainId - chain id of chain to withdraw from
-     * @param ceAmount - amount to withdraw
+     * @param tokenAmount - amount to withdraw
      * @param to - withdraw address
      * @param route - communication protocol
      * @param airdropAmount - amount to be airdropped to destination chain
@@ -207,7 +207,7 @@ contract Pool is
     function withdraw(
         bytes32 id,
         bytes32 chainId,
-        uint256 ceAmount,
+        uint256 tokenAmount,
         bytes32 to,
         bytes32 route,
         uint256 airdropAmount,
@@ -220,18 +220,20 @@ contract Pool is
         if(withdrawPause[id][chainId])
             revert WithdrawPaused(13, chainId, id);
 
-        uint256 tokenAmount = ICore(core).withdraw(
+        uint256 fee;
+        if (feeEnable) {
+            fee = IFeeProvider(feeProvider).getFeeAmount(chainId, id, tokenAmount);
+        }
+
+        uint256 burnAmount = ICore(core).withdraw(
             id,
             chainId,
-            ceAmount,
+            tokenAmount,
             _msgSender(),
             all
         );
-        if (feeEnable) {
-            uint256 fee = IFeeProvider(feeProvider).getFeeAmount(chainId, id);
-            tokenAmount -= fee;
-        }
 
+        tokenAmount -= fee;
         bytes memory payload = abi.encodePacked(
             id,
             to,
@@ -255,7 +257,69 @@ contract Pool is
             id,
             chainId,
             tokenAmount,
-            ceAmount,
+            burnAmount,
+            route
+        );
+        emit Data.SendToken(_bytesToAddress(to), id, tokenAmount);
+    }
+
+    function withdrawDeadTokens(
+        bytes32 id,
+        bytes32 chainId,
+        uint256 tokenAmount,
+        bytes32 to,
+        bytes32 route,
+        uint256 airdropAmount,
+        bool all
+    ) external payable nonReentrant {
+        // require(
+        //     !(withdrawPause[id][chainId] || protocolPause),
+        //     string.concat(TAG, ": Withdraw paused")
+        // );
+
+        if(protocolPause)
+            revert ProtocolPaused(13);
+
+        uint256 fee;
+        if (feeEnable) {
+            fee = IFeeProvider(feeProvider).getFeeAmount(chainId, id, tokenAmount);
+            
+        }
+
+        uint256 burnAmount = ICore(core).withdrawDeadTokens(
+            id,
+            chainId,
+            tokenAmount,
+            _msgSender(),
+            all
+        );
+
+        tokenAmount -= fee;
+        bytes memory payload = abi.encodePacked(
+            id,
+            to,
+            uint64(tokenAmount / BASE),
+            uint64(tokenAmount % BASE)
+        );
+        // require(payload.length == 80, string.concat(TAG, ": Bad payload"));
+        if(payload.length != 80)
+            revert BadPayload(13, payload.length, 80);
+
+        IAdapter(adapter).send{value: msg.value}(
+            payload,
+            chainId,
+            msg.sender,
+            airdropAmount,
+            _bytesToAddress(to),
+            route
+        );
+        emit Data.Withdraw(
+            _msgSender(),
+            _bytesToAddress(to),
+            id,
+            chainId,
+            tokenAmount,
+            burnAmount,
             route
         );
         emit Data.SendToken(_bytesToAddress(to), id, tokenAmount);
@@ -286,16 +350,19 @@ contract Pool is
         if(borrowPause[id][chainId])
             revert BorrowPaused(13, chainId, id);
 
+        uint256 fee;
+        if (feeEnable) {
+            fee = IFeeProvider(feeProvider).getFeeAmount(chainId, id, tokenAmount);
+        }
+
         uint256 debtAmount = ICore(core).borrow(
             id,
             chainId,
             tokenAmount,
             _msgSender()
         );
-        if (feeEnable) {
-            uint256 fee = IFeeProvider(feeProvider).getFeeAmount(chainId, id);
-            tokenAmount -= fee;
-        }
+
+        tokenAmount -= fee;
 
         bytes memory payload = abi.encodePacked(
             id,
@@ -344,6 +411,15 @@ contract Pool is
         (uint256 repayAmount, uint256 debtAmount, uint256 ceAmount) = ICore(
             core
         ).repay(id, chainId, user, tokenAmount);
+
+        uint256 fee;
+        if (feeEnable) {
+            fee = IFeeProvider(feeProvider).getFeeAmount(chainId, id, tokenAmount);
+            if (fee > 0)
+                ICore(core).repay(id, chainId, user, fee);
+        }
+        
+
         emit Data.Repay(user, id, chainId, repayAmount, debtAmount, ceAmount, route);
         emit Data.ReceiveToken(user, id, tokenAmount);
     }
@@ -364,6 +440,13 @@ contract Pool is
         bytes32 route
     ) internal {
         uint256 ceAmount = ICore(core).deposit(id, chainId, user, tokenAmount);
+        uint256 fee;
+        if (feeEnable) {
+            fee = IFeeProvider(feeProvider).getFeeAmount(chainId, id, tokenAmount);
+            if (fee > 0)
+                ICore(core).deposit(id, chainId, user, fee);
+        }
+        
         emit Data.Deposit(user, id, chainId, tokenAmount, ceAmount, route);
         emit Data.ReceiveToken(user, id, tokenAmount);
     }
