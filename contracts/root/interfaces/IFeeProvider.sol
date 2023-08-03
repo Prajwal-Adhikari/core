@@ -18,33 +18,6 @@ interface IFeeProvider {
     function setCore(address _coreAddress) external;
 
     /**
-    * @notice Configures upper limit of the fee for withdraw. 
-    * This function can only be accessed by the account with role SET_FEEPROVIDER_METHOD.
-    * @param _chainId - ids of the chain.
-    * @param _poolId - ids of the pool.
-    * @param _maxFee - upper limit of fee for each pool in diff chain.
-    
-    **/
-    function configureMaxFee(
-        bytes32[] memory _chainId,
-        bytes32[] memory _poolId,
-        uint256[] memory _maxFee
-    ) external;
-
-    /**
-     * @notice Configures Base Global Liquidity Factor.
-     * This function can only be accessed by the account with role SET_FEEPROVIDER_METHOD.
-     * @param _chainId - ids of the chain.
-     * @param _poolId - ids of the pool.
-     * @param _baseFee - base fee for each pool in diff chain.
-     **/
-    function configureBaseFee(
-        bytes32[] memory _chainId,
-        bytes32[] memory _poolId,
-        uint256[] memory _baseFee
-    ) external;
-
-    /**
      * @notice Configures Optimal Global Liquidity Factor.
      * This function can only be accessed by the account with role SET_FEEPROVIDER_METHOD.
      * @param _chainId - ids of the chain.
