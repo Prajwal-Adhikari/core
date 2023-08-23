@@ -85,13 +85,15 @@ library Data {
     }
 
     event MintToTreasury(bytes32 id, uint256 tokenAmount, uint256 ceAmount);
-    event Deposit(address user, bytes32 id, bytes32 chainId, uint256 tokenAmount, uint256 ceAmount,  bytes32 route);
-    event Withdraw(address user, address to, bytes32 id, bytes32 chainId, uint256 tokenAmount, uint256 ceAmount, bytes32 route);
-    event Borrow(address user, address to, bytes32 id, bytes32 chainId, uint256 tokenAmount, uint256 debtAmount,  bytes32 route);
-    event Repay(address user, bytes32 id, bytes32 chainId, uint256 tokenAmount, uint256 debtAmount, uint256 ceAmount,  bytes32 route);
+    event Deposit(address user, bytes32 id, bytes32 chainId, uint256 tokenAmount, uint256 ceAmount,  bytes32 route, uint256 reward);
+    event Withdraw(address user, address to, bytes32 id, bytes32 chainId, uint256 tokenAmount, uint256 ceAmount, bytes32 route, uint256 fee);
+    event Borrow(address user, address to, bytes32 id, bytes32 chainId, uint256 tokenAmount, uint256 debtAmount,  bytes32 route, uint256 fee);
+    event Repay(address user, bytes32 id, bytes32 chainId, uint256 tokenAmount, uint256 debtAmount, uint256 ceAmount,  bytes32 route, uint256 reward);
     event Liquidate(address user, address liquidator, bytes32 debtId, bytes32 collateralId, 
         uint256 collateralAmount, uint256 burnDebtAmount, uint256 repayAmount, uint256 discount);
     event ChangePoolStatus(bytes32 id, bool enable);
     event SendToken(address user, bytes32 id, uint256 tokenAmount);
     event ReceiveToken(address user, bytes32 id, uint256 tokenAmount);
+    event InterestRateUpdated(uint256 borrowRate, uint256 utilizationRatio);
+    event Swap(uint256 reward);
 }
