@@ -21,7 +21,7 @@ contract CEToken is ERC20Upgradeable {
     uint256 public transferBlockWait; //amount of blocks to wait before user can transfer minted ceToken
     uint256 public lockupTriggerAmt; //amount where lockup will kick in after cross-chain transfer
     mapping(address => uint256) public transferBlockRelease; //Block number
-    mapping(address => mapping(bytes32 => uint256)) public balancePerChain;
+    mapping(address => mapping(bytes32 => uint256)) public balancePerChain; // user => chain => balance
     mapping(address => bytes32[]) public chains; //chainList of a user holding the asset from different chains
     mapping(address => mapping(bytes32 => bool)) public isChainInList;
     bytes32[] public deadChains;
@@ -222,7 +222,7 @@ contract CEToken is ERC20Upgradeable {
         if (amount > lockupTriggerAmt) {
             transferBlockRelease[to] = block.number + transferBlockWait;
         }
-        balancePerChain[to][chainId] = amount;
+        balancePerChain[to][chainId] += amount;
         _addChain(to, chainId);
         _mint(to, amount);
     }
