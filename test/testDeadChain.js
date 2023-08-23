@@ -489,30 +489,30 @@ describe("Ready", function () {
 
     it("Revert withdraw", async function () {
         console.log("here");
-    
-      
         console.log("alice withdraw matic")
         await pool.connect(alice).withdraw(MATIC, FTM, toTokenAmount(4e5), ethers.utils.hexZeroPad(alice.address, 32), LZO, 0, false, { value: fees })
 
         await ceMATIC.addDeadChain(BNB);
         expect(await ceMATIC.balanceOf(alice.address)).to.equal(toTokenAmount(6e5));
-        await expect(pool.connect(alice).withdraw(MATIC, FTM, toTokenAmount(2e5), ethers.utils.hexZeroPad(alice.address, 32), LZO, 0, false, { value: fees })).to.be.revertedWithCustomError(ceMATIC, "NotEnoughCeTokens").withArgs(alice.address);
+        await expect(pool.connect(alice).withdraw(MATIC, FTM, toTokenAmount(2e5), ethers.utils.hexZeroPad(alice.address, 32), LZO, 0, false, { value: fees })).to.be.revertedWithCustomError(ceMATIC, "NotEnoughCeTokens").withArgs("CEToken", alice.address);
    
     })
 
-    it("Withdraw Dead Tokens", async function () {
+    it("Withdraw all", async function () {
         console.log("here");
-     
-
-      
-        console.log("alice withdraw matic")
-        await pool.connect(alice).withdraw(MATIC, FTM, toTokenAmount(4e5), ethers.utils.hexZeroPad(alice.address, 32), LZO, 0, false, { value: fees })
-
-        await ceMATIC.addDeadChain(BNB);
-        expect(await ceMATIC.balanceOf(alice.address)).to.equal(toTokenAmount(6e5));
-        await pool.connect(alice).withdrawDeadTokens(MATIC, BNB, toTokenAmount(4e5), ethers.utils.hexZeroPad(alice.address, 32), LZO, 0, false, { value: fees })
-        expect(await ceMATIC.balanceOf(alice.address)).to.equal(toTokenAmount(2e5));
-        expect(await ceMATIC.balanceBeforeScaledExcludingDeadTokens(alice.address)).to.equal(toTokenAmount(1e5));
+        chains = await ceMATIC.getChains(bob.address);
+        
+        console.log("chains", chains);
+        tokens = await core.getTokens(bob.address);
+        console.log("chains", tokens);
+        // await ceMATIC.addDeadChain(BNB);
+        console.log("bob withdraw matic")
+        await pool.connect(bob).withdraw(MATIC, FTM, toTokenAmount(4e5), ethers.utils.hexZeroPad(alice.address, 32), LZO, 0, true, { value: fees })
+        chains = await ceMATIC.getChains(bob.address);
+        console.log("chains", chains);
+        expect(await ceMATIC.balancePerChain(bob.address,BNB)).to.equal(toTokenAmount(0));
+        tokens = await core.getTokens(bob.address);
+        console.log("chains", tokens);
     })
 
     it("Withdraw Dead Tokens", async function () {
@@ -589,7 +589,7 @@ describe("Ready", function () {
         expect(await ceMATIC.balancePerChain(bob.address, FTM)).to.equal(toTokenAmount(3e5));
         expect(await ceMATIC.balancePerChain(bob.address, BNB)).to.equal(toTokenAmount(2e5));
         
-        await expect(pool.connect(bob).borrow(MATIC, BNB, toTokenAmount(2e5), ethers.utils.hexZeroPad(alice.address, 32), LZO, 0, { value: fees })).to.be.revertedWithCustomError(core, "LTVCheckFailed").withArgs(9, MATIC, toTokenAmount(2e5), toTokenAmount(15e4), toTokenAmount(2e5));
+        await expect(pool.connect(bob).borrow(MATIC, BNB, toTokenAmount(2e5), ethers.utils.hexZeroPad(alice.address, 32), LZO, 0, { value: fees })).to.be.revertedWithCustomError(core, "LTVCheckFailed").withArgs("Core", MATIC, toTokenAmount(2e5), toTokenAmount(15e4), toTokenAmount(2e5));
         await ceMATIC.removeDeadChain(BNB);
         await pool.connect(bob).borrow(MATIC, BNB, toTokenAmount(2e5), ethers.utils.hexZeroPad(alice.address, 32), LZO, 0, { value: fees });
        
@@ -610,7 +610,7 @@ describe("Ready", function () {
         expect(await ceMATIC.balancePerChain(bob.address, FTM)).to.equal(toTokenAmount(3e5));
         expect(await ceMATIC.balancePerChain(bob.address, BNB)).to.equal(toTokenAmount(2e5));
         
-        await expect(pool.connect(bob).borrow(MATIC, BNB, toTokenAmount(2e5), ethers.utils.hexZeroPad(alice.address, 32), LZO, 0, { value: fees })).to.be.revertedWithCustomError(core, "LTVCheckFailed").withArgs(9,MATIC, toTokenAmount(2e5), toTokenAmount(15e4), toTokenAmount(2e5));
+        await expect(pool.connect(bob).borrow(MATIC, BNB, toTokenAmount(2e5), ethers.utils.hexZeroPad(alice.address, 32), LZO, 0, { value: fees })).to.be.revertedWithCustomError(core, "LTVCheckFailed").withArgs("Core",MATIC, toTokenAmount(2e5), toTokenAmount(15e4), toTokenAmount(2e5));
         await ceMATIC.removeDeadChain(BNB);
 
         await pool.connect(bob).borrow(MATIC, BNB, toTokenAmount(2e5), ethers.utils.hexZeroPad(alice.address, 32), LZO, 0, { value: fees });
