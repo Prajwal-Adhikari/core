@@ -72,6 +72,23 @@ interface IPool {
     ) external;
 
     /**
+     * @notice Swaps liquidity amount from one chain to another
+     * This function can only be accessed by account with role SWAP.
+     * @param id - pool id of the asset.
+     * @param srcChainId - chain id of the source chain
+     * @param destChainId - chain id of the destination chain
+     * @param tokenAmountInSrc - liquidity amount sent from source chain
+     * @param tokenAmountInDest - liquidity amount received to destination chain
+     **/
+    function swap(
+        bytes32 id,
+        bytes32 srcChainId,
+        bytes32 destChainId,
+        uint256 tokenAmountInSrc,
+        uint256 tokenAmountInDest
+    ) external;
+
+    /**
      * @notice Executes the function according to the request type in the payload
      * This function can only be accessed by the account with role ADAPTER
      * @param payload - information of pool id, user and token amount
@@ -85,6 +102,12 @@ interface IPool {
      * This function can only be accessed by the account with role SET_POOL_METHOD
      **/
     function toggleFeeEnable() external;
+
+     /**
+     * @notice Configures reward status.
+     * This function can only be accessed by the account with role SET_POOL_METHOD
+     **/ 
+    function toggleRewardEnable() external;
 
     /**
      * @notice Configures pool status for withdraw

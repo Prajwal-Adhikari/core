@@ -51,14 +51,12 @@ interface ICore {
      * @param chainId - chain id of chain to withdraw from
      * @param tokenAmount - amount to withdraw
      * @param user - withdraw address
-     * @param all - withdraw all
      **/
     function withdraw(
         bytes32 id,
         bytes32 chainId,
         uint256 tokenAmount,
-        address user,
-        bool all
+        address user
     ) external returns (uint256);
 
     /**
@@ -189,6 +187,12 @@ interface ICore {
     function handleTransfer(address from, address to, bytes32 id) external view;
 
     /**
+     * @notice Returns list of the tokens the `user` has 
+     * @param user - address of the user
+     **/
+    function getTokens(address user) external view returns (bytes32[] memory);
+
+    /**
      * @notice Returns liquidity of an asset for a chain
      * @param _chainId - id of the chain.
      * @param _poolId - id of the pool.
@@ -203,6 +207,16 @@ interface ICore {
      * @param _poolId - id of the pool.
      **/
     function totalLiquidity(bytes32 _poolId) external view returns (uint256);
+
+    /**
+     * @notice Returns total withdrawable balance of an asset for a user
+     * @param _poolId - id of the pool.
+     * @param _user - address of the user
+     **/
+    function getWithdrawableBalancePerPool(
+        bytes32 _poolId,
+        address _user
+    ) external view returns (uint256);
 
     /**
      * @notice Returns pool parametes for an asset
