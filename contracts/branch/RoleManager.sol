@@ -4,6 +4,8 @@ pragma solidity 0.8.17;
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
+string constant TAG = "RoleManagerBranch";
+
 /**
  * @title RoleManagerBranch
  * @notice RoleManager is used to grant roles to EOAs.

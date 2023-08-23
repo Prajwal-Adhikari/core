@@ -10,6 +10,8 @@ import "./interfaces/IOracle.sol";
 import "./interfaces/IRoleManager.sol";
 import "./libraries/Data.sol";
 
+string constant TAG = "Core";
+
 /**
  * @title Core
  * @notice Core stores all the global data
@@ -39,13 +41,15 @@ contract Core is Initializable, ContextUpgradeable {
     mapping(bytes32 => mapping(bytes32 => uint256)) public chainLiquidity; // Stores liquidity of pool across chain
 
     mapping(address => bytes32[]) public users; // Stores poolIds of collateral or borrowed assets by a user
+    mapping(address => mapping(bytes32 => bool)) isPoolInList;
 
-    error PoolNotEnabled(uint contractCode, bytes32 id);
-    error NotEnoughLiquidity(uint contractCode, bytes32 chainId, bytes32 poolId, uint256 poolLiquidity, uint256 sentAmount);
-    error LTVCheckFailed(uint contractCode, bytes32 poolId, uint256 tokenAmount, uint256 collateralValue, uint256 debtValue);
-    error HealthFactorCheckFailed(uint contractCode, address user);
-    error InvalidSender(uint contractCode, address sender);
-    error ChainNotDead(uint contractCode, bytes32 chainId);
+    error PoolNotEnabled(string contractTAG, bytes32 id);
+    error NotEnoughLiquidity(string contractTAG, bytes32 chainId, bytes32 poolId, uint256 poolLiquidity, uint256 sentAmount);
+    error LTVCheckFailed(string contractTAG, bytes32 poolId, uint256 tokenAmount, uint256 collateralValue, uint256 debtValue);
+    error HealthFactorCheckFailed(string contractTAG, address user);
+    error InvalidSender(string contractTAG, address sender);
+    error ChainNotDead(string contractTAG, bytes32 chainId);
+    error ExcessLiquidityInDest(string contractTAG);
 
     /**
      * @dev Modifier that checks if caller has a specific role.
@@ -160,6 +164,8 @@ contract Core is Initializable, ContextUpgradeable {
             }
             pool.utilizationRatio = utilizationRatio;
         }
+
+        emit Data.InterestRateUpdated(pool.borrowInterestRate,pool.utilizationRatio);
     }
 
     /**
@@ -251,7 +257,7 @@ contract Core is Initializable, ContextUpgradeable {
         refresh(id);
         Data.PoolData storage pool = pools[id];
         if(! pool.enable)
-            revert PoolNotEnabled(9, id);
+            revert PoolNotEnabled(TAG, id);
 
         uint256 ceAmount = tokenAmount.mul(1e18).div(pool.ceScaled);
         ICEToken(pool.ceToken).mintInChain(user, ceAmount, chainId);
@@ -272,29 +278,22 @@ contract Core is Initializable, ContextUpgradeable {
      * @param chainId - chain id of chain to withdraw from
      * @param tokenAmount - amount to withdraw
      * @param user - withdraw address
-     * @param all - withdraw all
      **/
     function withdraw(
         bytes32 id,
         bytes32 chainId,
         uint256 tokenAmount,
-        address user,
-        bool all
+        address user
     ) external onlyRole(IRoleManager(roleManager).POOL()) returns (uint256) {
         refresh(id);
         Data.PoolData storage pool = pools[id];
         if(! pool.enable)
-            revert PoolNotEnabled(9, id);
+            revert PoolNotEnabled(TAG, id);
 
-        uint256 burnAmount;
-        if(all) {
-            burnAmount = ICEToken(pool.ceToken).balanceBeforeScaledExcludingDeadTokens(user);
-            tokenAmount = burnAmount.mul(pool.ceScaled).div(1e18);
-        } else {
-            burnAmount = tokenAmount.mul(1e18).div(pool.ceScaled);
-        } 
+        uint256 burnAmount = tokenAmount.mul(1e18).div(pool.ceScaled);
+         
         if(chainLiquidity[chainId][id] < tokenAmount)
-            revert NotEnoughLiquidity(9, chainId, id, chainLiquidity[chainId][id], tokenAmount);
+            revert NotEnoughLiquidity(TAG, chainId, id, chainLiquidity[chainId][id], tokenAmount);
 
         uint256 balanceInChainId = ICEToken(pool.ceToken).balancePerChain(user, chainId);
         if (balanceInChainId >= burnAmount) {
@@ -327,10 +326,10 @@ contract Core is Initializable, ContextUpgradeable {
         // require(pool.enable, string.concat(TAG, ": Not enable now"));
 
         if (! ICEToken(pool.ceToken).isChainDead(chainId))
-            revert ChainNotDead(9, chainId); 
+            revert ChainNotDead(TAG, chainId); 
 
         if(! pool.enable)
-            revert PoolNotEnabled(9, id);
+            revert PoolNotEnabled(TAG, id);
 
         uint256 burnAmount;
         uint256 balanceInChainId = ICEToken(pool.ceToken).balancePerChain(user, chainId);
@@ -340,15 +339,10 @@ contract Core is Initializable, ContextUpgradeable {
         } else {
             burnAmount = tokenAmount.mul(1e18).div(pool.ceScaled); 
             if( balanceInChainId < burnAmount)
-            revert NotEnoughLiquidity(9, chainId, id, balanceInChainId, burnAmount);
+            revert NotEnoughLiquidity(TAG, chainId, id, balanceInChainId, burnAmount);
         }
-        // require(
-        //     chainLiquidity[chainId][id] >= tokenAmount,
-        //     string.concat(TAG, ": No enough liquidity")
-        // );
-
         if(chainLiquidity[chainId][id] < tokenAmount)
-            revert NotEnoughLiquidity(9, chainId, id, chainLiquidity[chainId][id], tokenAmount);
+            revert NotEnoughLiquidity(TAG, chainId, id, chainLiquidity[chainId][id], tokenAmount);
 
         ICEToken(pool.ceToken).burnFromChain(user, burnAmount, chainId);
 
@@ -373,6 +367,7 @@ contract Core is Initializable, ContextUpgradeable {
         Data.ConfigData memory config = configs[id];
         params.liquidity = chainLiquidity[chainId][id];
         params.debtAmount = tokenAmount.mul(1e18).div(pool.dtScaled);
+        
         params.price = oracle.getSinglePrice(id);
         params.ltv = config.ltv;
         params.debtToken = pool.debtToken;
@@ -402,7 +397,7 @@ contract Core is Initializable, ContextUpgradeable {
         _addToken(user, id);
 
         if(params.liquidity < tokenAmount)
-            revert NotEnoughLiquidity(9, chainId, id, params.liquidity, tokenAmount);
+            revert NotEnoughLiquidity(TAG, chainId, id, params.liquidity, tokenAmount);
 
         IDebtToken(params.debtToken).mint(user, params.debtAmount);
         pools[id].debtSupply += params.debtAmount;
@@ -411,18 +406,11 @@ contract Core is Initializable, ContextUpgradeable {
         totalLiquidity[id] -= tokenAmount;
 
         Data.HealthData memory healthData = healthFactor(user);
-        // require(
-        //     healthData.collateralValue.mul(params.ltv).div(1e18) >=
-        //         healthData.debtValue.add(
-        //             tokenAmount.mul(params.price).div(1e18)
-        //         ),
-        //     "LTV check failed"
-        // );
 
         uint256 collateral = healthData.collateralValue.mul(params.ltv).div(1e18);
         uint256 debt =  healthData.debtValue;
         if( collateral < debt)
-            revert LTVCheckFailed(9, id, tokenAmount, collateral, debt);
+            revert LTVCheckFailed(TAG, id, tokenAmount, collateral, debt);
 
         return params.debtAmount;
     }
@@ -475,7 +463,7 @@ contract Core is Initializable, ContextUpgradeable {
                 params.ceScaled
             );
             if (ceAmount > 0) {
-                ICEToken(params.ceToken).mint(params.user, ceAmount);
+                ICEToken(params.ceToken).mintInChain(params.user, ceAmount, chainId);
                 pool.ceSupply = pool.ceSupply.add(ceAmount);
             }
         } else {
@@ -484,6 +472,7 @@ contract Core is Initializable, ContextUpgradeable {
                 params.dtScaled
             );
         }
+      
         chainLiquidity[chainId][id] += tokenAmount;
         totalLiquidity[id] += tokenAmount;
         IDebtToken(params.debtToken).burn(params.user, params.debtAmount);
@@ -525,9 +514,13 @@ contract Core is Initializable, ContextUpgradeable {
         bytes32 destChainId,
         uint256 tokenAmountInSrc,
         uint256 tokenAmountInDest
-    ) external onlyRole(IRoleManager(roleManager).SWAP()) {
+    ) external onlyRole(IRoleManager(roleManager).POOL()) {
+        if (tokenAmountInDest > tokenAmountInSrc) {
+            revert ExcessLiquidityInDest(TAG);
+        }
         chainLiquidity[srcChainId][id] -= tokenAmountInSrc;
         chainLiquidity[destChainId][id] += tokenAmountInDest;
+        totalLiquidity[id] -= tokenAmountInSrc.sub(tokenAmountInDest);
     }
 
     /**
@@ -536,7 +529,7 @@ contract Core is Initializable, ContextUpgradeable {
      **/
     function checkHealth(address user) public view {
         if(healthFactor(user).factor >= MAX_HEALTH_FACTOR)
-            revert HealthFactorCheckFailed(9, user);
+            revert HealthFactorCheckFailed(TAG, user);
     }
 
     /**
@@ -547,18 +540,16 @@ contract Core is Initializable, ContextUpgradeable {
      **/
     function handleTransfer(address from, address to, bytes32 id) external {
         if(msg.sender != pools[id].ceToken)
-            revert InvalidSender(9, msg.sender);
+            revert InvalidSender(TAG, msg.sender);
         checkHealth(from);
         _addToken(to, id);
         _removeToken(from, id);
     }
 
     function _addToken(address user, bytes32 id) internal {
-        for (uint256 i; i < users[user].length; i++) {
-            if (users[user][i] == id) {
-                return;
-            }
-        }
+        if(isPoolInList[user][id])
+            return;
+        isPoolInList[user][id] = true;
         users[user].push(id);
     }
 
@@ -572,14 +563,25 @@ contract Core is Initializable, ContextUpgradeable {
         _addToken(user, id);
     }
 
+    /**
+     * @notice Returns list of the tokens the `user` has 
+     * @param user - address of the user
+     **/
+    function getTokens(
+       address user
+    ) public view returns (bytes32[] memory){
+        return users[user];
+    }
+
     function _removeToken(address user, bytes32 id) internal {
         Data.PoolData memory pool = pools[id];
         if(ICEToken(pool.ceToken).balanceOf(user) == 0 && IDebtToken(pool.debtToken).balanceOf(user) == 0) {
-            uint length = users[user].length;
-            for (uint256 i; i < length; i++) {
+            uint256 len = users[user].length;
+            for (uint256 i; i < len; i++) {
                 if (users[user][i] == id) {
-                    users[user][i] = users[user][length - 1];
+                    users[user][i] = users[user][len -1];
                     users[user].pop();
+                    isPoolInList[user][id] = false;
                     break;
                 }
             }
@@ -628,7 +630,7 @@ contract Core is Initializable, ContextUpgradeable {
      * @notice Get the CE scaled amount.
      * @param _poolId - The pool id .
      **/
-    function getCEScaled(bytes32 _poolId) public view returns (uint256)  {
+    function getCEScaled(bytes32 _poolId) external view returns (uint256)  {
         Data.PoolData memory pool = pools[_poolId];
         uint256 increasedDebt = block
             .timestamp
@@ -648,7 +650,7 @@ contract Core is Initializable, ContextUpgradeable {
      * @notice Get the DT scaled amount.
      * @param _poolId - The pool id .
      **/
-    function getDTScaled(bytes32 _poolId) public view returns (uint256) {
+    function getDTScaled(bytes32 _poolId) external view returns (uint256) {
         Data.PoolData memory pool = pools[_poolId];
         uint256 increasedDebt = block
             .timestamp
@@ -666,7 +668,22 @@ contract Core is Initializable, ContextUpgradeable {
     function getLiquidity(
         bytes32 _chainId,
         bytes32 _poolId
-    ) public view returns (uint256) {
+    ) external view returns (uint256) {
         return chainLiquidity[_chainId][_poolId];
+    }
+
+    /**
+     * @notice Returns total withdrawable balance of an asset for a user
+     * @param _poolId - id of the pool.
+     * @param _user - address of the user
+     **/
+    function getWithdrawableBalancePerPool(
+        bytes32 _poolId,
+        address _user
+    ) external view returns (uint256) {
+        Data.PoolData storage pool = pools[_poolId];
+        return  ICEToken(pool.ceToken).balanceOfExcludingDeadTokens(_user);
+    
+        
     }
 }

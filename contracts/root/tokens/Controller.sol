@@ -5,6 +5,8 @@ import "../interfaces/ICEToken.sol";
 import "../interfaces/IRoleManager.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
 
+string constant TAG = "Controller";
+
 /**
  * @title Controller
  * @notice Controller is used to store all the CE tokens addresses.

@@ -12,6 +12,8 @@ import "./interfaces/IStargateEthVault.sol";
 import "./interfaces/IRoleManager.sol";
 import "../utils/ERC2771ContextUpgradeable.sol";
 
+string constant TAG = "Branch";
+
 /**
  * @title Branch
  * @notice Branch is deployed on all the chains Cedro supports.
@@ -77,13 +79,13 @@ contract Branch is
         uint256 aidrdropAmount
     );
 
-    error InsufficientValue(uint contractCode, uint256 valueSent, uint256 valueToBeGreater);
-    error InsufficientQuantity(uint contractCode);
-    error DepositPaused(uint contractCode, bytes32 poolID);
-    error ProtocolPaused(uint contractCode);
-    error NativeTransferFailed(uint contractCode);
-    error BadPayload(uint contractCode, uint256 currentLength, uint256 requiredLength);
-    error PoolNotEnabled(uint contractCode, bytes32 poolID);
+    error InsufficientValue(string contractTAG, uint256 valueSent, uint256 valueToBeGreater);
+    error InsufficientQuantity(string contractTAG);
+    error DepositPaused(string contractTAG, bytes32 poolID);
+    error ProtocolPaused(string contractTAG);
+    error NativeTransferFailed(string contractTAG);
+    error BadPayload(string contractTAG, uint256 currentLength, uint256 requiredLength);
+    error PoolNotEnabled(string contractTAG, bytes32 poolID);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -227,11 +229,11 @@ contract Branch is
         uint256 airdropAmount
     ) external payable nonReentrant {
         if(protocolPause)
-            revert ProtocolPaused(3);
+            revert ProtocolPaused(TAG);
         if(depositPause[id])
-            revert DepositPaused(3, id);
+            revert DepositPaused(TAG, id);
         if(! pools[id].enable)
-            revert PoolNotEnabled(3, id);
+            revert PoolNotEnabled(TAG, id);
         _pay(pools[id].token, amount, id, TYPE_DEPOSIT, route, airdropAmount);
         emit Deposit(_msgSender(), id, amount, route, airdropAmount);
         emit SendToken(_msgSender(), id, amount);
@@ -252,11 +254,11 @@ contract Branch is
         uint256 airdropAmount
     ) external payable nonReentrant {
         if(protocolPause)
-            revert ProtocolPaused(3);
+            revert ProtocolPaused(TAG);
         if(repayPause[id])
-            revert DepositPaused(3, id);
+            revert DepositPaused(TAG, id);
         if(! pools[id].enable)
-            revert PoolNotEnabled(3, id);
+            revert PoolNotEnabled(TAG, id);
         _pay(pools[id].token, amount, id, TYPE_REPAY, route, airdropAmount);
         emit Repay(_msgSender(), id, amount, route, airdropAmount);
         emit SendToken(_msgSender(), id, amount);
@@ -283,9 +285,9 @@ contract Branch is
         uint256 amountMin
     ) external payable onlyRole(IRoleManager(roleManager).SWAP()) {
         if(msg.value == 0)
-            revert InsufficientValue(3, msg.value, 0);
+            revert InsufficientValue(TAG, msg.value, 0);
         if(qty == 0)
-            revert InsufficientQuantity(3);
+            revert InsufficientQuantity(TAG);
 
         if (pools[id].token == address(0)) {
             // wrap the ETH into WETH
@@ -324,7 +326,7 @@ contract Branch is
         if (token == address(0)) {
             (bool sent, ) = payable(to).call{value: amount}("");
             if(! sent)
-                revert NativeTransferFailed(3);
+                revert NativeTransferFailed(TAG);
         } else {
             IERC20Upgradeable(token).safeTransfer(to, amount);
         }
@@ -339,10 +341,10 @@ contract Branch is
         bytes memory payload
     ) external onlyRole(IRoleManager(roleManager).ADAPTER()) {
         if(protocolPause)
-            revert ProtocolPaused(3);
+            revert ProtocolPaused(TAG);
 
         if(payload.length != 80)
-            revert BadPayload(3, payload.length, 80);
+            revert BadPayload(TAG, payload.length, 80);
 
         bytes32 id;
         bytes32 to;
@@ -360,7 +362,7 @@ contract Branch is
         if (token == address(0)) {
             (bool sent, ) = payable(receipient).call{value: amount}("");
             if(! sent)
-                revert NativeTransferFailed(3);
+                revert NativeTransferFailed(TAG);
         } else {
             IERC20Upgradeable(token).safeTransfer(receipient, amount);
         }
@@ -391,7 +393,7 @@ contract Branch is
         uint256 buildAmount;
         if (token == address(0)) {
             if(msg.value < payAmount)
-                revert InsufficientValue(3, msg.value, payAmount-1);
+                revert InsufficientValue(TAG, msg.value, payAmount-1);
 
             buildAmount = amount;
         } else {
@@ -416,7 +418,7 @@ contract Branch is
             amountsx
         );
         if(payload.length != 81)
-            revert BadPayload(3, payload.length, 81);
+            revert BadPayload(TAG, payload.length, 81);
 
         if (token == address(0)) {
             IAdapter(adapter).send{value: msg.value.sub(payAmount)}(

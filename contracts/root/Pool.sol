@@ -15,6 +15,8 @@ import "./interfaces/IRoleManager.sol";
 import "./libraries/Data.sol";
 import "../utils/ERC2771ContextUpgradeable.sol";
 
+string constant TAG = "Pool";
+
 /**
  * @title Pool
  * @notice Pool is deployed on a single chain
@@ -53,12 +55,13 @@ contract Pool is
     bool public protocolPause;
 
     bool public feeEnable;
+    bool public rewardEnable;
 
-    error ProtocolPaused(uint contractCode);
-    error UnsupportedFunctionType(uint contractCode, uint8 functionType);
-    error WithdrawPaused(uint contractCode, bytes32 chainId, bytes32 id);
-    error BorrowPaused(uint contractCode, bytes32 chainId, bytes32 id);
-    error BadPayload(uint contractCode, uint256 currentLength, uint256 requiredLength);
+    error ProtocolPaused(string contractTAG);
+    error UnsupportedFunctionType(string contractTAG, uint8 functionType);
+    error WithdrawPaused(string contractTAG, bytes32 chainId, bytes32 id);
+    error BorrowPaused(string contractTAG, bytes32 chainId, bytes32 id);
+    error BadPayload(string contractTAG, uint256 currentLength, uint256 requiredLength);
 
     /**
      * @dev Modifier that checks if caller has a specific role.
@@ -194,6 +197,17 @@ contract Pool is
     }
 
     /**
+     * @notice Configures reward status.
+     * This function can only be accessed by the account with role SET_POOL_METHOD
+     **/ 
+    function toggleRewardEnable()
+        external
+        onlyRole(IRoleManager(roleManager).SET_POOL_METHOD())
+    {
+        rewardEnable = !rewardEnable;
+    }
+
+    /**
      * @notice Sends a withdraw request of amount `ceAmount` to address `to` from pool with pool id `id`
      * in chain with chain id `chainId` to core contract
      * This function can be accessed by anyone
@@ -215,22 +229,24 @@ contract Pool is
     ) external payable nonReentrant {
   
         if(protocolPause)
-            revert ProtocolPaused(13);
+            revert ProtocolPaused(TAG);
 
         if(withdrawPause[id][chainId])
-            revert WithdrawPaused(13, chainId, id);
+            revert WithdrawPaused(TAG, chainId, id);
 
         uint256 fee;
-        if (feeEnable) {
-            fee = IFeeProvider(feeProvider).getFeeAmount(chainId, id, tokenAmount);
+         if(all) {
+            tokenAmount = ICore(core).getWithdrawableBalancePerPool(id,_msgSender());
+        }
+        if(feeEnable) {
+            fee = IFeeProvider(feeProvider).setFeeAmount(chainId, id, tokenAmount);
         }
 
         uint256 burnAmount = ICore(core).withdraw(
             id,
             chainId,
             tokenAmount,
-            _msgSender(),
-            all
+            _msgSender()
         );
 
         tokenAmount -= fee;
@@ -241,7 +257,7 @@ contract Pool is
             uint64(tokenAmount % BASE)
         );
         if(payload.length != 80)
-            revert BadPayload(13, payload.length, 80);
+            revert BadPayload(TAG, payload.length, 80);
 
         IAdapter(adapter).send{value: msg.value}(
             payload,
@@ -258,7 +274,8 @@ contract Pool is
             chainId,
             tokenAmount,
             burnAmount,
-            route
+            route,
+            fee
         );
         emit Data.SendToken(_bytesToAddress(to), id, tokenAmount);
     }
@@ -272,19 +289,8 @@ contract Pool is
         uint256 airdropAmount,
         bool all
     ) external payable nonReentrant {
-        // require(
-        //     !(withdrawPause[id][chainId] || protocolPause),
-        //     string.concat(TAG, ": Withdraw paused")
-        // );
-
         if(protocolPause)
-            revert ProtocolPaused(13);
-
-        uint256 fee;
-        if (feeEnable) {
-            fee = IFeeProvider(feeProvider).getFeeAmount(chainId, id, tokenAmount);
-            
-        }
+            revert ProtocolPaused(TAG);
 
         uint256 burnAmount = ICore(core).withdrawDeadTokens(
             id,
@@ -294,7 +300,6 @@ contract Pool is
             all
         );
 
-        tokenAmount -= fee;
         bytes memory payload = abi.encodePacked(
             id,
             to,
@@ -303,7 +308,7 @@ contract Pool is
         );
         // require(payload.length == 80, string.concat(TAG, ": Bad payload"));
         if(payload.length != 80)
-            revert BadPayload(13, payload.length, 80);
+            revert BadPayload(TAG, payload.length, 80);
 
         IAdapter(adapter).send{value: msg.value}(
             payload,
@@ -320,7 +325,8 @@ contract Pool is
             chainId,
             tokenAmount,
             burnAmount,
-            route
+            route,
+            0
         );
         emit Data.SendToken(_bytesToAddress(to), id, tokenAmount);
     }
@@ -345,14 +351,14 @@ contract Pool is
         uint256 airdropAmount
     ) external payable nonReentrant {
         if(protocolPause)
-            revert ProtocolPaused(13);
+            revert ProtocolPaused(TAG);
 
         if(borrowPause[id][chainId])
-            revert BorrowPaused(13, chainId, id);
+            revert BorrowPaused(TAG, chainId, id);
 
         uint256 fee;
         if (feeEnable) {
-            fee = IFeeProvider(feeProvider).getFeeAmount(chainId, id, tokenAmount);
+            fee = IFeeProvider(feeProvider).setFeeAmount(chainId, id, tokenAmount);
         }
 
         uint256 debtAmount = ICore(core).borrow(
@@ -371,7 +377,7 @@ contract Pool is
             uint64(tokenAmount % BASE)
         );
         if(payload.length != 80)
-            revert BadPayload(13, payload.length, 80);
+            revert BadPayload(TAG, payload.length, 80);
 
         IAdapter(adapter).send{value: msg.value}(
             payload,
@@ -388,7 +394,8 @@ contract Pool is
             chainId,
             tokenAmount,
             debtAmount,
-            route
+            route,
+            fee
         );
         emit Data.SendToken(_bytesToAddress(to), id, tokenAmount);
     }
@@ -408,19 +415,17 @@ contract Pool is
         uint256 tokenAmount,
         bytes32 route
     ) internal {
-        (uint256 repayAmount, uint256 debtAmount, uint256 ceAmount) = ICore(
-            core
-        ).repay(id, chainId, user, tokenAmount);
-
-        uint256 fee;
-        if (feeEnable) {
-            fee = IFeeProvider(feeProvider).getFeeAmount(chainId, id, tokenAmount);
-            if (fee > 0)
-                ICore(core).repay(id, chainId, user, fee);
+        uint256 reward;
+        if (rewardEnable) {
+            reward = IFeeProvider(feeProvider).setRewardAmount(chainId, id, tokenAmount);
+            tokenAmount += reward;
         }
+        (uint256 repayAmount, uint256 debtAmount, uint256 ceAmount) = ICore(core).repay(id, chainId, user, tokenAmount);
+
+        
         
 
-        emit Data.Repay(user, id, chainId, repayAmount, debtAmount, ceAmount, route);
+        emit Data.Repay(user, id, chainId, repayAmount, debtAmount, ceAmount, route, reward);
         emit Data.ReceiveToken(user, id, tokenAmount);
     }
 
@@ -439,16 +444,36 @@ contract Pool is
         uint256 tokenAmount,
         bytes32 route
     ) internal {
-        uint256 ceAmount = ICore(core).deposit(id, chainId, user, tokenAmount);
-        uint256 fee;
-        if (feeEnable) {
-            fee = IFeeProvider(feeProvider).getFeeAmount(chainId, id, tokenAmount);
-            if (fee > 0)
-                ICore(core).deposit(id, chainId, user, fee);
+        uint256 reward;
+        if (rewardEnable) {
+            reward = IFeeProvider(feeProvider).setRewardAmount(chainId, id, tokenAmount);
         }
+        uint256 ceAmount = ICore(core).deposit(id, chainId, user, tokenAmount.add(reward));
         
-        emit Data.Deposit(user, id, chainId, tokenAmount, ceAmount, route);
+        emit Data.Deposit(user, id, chainId, tokenAmount, ceAmount, route, reward);
         emit Data.ReceiveToken(user, id, tokenAmount);
+    }
+
+     /**
+     * @notice Swaps liquidity amount from one chain to another
+     * This function can only be accessed by account with role SWAP.
+     * @param id - pool id of the asset.
+     * @param srcChainId - chain id of the source chain
+     * @param destChainId - chain id of the destination chain
+     * @param tokenAmountInSrc - liquidity amount sent from source chain
+     * @param tokenAmountInDest - liquidity amount received to destination chain
+     **/
+    function swap(
+        bytes32 id,
+        bytes32 srcChainId,
+        bytes32 destChainId,
+        uint256 tokenAmountInSrc,
+        uint256 tokenAmountInDest
+    ) external onlyRole(IRoleManager(roleManager).SWAP()) {
+        ICore(core).swap(id,srcChainId,destChainId,tokenAmountInSrc,tokenAmountInDest);
+        uint256 reward = IFeeProvider(feeProvider).setRewardAmount(destChainId, id, tokenAmountInDest);
+        emit Data.Swap(reward);
+        
     }
 
     /**
@@ -468,7 +493,7 @@ contract Pool is
         uint64 amountpx;
         uint64 amountsx;
         if(_payload.length != 81)
-            revert BadPayload(13, _payload.length, 81);
+            revert BadPayload(TAG, _payload.length, 81);
         
         uint8 functionType = uint8(_payload[0]); // _payload received is encoded in format (uint8, bytes32, bytes32, uint64, uint64)
         assembly {
@@ -484,7 +509,7 @@ contract Pool is
         } else if (functionType == TYPE_REPAY) {
             _repay(tokenId, chainId, _bytesToAddress(data), amount, route);
         } else {
-            revert UnsupportedFunctionType(13, functionType);
+            revert UnsupportedFunctionType(TAG, functionType);
         }
     }
 

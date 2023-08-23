@@ -6,6 +6,8 @@ import "@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
 import "../interfaces/IRoleManager.sol";
 import "../interfaces/ICore.sol";
 
+string constant TAG = "DebtToken";
+
 /**
  * @title Debt (DT) Token
  * @notice Each token that is deposited will have it's own DT Token.
@@ -17,7 +19,7 @@ contract DebtToken is ERC20Upgradeable {
     address public roleManager;
     bytes32 public poolId;
 
-    error CannotTransferDebtToken();
+    error CannotTransferDebtToken(string contractTAG);
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -82,7 +84,7 @@ contract DebtToken is ERC20Upgradeable {
      * @param user - The address of user.
      **/
     function balanceOf(address user) public view override returns (uint256) {
-        uint dtScaled = ICore(core).getDTScaled(poolId);
+        uint256 dtScaled = ICore(core).getDTScaled(poolId);
         return super.balanceOf(user).mul(dtScaled).div(1e18);
     }
 
@@ -98,8 +100,7 @@ contract DebtToken is ERC20Upgradeable {
         uint256 amount
     ) internal pure override {
         (from, to, amount);
-        // require(false, string.concat(TAG,": Cannot transfer debt token"));
-        revert CannotTransferDebtToken();
+        revert CannotTransferDebtToken(TAG);
     }
 
     /**

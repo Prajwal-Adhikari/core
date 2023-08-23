@@ -18,9 +18,9 @@ abstract contract NonblockingLzApp is LzApp {
 
     event MessageFailed(uint16 _srcChainId, bytes _srcAddress, uint64 _nonce, bytes _payload);
 
-    error CallerNotLzApp(uint contractCode, address caller);
-    error NoStoredMessage(uint contractCode);
-    error InvalidPayload(uint contractCode);
+    error CallerNotLzApp(string contractTAG, address caller);
+    error NoStoredMessage(string contractTAG);
+    error InvalidPayload(string contractTAG);
 
     // overriding the virtual function in LzReceiver
     function _blockingLzReceive(uint16 _srcChainId, bytes memory _srcAddress, uint64 _nonce, bytes memory _payload) internal virtual override {
@@ -37,7 +37,7 @@ abstract contract NonblockingLzApp is LzApp {
     function nonblockingLzReceive(uint16 _srcChainId, bytes memory _srcAddress, uint64 _nonce, bytes memory _payload) public virtual {
         // only internal transaction
         if(_msgSender() != address(this))
-            revert CallerNotLzApp(6, _msgSender());
+            revert CallerNotLzApp(TAG, _msgSender());
         _nonblockingLzReceive(_srcChainId, _srcAddress, _nonce, _payload);
     }
 
@@ -49,10 +49,10 @@ abstract contract NonblockingLzApp is LzApp {
         bytes32 payloadHash = failedMessages[_srcChainId][_srcAddress][_nonce];
 
         if(payloadHash == bytes32(0))
-            revert NoStoredMessage(6);
+            revert NoStoredMessage(TAG);
 
         if(keccak256(_payload) != payloadHash)
-            revert InvalidPayload(6);
+            revert InvalidPayload(TAG);
         
         // clear the stored message
         failedMessages[_srcChainId][_srcAddress][_nonce] = bytes32(0);

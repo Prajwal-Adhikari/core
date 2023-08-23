@@ -7,6 +7,8 @@ import "./interfaces/IRoute.sol";
 import "./interfaces/IPool.sol";
 import "./interfaces/IRoleManager.sol";
 
+string constant TAG = "AdapterPool";
+
 /**
  * @title AdapterPool
  * @notice Pool interact with Adapter pass message through desired route
@@ -21,7 +23,7 @@ contract AdapterPool is Initializable, ContextUpgradeable {
     mapping(bytes32 => address) public router;
     mapping(address => bool) public routeExist;
 
-    error NoRouteExists(uint contractCode, bytes32 route);
+    error NoRouteExists(string contractTAG, bytes32 route);
     /**
      * @dev Modifier that checks if caller has a specific role.
      **/
@@ -91,7 +93,7 @@ contract AdapterPool is Initializable, ContextUpgradeable {
         bytes32 route
     ) external payable onlyRole(IRoleManager(roleManager).POOL()) {
         if(! routeExist[router[route]])
-            revert NoRouteExists(8, route);
+            revert NoRouteExists(TAG, route);
         IRoute(router[route]).send{value: msg.value}(
             payload,
             chainId,

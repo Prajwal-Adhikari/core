@@ -13,6 +13,8 @@ import "./interfaces/ICore.sol";
 import "./interfaces/IRoleManager.sol";
 import "./libraries/Data.sol";
 
+string constant TAG = "LiquidationManager";
+
 /** 
 * @title LiquidationManager
 * @notice Users interact with LiquidationManager for Liquidate actions.
@@ -32,9 +34,9 @@ contract LiquidationManager is
     IOracle public oracle;
     bool public liquidationPause;
 
-    error CannotLiquidate(uint contractCode, uint256 currentHealthFactor);
-    error ClosingFactotExceeded(uint contractCode);
-    error LiquidationPaused(uint contractCode);
+    error CannotLiquidate(string contractTAG, uint256 currentHealthFactor);
+    error ClosingFactotExceeded(string contractTAG);
+    error LiquidationPaused(string contractTAG);
     /**
      * @dev Modifier that checks if caller has a specific role.
      **/
@@ -153,7 +155,7 @@ contract LiquidationManager is
     ) external nonReentrant {
         // whether liquidation is enable or not
         if(liquidationPause)
-            revert LiquidationPaused(11);
+            revert LiquidationPaused(TAG);
 
         // refresh the pool data
         ICore(core).refresh(collateralId);
@@ -165,7 +167,7 @@ contract LiquidationManager is
 
         // whether borrower can be liquidated
         if(healthData.factor < MAX_HEALTH_FACTOR)
-            revert CannotLiquidate(11, healthData.factor);
+            revert CannotLiquidate(TAG, healthData.factor);
 
         // calculate LTV, and using formula to calculate liquidate discount and closing factor
         uint256 currentLTV = healthData.debtValue.mul(1e18).div(
@@ -205,7 +207,7 @@ contract LiquidationManager is
             discount
         );
         if(healthData.collateralValue.mul(liqPercent).div(1e18) < params.liqValue)
-            revert ClosingFactotExceeded(11);
+            revert ClosingFactotExceeded(TAG);
         // mint and burn CEToken and DebtToken then update supply
         IDebtToken(debtPool.debtToken).burn(
             user,
@@ -222,11 +224,8 @@ contract LiquidationManager is
             debtPool.debtSupply.sub(params.burnBorrowerDebtAmount)
         );
 
-        ICEToken(collateralPool.ceToken).burn(user, params.liqBorrowerCEAmount);
-        ICEToken(collateralPool.ceToken).mint(
-            msg.sender,
-            params.liqBorrowerCEAmount
-        );
+        ICEToken(collateralPool.ceToken).liquidate(user,msg.sender, params.liqBorrowerCEAmount);
+    
         ICore(core).addTokenForLiquidator(msg.sender, collateralId);
 
         ICore(core).updateInterestRate(collateralId);

@@ -7,6 +7,8 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "./interfaces/ICore.sol";
 import "./interfaces/IRoleManager.sol";
 
+string constant TAG = "FeeProvider";
+
 /**
  * @title FeeProvider
  * @notice Pool interact with FeeProvider for getting fee and reward amount.
@@ -31,9 +33,9 @@ contract FeeProvider is Initializable, ContextUpgradeable {
     address public core;
     address public roleManager;
 
-    error ArgumentsMismatch(uint256 contractCode);
-    error NotEnoughLiquidity(uint256 contractCode, uint256 liquidity);
-    error OutOfBoundBalance(uint256 contractCode);
+    error ArgumentsMismatch(string contractTAG);
+    error NotEnoughLiquidity(string contractTAG, uint256 liquidity);
+    error OutOfBoundBalance(string contractTAG);
     /**
      * @dev Modifier that checks if caller has a specific role.
      **/
@@ -90,7 +92,7 @@ contract FeeProvider is Initializable, ContextUpgradeable {
         uint256[] memory liquidityFactor
     ) external onlyRole(IRoleManager(roleManager).SET_FEEPROVIDER_METHOD()) {
         if (poolId.length != liquidityFactor.length)
-            revert ArgumentsMismatch(10);
+            revert ArgumentsMismatch(TAG);
 
         for (uint256 i = 0; i < poolId.length; i++) {
             OPTIMAL_GLOBAL_LIQUIDITY_FACTOR[chainId][poolId[i]] = liquidityFactor[i];
@@ -99,6 +101,7 @@ contract FeeProvider is Initializable, ContextUpgradeable {
 
     /**
      * @notice Add the amount of fee to fee pool while withdrawing/borrowing an asset from a chain
+     * This function can only be accessed by the account with role POOL.
      * @param chainId - id of the chain.
      * @param poolId - id of the pool.
      * @param amount - amount of tokens withdrawn or borrowed
@@ -118,6 +121,7 @@ contract FeeProvider is Initializable, ContextUpgradeable {
 
     /**
      * @notice Deduct the amount of reward from fee pool while depositing/repaying an asset from a chain
+     * This function can only be accessed by the account with role POOL.
      * @param chainId - id of the chain.
      * @param poolId - id of the pool.
      * @param amount - amount of tokens withdrawn or borrowed
@@ -150,7 +154,7 @@ contract FeeProvider is Initializable, ContextUpgradeable {
         uint256 totalLiquidity = ICore(core).totalLiquidity(poolId);
 
         if (beforeLiquidity < amount) {
-            revert NotEnoughLiquidity(10, beforeLiquidity);
+            revert NotEnoughLiquidity(TAG, beforeLiquidity);
         }
 
         uint256 afterLiquidity = beforeLiquidity.sub(amount);
@@ -307,7 +311,7 @@ contract FeeProvider is Initializable, ContextUpgradeable {
         uint256 xEnd
     ) internal pure returns (uint256) {
         if (xEnd < xLowerBound || xStart > xUpperBound) {
-            revert OutOfBoundBalance(10);
+            revert OutOfBoundBalance(TAG);
         }
        
         uint256 xBoundWidth = xUpperBound.sub(xLowerBound);

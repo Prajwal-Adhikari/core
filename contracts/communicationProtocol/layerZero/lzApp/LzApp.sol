@@ -8,21 +8,23 @@ import "../interfaces/ILayerZeroReceiver.sol";
 import "../interfaces/ILayerZeroUserApplicationConfig.sol";
 import "../interfaces/ILayerZeroEndpoint.sol";
 
+string constant TAG = "LzApp";
+
 /*
  * a generic LzReceiver implementation
  */
 contract LzApp is Initializable, OwnableUpgradeable, ILayerZeroReceiver {
     ILayerZeroEndpoint public lzEndpoint;
-    uint public localId;
+    uint256 public localId;
 
     mapping(uint16 => bytes) public trustedRemoteLookup;
 
     event SetTrustedRemote(uint16 _srcChainId, bytes _srcAddress);
 
-    error InvalidSrcContract(uint contractCode, bytes srcContract);
-    error InvalidEndpointCaller(uint contractCode, address srcContract);
-    error DstChainIsNotTrusted(uint contractCode, uint16 dstChainID);
-    error FeeRefundFailed(uint contractCode);
+    error InvalidSrcContract(string contractTAG, bytes srcContract);
+    error InvalidEndpointCaller(string contractTAG, address srcContract);
+    error DstChainIsNotTrusted(string contractTAG, uint16 dstChainID);
+    error FeeRefundFailed(string contractTAG);
 
     function __LzApp_init(address _endpoint, uint16 _localId) internal onlyInitializing {
         lzEndpoint = ILayerZeroEndpoint(_endpoint);
@@ -35,10 +37,10 @@ contract LzApp is Initializable, OwnableUpgradeable, ILayerZeroReceiver {
         bytes memory sender = abi.encodePacked(msg.sender, address(this));
 
         if(sender.length != trustedRemote.length)
-            revert InvalidSrcContract(5, sender);
+            revert InvalidSrcContract(TAG, sender);
 
         if(keccak256(sender) != keccak256(trustedRemote))
-            revert InvalidSrcContract(5, sender);
+            revert InvalidSrcContract(TAG, sender);
 
         _blockingLzReceive(_srcChainId, sender, 0, _payload);
     }
@@ -46,15 +48,15 @@ contract LzApp is Initializable, OwnableUpgradeable, ILayerZeroReceiver {
     function lzReceive(uint16 _srcChainId, bytes memory _srcAddress, uint64 _nonce, bytes memory _payload) public virtual override {
         // lzReceive must be called by the endpoint for security
         if(_msgSender() != address(lzEndpoint))
-            revert InvalidEndpointCaller(5, _msgSender());
+            revert InvalidEndpointCaller(TAG, _msgSender());
 
         bytes memory trustedRemote = trustedRemoteLookup[_srcChainId];
         // if will still block the message pathway from (srcChainId, srcAddress). should not receive message from untrusted remote.
         if(_srcAddress.length != trustedRemote.length)
-            revert InvalidSrcContract(5, _srcAddress);
+            revert InvalidSrcContract(TAG, _srcAddress);
 
         if(keccak256(_srcAddress) != keccak256(trustedRemote))
-            revert InvalidSrcContract(5, _srcAddress);
+            revert InvalidSrcContract(TAG, _srcAddress);
             
         _blockingLzReceive(_srcChainId, _srcAddress, _nonce, _payload);
     }
@@ -65,18 +67,18 @@ contract LzApp is Initializable, OwnableUpgradeable, ILayerZeroReceiver {
 
     
 
-    function _lzSend(uint16 _dstChainId, bytes memory _payload, address payable _refundAddress, address _zroPaymentAddress, bytes memory _adapterParams, uint gasValue) internal virtual {
+    function _lzSend(uint16 _dstChainId, bytes memory _payload, address payable _refundAddress, address _zroPaymentAddress, bytes memory _adapterParams, uint256 gasValue) internal virtual {
         bytes memory trustedRemote = trustedRemoteLookup[_dstChainId];
 
         if(trustedRemote.length == 0)
-            revert DstChainIsNotTrusted(5, _dstChainId);
+            revert DstChainIsNotTrusted(TAG, _dstChainId);
 
         if(_dstChainId == localId) {
             if (gasValue > 0) {
                 (bool sent, ) = _refundAddress.call{value: gasValue}("");
                 // require(sent, "LzApp: Failed to refund fees");
                 if(! sent)
-                    revert FeeRefundFailed(5);
+                    revert FeeRefundFailed(TAG);
             }
             ILayerZeroReceiver(address(bytes20(trustedRemote))).localReceive(_dstChainId, _payload);
         } else {

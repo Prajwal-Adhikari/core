@@ -25,8 +25,8 @@ contract AxlRoutePool is Initializable, AxelarExecutable, ContextUpgradeable {
     bytes32 public route;
 
     event Executed();
-    error FeeRefundFailed(uint contractCode);
-    error InvalidContract(uint contractCode, address receivedAddress);
+    error FeeRefundFailed(string contractTAG);
+    error InvalidContract(string contractTAG, address receivedAddress);
     
     /**
      * @dev Modifier that checks if caller has a specific role.
@@ -95,7 +95,7 @@ contract AxlRoutePool is Initializable, AxelarExecutable, ContextUpgradeable {
             if (msg.value > 0) {
                 (bool sent, ) = payable(sender).call{value: msg.value}("");
                 if(! sent)
-                    revert FeeRefundFailed(7);
+                    revert FeeRefundFailed(TAG);
             }
             
             IAxelarGateway(StringToAddress.toAddress(destAddress[chainId]))
@@ -127,7 +127,7 @@ contract AxlRoutePool is Initializable, AxelarExecutable, ContextUpgradeable {
         bytes32 chain = keccak256(abi.encodePacked(sourceChain_));
         address addr = StringToAddress.toAddress(sourceAddress_);
         if(trustedContract[chain] != addr)
-            revert InvalidContract(7, addr);
+            revert InvalidContract(TAG, addr);
         IAdapter(adapter).execute(payload_, chainKey[chain], route);
     }
 }

@@ -8,15 +8,17 @@ import "./interfaces/IUniswapV3Factory.sol";
 import "./libraries/OracleLibrary.sol";
 import "./interfaces/IRoleManager.sol";
 
+string constant TAG = "Oracle";
+
 interface IERC20 {
     function decimals() external view returns (uint8);
 }
 
 interface DexRouter {
     function getAmountsOut(
-        uint amountIn,
+        uint256 amountIn,
         address[] calldata path
-    ) external view returns (uint[] memory amounts);
+    ) external view returns (uint256[] memory amounts);
 }
 
 /**
@@ -40,11 +42,11 @@ contract Oracle is Initializable, ContextUpgradeable {
 
     event SetPrice(bytes32 symbol, uint256 price);
 
-    error PriceNotSet(uint contractCode, bytes32 symbol);
-    error ChainlinkMalfunction(uint contractCode, bytes32 symbol);
-    error RoundNotComplete(uint contractCode, bytes32 symbol);
-    error StaleData(uint contractCode, bytes32 symbol);
-    error PoolNotExist(uint contractCode, bytes32 symbol);
+    error PriceNotSet(string contractTAG, bytes32 symbol);
+    error ChainlinkMalfunction(string contractTAG, bytes32 symbol);
+    error RoundNotComplete(string contractTAG, bytes32 symbol);
+    error StaleData(string contractTAG, bytes32 symbol);
+    error PoolNotExist(string contractTAG, bytes32 symbol);
     /**
      * @dev Modifier that checks if caller has a specific role.
      **/
@@ -190,7 +192,7 @@ contract Oracle is Initializable, ContextUpgradeable {
                 price = getPriceFromChainlink(_symbols[i]);
             }
             if(price == 0)
-                revert PriceNotSet(12, _symbols[i]);
+                revert PriceNotSet(TAG, _symbols[i]);
             results[i] = price;
         }
     }
@@ -212,7 +214,7 @@ contract Oracle is Initializable, ContextUpgradeable {
                 result = getPriceFromChainlink(_symbol);
             }
             if(result == 0)
-                revert PriceNotSet(12, _symbol);
+                revert PriceNotSet(TAG, _symbol);
             
         }
     
@@ -227,8 +229,8 @@ contract Oracle is Initializable, ContextUpgradeable {
         (
             uint80 roundID,
             int256 basePrice,
-            /*uint startedAt*/,
-            uint timeStamp,
+            /*uint256 startedAt*/,
+            uint256 timeStamp,
             uint80 answeredInRound
         ) =
          AggregatorV3Interface(
@@ -236,13 +238,13 @@ contract Oracle is Initializable, ContextUpgradeable {
         ).latestRoundData();
 
         if(basePrice == 0)
-            revert ChainlinkMalfunction(12, _symbol);
+            revert ChainlinkMalfunction(TAG, _symbol);
 
         if(timeStamp == 0)
-            revert RoundNotComplete(12, _symbol);
+            revert RoundNotComplete(TAG, _symbol);
 
         if(answeredInRound < roundID)
-            revert StaleData(12, _symbol);
+            revert StaleData(TAG, _symbol);
 
         uint8 quoteDecimals = AggregatorV3Interface(aggregator[_symbol])
             .decimals();
@@ -269,7 +271,7 @@ contract Oracle is Initializable, ContextUpgradeable {
             fee[_symbol]
         );
         if(pool == address(0))
-            revert PoolNotExist(12, _symbol);
+            revert PoolNotExist(TAG, _symbol);
 
         int24 tick = OracleLibrary.consult(pool, timeInterval[_symbol]);
 

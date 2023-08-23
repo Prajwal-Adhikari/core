@@ -2,7 +2,7 @@
 pragma solidity 0.8.17;
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "../../communicationProtocol/layerZero/lzApp/LzApp.sol";
+import {LzApp} from "../../communicationProtocol/layerZero/lzApp/LzApp.sol";
 import "../interfaces/IAdapter.sol";
 import "../interfaces/IRoleManager.sol";
 
@@ -25,8 +25,8 @@ contract LzRouteBranch is Initializable, LzApp {
     uint8 internal constant TYPE_SWAP = 3;
 
     uint256 public gasUsage;
-    error InvalidChainId(uint contractCode, uint16 chainIdReceived);
-    error UnsupportedFunctionType(uint contractCode, uint8 functionType);
+    error InvalidChainId(string contractTAG, uint16 chainIdReceived);
+    error UnsupportedFunctionType(string contractTAG, uint8 functionType);
     /**
      * @dev Modifier that checks if caller has a specific role.
      **/
@@ -119,7 +119,7 @@ contract LzRouteBranch is Initializable, LzApp {
         bytes memory _payload
     ) internal override {
         if(rootChainId != _srcId)
-            revert InvalidChainId(1, _srcId);
+            revert InvalidChainId(TAG, _srcId);
         IAdapter(adapter).execute(_payload);
     }
 
@@ -139,7 +139,7 @@ contract LzRouteBranch is Initializable, LzApp {
         } else if (functionType == TYPE_SWAP) {
             payload = abi.encode(TYPE_SWAP, 1, msg.sender, 1, 1);
         } else {
-            revert UnsupportedFunctionType(1, functionType);
+            revert UnsupportedFunctionType(TAG, functionType);
         }
         uint256 fees;
         if (airdropAmount > 0) {

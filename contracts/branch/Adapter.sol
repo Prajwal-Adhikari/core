@@ -6,6 +6,8 @@ import "./interfaces/IRoute.sol";
 import "./interfaces/IBranch.sol";
 import "./interfaces/IRoleManager.sol";
 
+string constant TAG = "AdapterBranch";
+
 /**
  * @title AdapterBranch
  * @notice Branch interact with Adapter pass message through desired route
@@ -22,7 +24,7 @@ contract AdapterBranch is Initializable, ContextUpgradeable {
     mapping(bytes32 => address) public router;
     mapping(address => bool) public routeExist;
 
-    error NoRouteExists(uint contractCode, bytes32 route);
+    error NoRouteExists(string contractTAG, bytes32 route);
     /**
      * @dev Modifier that checks if caller has a specific role.
      **/
@@ -93,7 +95,7 @@ contract AdapterBranch is Initializable, ContextUpgradeable {
         bytes32 route
     ) external payable onlyRole(IRoleManager(roleManager).BRANCH()) {
         if(! routeExist[router[route]])
-            revert NoRouteExists(2, route);
+            revert NoRouteExists(TAG, route);
         IRoute(router[route]).send{value: msg.value}(
             payload,
             sender,

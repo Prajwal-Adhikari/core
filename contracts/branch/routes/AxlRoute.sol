@@ -10,7 +10,7 @@ import "../interfaces/IAdapter.sol";
 import "../interfaces/IRoleManager.sol";
 import "../../root/libraries/Address.sol";
 
-// string constant TAG = "AxlRouteBranch";
+string constant TAG = "AxlRouteBranch";
 
 contract AxlRouteBranch is Initializable, AxelarExecutable, ContextUpgradeable {
     //Axelar's chain id of the chain where root is deployed
@@ -24,8 +24,8 @@ contract AxlRouteBranch is Initializable, AxelarExecutable, ContextUpgradeable {
     IAxelarGasService gasService;
 
     event Executed();
-    error InvalidSource(uint contractCode);
-    error FeeRefundFailed(uint contractCode);
+    error InvalidSource(string contractTAG);
+    error FeeRefundFailed(string contractTAG);
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -82,7 +82,7 @@ contract AxlRouteBranch is Initializable, AxelarExecutable, ContextUpgradeable {
             if (msg.value > 0) {
                 (bool sent, ) = payable(sender).call{value: msg.value}("");
                 if(! sent)
-                    revert FeeRefundFailed(0);
+                    revert FeeRefundFailed(TAG);
             }
             IAxelarGateway(StringToAddress.toAddress(rootAddress)).localReceive(
                 localChainId,
@@ -112,12 +112,12 @@ contract AxlRouteBranch is Initializable, AxelarExecutable, ContextUpgradeable {
             keccak256(abi.encodePacked(rootChainId)) !=
             keccak256(abi.encodePacked(sourceChain_)) 
         )
-            revert InvalidSource(0);
+            revert InvalidSource(TAG);
         if(
             StringToAddress.toAddress(rootAddress) !=
             StringToAddress.toAddress(sourceAddress_)
         )
-            revert InvalidSource(0);
+            revert InvalidSource(TAG);
 
         IAdapter(adapter).execute(payload_);
         emit Executed();
