@@ -240,7 +240,7 @@ contract Pool is
         }
         if(feeEnable) {
             fee = IFeeProvider(feeProvider).setFeeAmount(chainId, id, tokenAmount);
-            tokenAmount -= fee;
+            
         }
 
         uint256 burnAmount = ICore(core).withdraw(
@@ -249,6 +249,8 @@ contract Pool is
             tokenAmount,
             _msgSender()
         );
+
+        tokenAmount -= fee;
 
         bytes memory payload = abi.encodePacked(
             id,
@@ -359,7 +361,6 @@ contract Pool is
         uint256 fee;
         if (feeEnable) {
             fee = IFeeProvider(feeProvider).setFeeAmount(chainId, id, tokenAmount);
-            tokenAmount -= fee;
         }
 
         uint256 debtAmount = ICore(core).borrow(
@@ -368,6 +369,8 @@ contract Pool is
             tokenAmount,
             _msgSender()
         );
+
+        tokenAmount -= fee;
 
         bytes memory payload = abi.encodePacked(
             id,
