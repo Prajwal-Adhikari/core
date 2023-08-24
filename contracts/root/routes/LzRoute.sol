@@ -45,6 +45,8 @@ contract LzRoutePool is Initializable, LzApp {
         address roleManagerAddress
     ) public initializer {
         __LzApp_init(_lzEndpoint, _localChainId);
+        if(_gasUsage < 200000)
+            revert InsufficientGas(TAG);
         gasUsage = _gasUsage;
         roleManager = roleManagerAddress;
     }

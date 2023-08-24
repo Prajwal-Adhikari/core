@@ -51,6 +51,8 @@ contract LzRouteBranch is Initializable, LzApp {
     ) public initializer {
         __LzApp_init(_lzEndpoint, _localChainId);
         rootChainId = _rootChainId;
+        if(_gasUsage < 600000)
+            revert InsufficientGas(TAG);
         gasUsage = _gasUsage;
         roleManager = roleManagerAddress;
     }
@@ -80,7 +82,7 @@ contract LzRouteBranch is Initializable, LzApp {
     function setGasUsage(
         uint256 _gasUsage
     ) external onlyRole(IRoleManager(roleManager).SET_ROUTE_METHOD()) {
-        if(_gasUsage < 400000)
+        if(_gasUsage < 600000)
             revert InsufficientGas(TAG);
         gasUsage = _gasUsage;
     }
