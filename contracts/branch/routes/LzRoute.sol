@@ -27,6 +27,8 @@ contract LzRouteBranch is Initializable, LzApp {
     uint256 public gasUsage;
     error InvalidChainId(string contractTAG, uint16 chainIdReceived);
     error UnsupportedFunctionType(string contractTAG, uint8 functionType);
+    error InsufficientGas(string contractTAG);
+    
     /**
      * @dev Modifier that checks if caller has a specific role.
      **/
@@ -78,6 +80,8 @@ contract LzRouteBranch is Initializable, LzApp {
     function setGasUsage(
         uint256 _gasUsage
     ) external onlyRole(IRoleManager(roleManager).SET_ROUTE_METHOD()) {
+        if(_gasUsage < 400000)
+            revert InsufficientGas(TAG);
         gasUsage = _gasUsage;
     }
 

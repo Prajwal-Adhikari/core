@@ -50,6 +50,7 @@ contract Core is Initializable, ContextUpgradeable {
     error InvalidSender(string contractTAG, address sender);
     error ChainNotDead(string contractTAG, bytes32 chainId);
     error ExcessLiquidityInDest(string contractTAG);
+    error HighDiscountPercentage(string contractTAG);
 
     /**
      * @dev Modifier that checks if caller has a specific role.
@@ -109,6 +110,9 @@ contract Core is Initializable, ContextUpgradeable {
         address _ceToken,
         address _debtToken
     ) external onlyRole(IRoleManager(roleManager).INIT_POOL()) {
+        if (config.liqMaxDiscount > 2e17)
+            revert HighDiscountPercentage(TAG);
+
         updateInterestRate(id);
         configs[id] = config;
         Data.PoolData storage pool = pools[id];

@@ -23,6 +23,8 @@ contract LzRoutePool is Initializable, LzApp {
     uint256 public gasUsage;
     bytes32 public route;
 
+    error InsufficientGas(string contractTAG);
+
     /**
      * @dev Modifier that checks if caller has a specific role.
      **/
@@ -58,6 +60,8 @@ contract LzRoutePool is Initializable, LzApp {
     }
 
     function setGasUsage(uint256 _gasUsage) external onlyRole(IRoleManager(roleManager).SET_ROUTE_METHOD()) {
+        if(_gasUsage < 200000)
+            revert InsufficientGas(TAG);
         gasUsage = _gasUsage;
     }
 
