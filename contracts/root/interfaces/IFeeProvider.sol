@@ -55,6 +55,19 @@ interface IFeeProvider {
     ) external returns (uint256);
 
     /**
+     * @notice Deduct the amount of reward from fee pool while swapping
+     * This function can only be accessed by the account with role POOL.
+     * @param chainId - id of the chain.
+     * @param poolId - id of the pool.
+     * @param amount - amount of tokens swapped and deposited to the chain
+     **/
+    function setRewardAmountForSwap(
+        bytes32 chainId,
+        bytes32 poolId,
+        uint256 amount
+    ) external returns (uint256);
+
+    /**
      * @notice Returns the amount of fee while withdrawing/borrowing an asset from a chain
      * @param _chainId - id of the chain.
      * @param _poolId - id of the pool.
@@ -73,6 +86,18 @@ interface IFeeProvider {
      * @param amount - amount of tokens deposited or repayed
      **/
     function getRewardAmount(
+        bytes32 chainId,
+        bytes32 poolId,
+        uint256 amount
+    ) external view returns (uint256);
+
+    /**
+     * @notice Returns the amount of reward while swapping
+     * @param chainId - id of the chain.
+     * @param poolId - id of the pool.
+     * @param amount - amount of tokens amount of tokens swapped and deposited to the chain
+     **/
+    function getRewardAmountForSwap(
         bytes32 chainId,
         bytes32 poolId,
         uint256 amount

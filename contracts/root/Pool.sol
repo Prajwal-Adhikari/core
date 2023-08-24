@@ -235,11 +235,12 @@ contract Pool is
             revert WithdrawPaused(TAG, chainId, id);
 
         uint256 fee;
-         if(all) {
+        if(all) {
             tokenAmount = ICore(core).getWithdrawableBalancePerPool(id,_msgSender());
         }
         if(feeEnable) {
             fee = IFeeProvider(feeProvider).setFeeAmount(chainId, id, tokenAmount);
+            tokenAmount -= fee;
         }
 
         uint256 burnAmount = ICore(core).withdraw(
@@ -249,7 +250,6 @@ contract Pool is
             _msgSender()
         );
 
-        tokenAmount -= fee;
         bytes memory payload = abi.encodePacked(
             id,
             to,
@@ -359,6 +359,7 @@ contract Pool is
         uint256 fee;
         if (feeEnable) {
             fee = IFeeProvider(feeProvider).setFeeAmount(chainId, id, tokenAmount);
+            tokenAmount -= fee;
         }
 
         uint256 debtAmount = ICore(core).borrow(
@@ -367,8 +368,6 @@ contract Pool is
             tokenAmount,
             _msgSender()
         );
-
-        tokenAmount -= fee;
 
         bytes memory payload = abi.encodePacked(
             id,
@@ -418,13 +417,9 @@ contract Pool is
         uint256 reward;
         if (rewardEnable) {
             reward = IFeeProvider(feeProvider).setRewardAmount(chainId, id, tokenAmount);
-            tokenAmount += reward;
         }
-        (uint256 repayAmount, uint256 debtAmount, uint256 ceAmount) = ICore(core).repay(id, chainId, user, tokenAmount);
 
-        
-        
-
+        (uint256 repayAmount, uint256 debtAmount, uint256 ceAmount) = ICore(core).repay(id, chainId, user, tokenAmount.add(reward));
         emit Data.Repay(user, id, chainId, repayAmount, debtAmount, ceAmount, route, reward);
         emit Data.ReceiveToken(user, id, tokenAmount);
     }
@@ -470,8 +465,11 @@ contract Pool is
         uint256 tokenAmountInSrc,
         uint256 tokenAmountInDest
     ) external onlyRole(IRoleManager(roleManager).SWAP()) {
+        uint256 reward;
+        if (rewardEnable) {
+            reward = IFeeProvider(feeProvider).setRewardAmountForSwap(destChainId, id, tokenAmountInDest);
+        }
         ICore(core).swap(id,srcChainId,destChainId,tokenAmountInSrc,tokenAmountInDest);
-        uint256 reward = IFeeProvider(feeProvider).setRewardAmount(destChainId, id, tokenAmountInDest);
         emit Data.Swap(reward);
         
     }

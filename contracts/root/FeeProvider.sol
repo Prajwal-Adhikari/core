@@ -110,10 +110,7 @@ contract FeeProvider is Initializable, ContextUpgradeable {
         bytes32 chainId,
         bytes32 poolId,
         uint256 amount
-    )
-        external
-        onlyRole(IRoleManager(roleManager).POOL())
-        returns (uint256 fee)
+    ) external onlyRole(IRoleManager(roleManager).POOL()) returns (uint256 fee)
     {
         fee = getFeeAmount(chainId, poolId, amount);
         feeAmount[chainId][poolId] += fee;
@@ -130,12 +127,26 @@ contract FeeProvider is Initializable, ContextUpgradeable {
         bytes32 chainId,
         bytes32 poolId,
         uint256 amount
-    )
-        external
-        onlyRole(IRoleManager(roleManager).POOL())
-        returns (uint256 reward)
+    ) external onlyRole(IRoleManager(roleManager).POOL()) returns (uint256 reward)
     {
         reward = getRewardAmount(chainId, poolId, amount);
+        feeAmount[chainId][poolId] -= reward;
+    }
+
+    /**
+     * @notice Deduct the amount of reward from fee pool while swapping
+     * This function can only be accessed by the account with role POOL.
+     * @param chainId - id of the chain.
+     * @param poolId - id of the pool.
+     * @param amount - amount of tokens amount of tokens swapped and deposited to the chain
+     **/
+    function setRewardAmountForSwap(
+        bytes32 chainId,
+        bytes32 poolId,
+        uint256 amount
+    ) external onlyRole(IRoleManager(roleManager).POOL()) returns (uint256 reward)
+    {
+        reward = getRewardAmountForSwap(chainId, poolId, amount);
         feeAmount[chainId][poolId] -= reward;
     }
 
@@ -262,6 +273,39 @@ contract FeeProvider is Initializable, ContextUpgradeable {
        
         reward = (feeAmount[chainId][poolId].mul(amount)).div(
             newSafeZoneMax.sub(beforeLiquidity)
+        );
+        if (reward > feeAmount[chainId][poolId]) {
+            reward = feeAmount[chainId][poolId];
+        }
+    }
+
+    /**
+     * @notice Returns the amount of reward while swapping
+     * @param chainId - id of the chain.
+     * @param poolId - id of the pool.
+     * @param amount - amount of tokens amount of tokens swapped and deposited to the chain
+     **/
+    function getRewardAmountForSwap(
+        bytes32 chainId,
+        bytes32 poolId,
+        uint256 amount
+    ) public view returns (uint256 reward) {
+        uint256 beforeLiquidity = ICore(core).getLiquidity(chainId, poolId);
+        uint256 totalLiquidity = ICore(core).totalLiquidity(poolId);
+        uint256 optimalFactor = OPTIMAL_GLOBAL_LIQUIDITY_FACTOR[chainId][poolId];
+
+        uint256 safeZoneMax = optimalFactor
+            .mul(totalLiquidity)
+            .div(DENOMINATOR)
+            .mul(DELTA_1)
+            .div(DENOMINATOR);
+
+        if (beforeLiquidity > safeZoneMax) {
+            return 0;
+        }
+       
+        reward = (feeAmount[chainId][poolId].mul(amount)).div(
+            safeZoneMax.sub(beforeLiquidity)
         );
         if (reward > feeAmount[chainId][poolId]) {
             reward = feeAmount[chainId][poolId];

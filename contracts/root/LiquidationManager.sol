@@ -91,7 +91,8 @@ contract LiquidationManager is
     }
 
     /**
-     * @dev Set status for liquidation pause.
+     * @notice Sets status for liquidation pause.
+     * This function can only be accessed by the account with role SET_LIQUIDATION_METHOD
      * @param pause - Status for liquidation pause.
      **/
     function setLiquidationPause(
