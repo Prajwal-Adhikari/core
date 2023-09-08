@@ -184,7 +184,7 @@ contract Oracle is Initializable, ContextUpgradeable {
         for (uint256 i; i < _symbols.length; i++) {
             if (fetchFromDex[_symbols[i]]) {
                 if (isStableCoin[_symbols[i]]) {
-                    price = 1e18;
+                    price = getPriceFromChainlink(_symbols[i]);
                 } else {
                     price = getPriceFromDex(_symbols[i]);
                 }
