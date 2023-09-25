@@ -117,7 +117,7 @@ describe("Ready", function () {
 
         // Server Route
         const LzRoutePool = await ethers.getContractFactory("LzRoutePool");
-        routeS = await upgrades.deployProxy(LzRoutePool, [this.lzEndpointMockServer.address, this.chainIdServer, 600000, roleManagerS.address]);
+        routeS = await upgrades.deployProxy(LzRoutePool, [this.lzEndpointMockServer.address, this.chainIdServer, 200000, roleManagerS.address]);
 
         const LiquidationManager = await ethers.getContractFactory("LiquidationManager");
         liquidationManager = await upgrades.deployProxy(LiquidationManager, [roleManagerS.address]);
@@ -186,10 +186,10 @@ describe("Ready", function () {
         await liquidationManager.setCore(core.address);
 
         // alice account only has the permission to init pool
-        await core.connect(alice).initPool(MATIC, [toTokenAmount(0.5), toTokenAmount(0.1), toTokenAmount(0.5), 0, toTokenAmount(0.5), toTokenAmount(0.5), toTokenAmount(0.1), toTokenAmount(1), toTokenAmount(0.15)], ceMATIC.address, debtMATIC.address);
-        await core.connect(alice).initPool(FTM, [toTokenAmount(0.5), toTokenAmount(0.1), toTokenAmount(0.5), 0, toTokenAmount(0.5), toTokenAmount(0.5), toTokenAmount(0.1), toTokenAmount(1), toTokenAmount(0.15)], ceFTM.address, debtFTM.address);
-        await core.connect(alice).initPool(BNB, [toTokenAmount(0.5), toTokenAmount(0.1), toTokenAmount(0.5), 0, toTokenAmount(0.5), toTokenAmount(0.5), toTokenAmount(0.1), toTokenAmount(1), toTokenAmount(0.15)], ceBNB.address, debtBNB.address);
-        await core.connect(alice).initPool(USDC, [toTokenAmount(0.5), toTokenAmount(0.1), toTokenAmount(0.5), 0, toTokenAmount(0.5), toTokenAmount(0.5), toTokenAmount(0.1), toTokenAmount(1), toTokenAmount(0.15)], ceUSDC.address, debtUSDC.address);
+        await core.connect(alice).initPool(MATIC, [toTokenAmount(0.5), toTokenAmount(0.1), toTokenAmount(0.5), 0, toTokenAmount(0.5), toTokenAmount(0.5), toTokenAmount(0.1), toTokenAmount(0.1), toTokenAmount(0.15)], ceMATIC.address, debtMATIC.address);
+        await core.connect(alice).initPool(FTM, [toTokenAmount(0.5), toTokenAmount(0.1), toTokenAmount(0.5), 0, toTokenAmount(0.5), toTokenAmount(0.5), toTokenAmount(0.1), toTokenAmount(0.1), toTokenAmount(0.15)], ceFTM.address, debtFTM.address);
+        await core.connect(alice).initPool(BNB, [toTokenAmount(0.5), toTokenAmount(0.1), toTokenAmount(0.5), 0, toTokenAmount(0.5), toTokenAmount(0.5), toTokenAmount(0.1), toTokenAmount(0.1), toTokenAmount(0.15)], ceBNB.address, debtBNB.address);
+        await core.connect(alice).initPool(USDC, [toTokenAmount(0.5), toTokenAmount(0.1), toTokenAmount(0.5), 0, toTokenAmount(0.5), toTokenAmount(0.5), toTokenAmount(0.1), toTokenAmount(0.1), toTokenAmount(0.15)], ceUSDC.address, debtUSDC.address);
 
 
         // bob account only has the permission to change pool status
