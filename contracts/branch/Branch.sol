@@ -343,30 +343,28 @@ contract Branch is
         if(protocolPause)
             revert ProtocolPaused(TAG);
 
-        if(payload.length != 80)
-            revert BadPayload(TAG, payload.length, 80);
+        if(payload.length != 96)
+            revert BadPayload(TAG, payload.length, 96);
 
         bytes32 id;
         bytes32 to;
-        uint64 amountpx;
-        uint64 amountsx;
+        uint256 amount;
         assembly {
             id := mload(add(payload, 32))
             to := mload(add(payload, 64))
-            amountpx := mload(add(payload, 72))
-            amountsx := mload(add(payload, 80))
+            amount := mload(add(payload, 96))
         }
         address token = pools[id].token;
-        uint256 amount = _buildLocalAmount(amountpx, amountsx, token);
+        uint localAmount = _buildLocalAmount(amount, token);
         address receipient = address(uint160(uint256(to)));
         if (token == address(0)) {
-            (bool sent, ) = payable(receipient).call{value: amount}("");
+            (bool sent, ) = payable(receipient).call{value: localAmount}("");
             if(! sent)
                 revert NativeTransferFailed(TAG);
         } else {
-            IERC20Upgradeable(token).safeTransfer(receipient, amount);
+            IERC20Upgradeable(token).safeTransfer(receipient, localAmount);
         }
-        emit ReceiveToken(receipient, id, amount);
+        emit ReceiveToken(receipient, id, localAmount);
     }
 
     /**
@@ -406,7 +404,7 @@ contract Branch is
             uint256 tokenBalanceAfter = IERC20Upgradeable(token).balanceOf(address(this));
             buildAmount = tokenBalanceAfter.sub(tokenBalanceBefore);
         }
-        (uint64 amountpx, uint64 amountsx) = _buildRemoteAmount(
+        uint256 remoteAmount = _buildRemoteAmount(
                 buildAmount,
                 token
         );
@@ -414,11 +412,10 @@ contract Branch is
             functionType,
             id,
             addressToBytes32(_msgSender()),
-            amountpx,
-            amountsx
+            remoteAmount
         );
-        if(payload.length != 81)
-            revert BadPayload(TAG, payload.length, 81);
+        if(payload.length != 97)
+            revert BadPayload(TAG, payload.length, 97);
 
         if (token == address(0)) {
             IAdapter(adapter).send{value: msg.value.sub(payAmount)}(
@@ -464,20 +461,17 @@ contract Branch is
 
     /**
      * @dev Combines the amount sent from the payload.
-     * @param _amountpx The amount sent from payload.
-     * @param _amountsx The amount sent from payload.
+     * @param _amount the remote amount
      * @param _token The token address.
      **/
     function _buildLocalAmount(
-        uint256 _amountpx,
-        uint256 _amountsx,
+        uint256 _amount,
         address _token
     ) internal view returns (uint _localAmount) {
-        uint _remoteAmount = uint256(_amountpx) * BASE + uint256(_amountsx);
         uint8 decimals = _getTokenDecimal(_token);
         _localAmount = decimals > ROOT_DECIMALS
-            ? _remoteAmount * (10 ** (decimals - ROOT_DECIMALS))
-            : _remoteAmount / (10 ** (ROOT_DECIMALS - decimals));
+            ? _amount * (10 ** (decimals - ROOT_DECIMALS))
+            : _amount / (10 ** (ROOT_DECIMALS - decimals));
     }
 
     /**
@@ -489,17 +483,14 @@ contract Branch is
     function _buildRemoteAmount(
         uint256 _localAmount,
         address _token
-    ) internal view returns (uint64 amountpx, uint64 amountsx) {
+    ) internal view returns (uint256 amount) {
         uint8 decimals = _getTokenDecimal(_token);
 
         if (decimals > ROOT_DECIMALS) {
-            _localAmount = _localAmount / (10 ** (decimals - ROOT_DECIMALS));
+            amount = _localAmount / (10 ** (decimals - ROOT_DECIMALS));
         } else {
-            _localAmount = _localAmount * (10 ** (ROOT_DECIMALS - decimals));
+            amount = _localAmount * (10 ** (ROOT_DECIMALS - decimals));
         }
-
-        amountpx = uint64(_localAmount / BASE);
-        amountsx = uint64(_localAmount % BASE);
     }
 
     /**

@@ -11,6 +11,8 @@
     "@openzeppelin/contracts": "^4.7.3",
     "@openzeppelin/contracts-upgradeable": "^4.8.2",
     "@openzeppelin/hardhat-upgrades": "^1.22.1",
+    "bignumber.js": "^9.1.2",
+    "chai-almost": "^1.0.1",
     "chain": "^0.4.0",
     "dotenv": "^16.0.3",
     "hardhat-contract-sizer": "^2.8.0",
