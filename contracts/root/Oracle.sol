@@ -27,6 +27,7 @@ interface DexRouter {
 **/
 contract Oracle is Initializable, ContextUpgradeable {
     uint8 public constant ROOT_DECIMALS = 18;
+    uint160 public acceptedDelayTime;
 
     mapping(bytes32 => address) public aggregator;
     mapping(bytes32 => address) public assetAddress;
@@ -46,7 +47,9 @@ contract Oracle is Initializable, ContextUpgradeable {
     error ChainlinkMalfunction(string contractTAG, bytes32 symbol);
     error RoundNotComplete(string contractTAG, bytes32 symbol);
     error StaleData(string contractTAG, bytes32 symbol);
+    error PriceOutDated(string contractTAG, bytes32 symbol);
     error PoolNotExist(string contractTAG, bytes32 symbol);
+    
     /**
      * @dev Modifier that checks if caller has a specific role.
      **/
@@ -173,6 +176,17 @@ contract Oracle is Initializable, ContextUpgradeable {
     }
 
     /**
+     * @notice Configures the accepted delay time for the chainlink data
+     * This function can only be accessed by the account with role SET_ORACLE_METHOD.
+     * @param _maxDelayTime - max acceptable delayed time
+     **/
+    function setDelayTime(
+        uint160 _maxDelayTime
+    ) external onlyRole(IRoleManager(roleManager).SET_ORACLE_METHOD()) {
+        acceptedDelayTime = _maxDelayTime;
+    }
+
+    /**
     * @notice Returns price of assets
     * @param _symbols - list of the asset's pool id
     **/
@@ -242,6 +256,9 @@ contract Oracle is Initializable, ContextUpgradeable {
 
         if(timeStamp == 0)
             revert RoundNotComplete(TAG, _symbol);
+        
+        if (timeStamp < block.timestamp - acceptedDelayTime)
+            revert PriceOutDated(TAG, _symbol);
 
         if(answeredInRound < roundID)
             revert StaleData(TAG, _symbol);
