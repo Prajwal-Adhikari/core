@@ -86,6 +86,8 @@ contract Branch is
     error NativeTransferFailed(string contractTAG);
     error BadPayload(string contractTAG, uint256 currentLength, uint256 requiredLength);
     error PoolNotEnabled(string contractTAG, bytes32 poolID);
+    error InvalidTokenAmount(string contractTAG);
+    error InvalidReceipientAddress(string contractTAG);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -354,9 +356,16 @@ contract Branch is
             to := mload(add(payload, 64))
             amount := mload(add(payload, 96))
         }
+
+        if(! pools[id].enable)
+            revert PoolNotEnabled(TAG, id);
         address token = pools[id].token;
         uint localAmount = _buildLocalAmount(amount, token);
+        if(localAmount == 0)
+            revert InvalidTokenAmount(TAG);
         address receipient = address(uint160(uint256(to)));
+        if(receipient == address(0))
+            revert InvalidReceipientAddress(TAG);
         if (token == address(0)) {
             (bool sent, ) = payable(receipient).call{value: localAmount}("");
             if(! sent)
