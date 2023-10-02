@@ -290,6 +290,8 @@ contract Branch is
             revert InsufficientValue(TAG, msg.value, 0);
         if(qty == 0)
             revert InsufficientQuantity(TAG);
+        if(! pools[id].enable)
+            revert PoolNotEnabled(TAG, id);
 
         if (pools[id].token == address(0)) {
             // wrap the ETH into WETH
@@ -315,7 +317,7 @@ contract Branch is
     /**
      * @notice Emergency function to withdraw liquidity if case of any exploit
      * This function can only be accessed by account with role EMERGENCY_WITHDRAW.
-     * @param id - token address to withdraw
+     * @param id - id of the pool to withdraw
      * @param amount - amount of token to withdraw
      * @param to - receipient address
      **/ 
@@ -324,6 +326,8 @@ contract Branch is
         uint256 amount,
         address to
     ) external onlyRole(IRoleManager(roleManager).EMERGENCY_WITHDRAW()) {
+        if(! pools[id].enable)
+            revert PoolNotEnabled(TAG, id);
         address token = pools[id].token;
         if (token == address(0)) {
             (bool sent, ) = payable(to).call{value: amount}("");
