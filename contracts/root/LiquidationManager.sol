@@ -228,6 +228,7 @@ contract LiquidationManager is
         ICEToken(collateralPool.ceToken).liquidate(user,msg.sender, params.liqBorrowerCEAmount);
     
         ICore(core).addTokenForLiquidator(msg.sender, collateralId);
+        ICore(core).removeTokenForBorrower(user,collateralId);
 
         ICore(core).updateInterestRate(collateralId);
         ICore(core).updateInterestRate(debtId);

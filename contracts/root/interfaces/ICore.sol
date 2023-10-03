@@ -157,6 +157,14 @@ interface ICore {
     function addTokenForLiquidator(address user, bytes32 id) external;
 
     /**
+     * @notice Removes pool id from borrower's token list
+     * This function can only be accessed by account with role LIQUIDATION_MANAGER.
+     * @param user - address of the borrower
+     * @param id - pool id of the asset.
+     **/
+    function removeTokenForBorrower(address user, bytes32 id) external;
+
+    /**
      * @notice Refreshes the parameters of the pool.
      * This function is public.
      * @param id - pool id

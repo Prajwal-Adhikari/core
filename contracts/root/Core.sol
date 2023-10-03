@@ -568,6 +568,16 @@ contract Core is Initializable, ContextUpgradeable {
     }
 
     /**
+     * @notice Removes pool id from borrower's token list
+     * This function can only be accessed by account with role LIQUIDATION_MANAGER.
+     * @param user - address of the borrower
+     * @param id - pool id of the asset.
+     **/
+    function removeTokenForBorrower(address user, bytes32 id) external onlyRole(IRoleManager(roleManager).LIQUIDATION_MANAGER()){
+        _removeToken(user, id);
+    }
+
+    /**
      * @notice Returns list of the tokens the `user` has 
      * @param user - address of the user
      **/
