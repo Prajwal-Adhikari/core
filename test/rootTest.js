@@ -445,6 +445,43 @@ describe("Root Function Tests", function () {
         bob_balance = await debtFTM.balanceOf(bob.address);
         console.log(`debtToken alice: ${alice_balance} bob: ${bob_balance}`);
     }
+
+    async function printPoolInfo() {
+        let matic_reserve = await core.pools(MATIC);
+        console.log("MATIC");
+        console.log(`interest rate: ${matic_reserve[0]} currentRatio: ${matic_reserve[1]} ceScaled: ${matic_reserve[4]}`)
+        console.log(`dtScaled: ${matic_reserve[5]} ceSupply: ${matic_reserve[7]} debtSupply: ${matic_reserve[8]}`)
+        console.log()
+
+        let ftm_reserve = await core.pools(FTM);
+        console.log("FTM");
+        console.log(`interest rate: ${ftm_reserve[0]} currentRatio: ${ftm_reserve[1]} ceScaled: ${ftm_reserve[4]}`)
+        console.log(`dtScaled: ${ftm_reserve[5]} ceSupply: ${ftm_reserve[7]} debtSupply: ${ftm_reserve[8]}`)
+        console.log()
+
+        let bnb_reserve = await core.pools(BNB);
+        console.log("BNB");
+        console.log(`interest rate: ${bnb_reserve[0]} currentRatio: ${bnb_reserve[1]} ceScaled: ${bnb_reserve[4]}`)
+        console.log(`dtScaled: ${bnb_reserve[5]} ceSupply: ${bnb_reserve[7]} debtSupply: ${bnb_reserve[8]}`)
+        console.log()
+    }
+
+    async function printSpecificChainLiquidity(poolId){
+
+        let maticChainPoolliquidity = await core.chainLiquidity(MATIC,poolId);
+        let bnbChainPoolliquidity = await core.chainLiquidity(BNB,poolId);
+        let ftmChainPoolliquidity = await core.chainLiquidity(FTM,poolId);
+        console.log();
+        console.log("Matic");
+        console.log(` Matic Chain liquidity = ${maticChainPoolliquidity}` );
+        console.log();
+        console.log("BNB");
+        console.log(`BNB Chain liquidity = ${bnbChainPoolliquidity}`);
+        console.log();
+        console.log("FTM");
+        console.log(`FTM Chain liquidity = ${ftmChainPoolliquidity}`);
+
+    }
     
     describe("1. Testing setting of functions of Pool contract ", () => {
 
@@ -571,5 +608,71 @@ describe("Root Function Tests", function () {
         });
 
     });
+
+    describe("3. Testing the withdraw ", async () => {
+        
+        it("Withdrawing from differnt chain than deposited", async function () {
+            let fees = await routeA.connect(alice).estimateFees(1, 1000000);
+            await clientA.connect(alice).depositRequest(MATIC, toTokenAmount(200000), LZO, 0, { value: fees })
+            await clientC.connect(alice).depositRequest(MATIC, toTokenAmount(200000), LZO, 0, { value: fees })
+            await clientB.connect(bob).depositRequest(MATIC, toTokenAmount(200000), LZO, 0, { value: fees })
+            expect(await ceMATIC.balanceOf(alice.address)).to.equal("400000000000000000000000");
+            await pool.connect(alice).withdraw(MATIC, BNB, toTokenAmount(200000), ethers.utils.hexZeroPad(alice.address, 32), LZO, 0, false, { value: fees })
+            expect(await ceMATIC.balanceOf(alice.address)).to.equal("200000000000000000000000");
+        })
+
+        it("Withdrawing reverts when deposit is not done", async function () {
+
+            let fees = await routeA.connect(alice).estimateFees(1, 1000000);
+            await clientA.connect(alice).depositRequest(MATIC, toTokenAmount(200000), LZO, 0, { value: fees })
+            expect(await ceMATIC.balanceOf(alice.address)).to.equal("200000000000000000000000");
+            await expect (pool.connect(bob).withdraw(MATIC, BNB, toTokenAmount(200000), ethers.utils.hexZeroPad(bob.address, 32), LZO, 0, false, { value: fees })).to.be.revertedWithCustomError(core, "NotEnoughLiquidity").withArgs("Core",BNB,MATIC,0,200000000000000000000000n);
+
+        })
+
+        it("Withdrawing reverts when withdrawing without any deposit", async function () {
+
+            let fees = await routeA.connect(alice).estimateFees(1, 1000000);
+            await clientA.connect(alice).depositRequest(MATIC, toTokenAmount(200000), LZO, 0, { value: fees })
+            await clientB.connect(alice).depositRequest(MATIC, toTokenAmount(200000), LZO, 0, { value: fees })
+           await clientC.connect(alice).depositRequest(MATIC, toTokenAmount(300000), LZO, 0, { value: fees })
+            expect(await ceMATIC.balanceOf(alice.address)).to.equal("700000000000000000000000");
+            await expect (pool.connect(bob).withdraw(MATIC, MATIC, toTokenAmount(200000), ethers.utils.hexZeroPad(bob.address, 32), LZO, 0, false, { value: fees })).to.be.revertedWithCustomError(ceMATIC, "NotEnoughCeTokens").withArgs("CEToken",bob.address);
+
+        })
+
+        it("Withdraw reverts when there is no any liquidity in a chain's pool", async function () {
+
+            let fees = await routeA.connect(alice).estimateFees(1, 1000000);
+            await clientA.connect(alice).depositRequest(MATIC, toTokenAmount(200000), LZO, 0, { value: fees })
+            await clientB.connect(bob).depositRequest(MATIC, toTokenAmount(200000), LZO, 0, { value: fees })
+            expect(await ceMATIC.balanceOf(alice.address)).to.equal("200000000000000000000000");
+            expect(await ceMATIC.balanceOf(bob.address)).to.equal("200000000000000000000000");
+            await pool.connect(alice).withdraw(MATIC, BNB, toTokenAmount(200000), ethers.utils.hexZeroPad(alice.address, 32), LZO, 0, false, { value: fees });
+            await expect (pool.connect(bob).withdraw(MATIC, BNB, toTokenAmount(200000), ethers.utils.hexZeroPad(bob.address, 32), LZO, 0, false, { value: fees })).to.be.revertedWithCustomError(core, "NotEnoughLiquidity").withArgs("Core",BNB,MATIC,0,200000000000000000000000n);
+        
+           
+        })
+
+
+    }); 
+
+    describe("4. Testing the burrow ", async () => {
+
+        it.only("Testing the burrowed amount", async function () {
+
+            let fees = await routeA.connect(alice).estimateFees(1, 1000000);
+            await clientA.connect(alice).depositRequest(MATIC, toTokenAmount(2e5), LZO, 0, { value: fees });
+            await clientB.connect(bob).depositRequest(MATIC, toTokenAmount(2e5), LZO, 0, { value: fees });
+           let bnbs = await bnb.balanceOf(user3.address);
+            await clientC.connect(user3).depositRequest(BNB, toTokenAmount(2e5), LZO, 0, { value: fees });
+            await pool.connect(user3).borrow(MATIC, BNB, toTokenAmount(1e5), ethers.utils.hexZeroPad(user3.address, 32), LZO, 0, { value: fees });
+            expect(await matic.balanceOf(user3.address)).to.equal("1100000000000000000000000"); 
+
+        })
+
+    
+    }); 
+
     
 })
