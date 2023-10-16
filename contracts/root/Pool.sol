@@ -217,6 +217,7 @@ contract Pool is
      * @param to - withdraw address
      * @param route - communication protocol
      * @param airdropAmount - amount to be airdropped to destination chain
+     * @param all - true if withdraw all
      **/
     function withdraw(
         bytes32 id,
@@ -247,7 +248,8 @@ contract Pool is
             id,
             chainId,
             tokenAmount,
-            _msgSender()
+            _msgSender(),
+            all
         );
 
         tokenAmount -= fee;

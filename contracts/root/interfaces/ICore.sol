@@ -51,12 +51,14 @@ interface ICore {
      * @param chainId - chain id of chain to withdraw from
      * @param tokenAmount - amount to withdraw
      * @param user - withdraw address
+     * @param all - true if withdraw all
      **/
     function withdraw(
         bytes32 id,
         bytes32 chainId,
         uint256 tokenAmount,
-        address user
+        address user,
+        bool all
     ) external returns (uint256);
 
     /**

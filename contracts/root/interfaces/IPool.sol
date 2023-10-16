@@ -41,6 +41,7 @@ interface IPool {
      * @param to - withdraw address
      * @param route - communication protocol
      * @param airdropAmount - amount to be airdropped to destination chain
+     * @param all - true if withdraw all
      **/
     function withdraw(
         bytes32 id,
@@ -48,7 +49,8 @@ interface IPool {
         uint256 tokenAmount,
         bytes32 to,
         bytes32 route,
-        uint256 airdropAmount
+        uint256 airdropAmount,
+        bool all
     ) external;
 
     /**

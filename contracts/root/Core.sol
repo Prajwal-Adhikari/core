@@ -282,19 +282,28 @@ contract Core is Initializable, ContextUpgradeable {
      * @param chainId - chain id of chain to withdraw from
      * @param tokenAmount - amount to withdraw
      * @param user - withdraw address
+     * @param all - withdraw address
      **/
     function withdraw(
         bytes32 id,
         bytes32 chainId,
         uint256 tokenAmount,
-        address user
+        address user,
+        bool all
     ) external onlyRole(IRoleManager(roleManager).POOL()) returns (uint256) {
         refresh(id);
         Data.PoolData storage pool = pools[id];
         if(! pool.enable)
             revert PoolNotEnabled(TAG, id);
 
-        uint256 burnAmount = tokenAmount.mul(1e18).div(pool.ceScaled);
+        uint256 burnAmount;
+
+        if(all) {
+            burnAmount = ICEToken(pool.ceToken).balanceBeforeScaledExcludingDeadTokens(user);
+        } else {
+            burnAmount = tokenAmount.mul(1e18).div(pool.ceScaled);
+        }
+
          
         if(chainLiquidity[chainId][id] < tokenAmount)
             revert NotEnoughLiquidity(TAG, chainId, id, chainLiquidity[chainId][id], tokenAmount);
