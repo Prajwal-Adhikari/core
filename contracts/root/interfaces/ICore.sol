@@ -59,7 +59,7 @@ interface ICore {
         uint256 tokenAmount,
         address user,
         bool all
-    ) external returns (uint256);
+    ) external returns (uint256, uint256);
 
     /**
      * @notice Sends a withdraw request of amount `tokenAmount` of dead tokens to address `user` from pool with pool id `id`

@@ -290,7 +290,7 @@ contract Core is Initializable, ContextUpgradeable {
         uint256 tokenAmount,
         address user,
         bool all
-    ) external onlyRole(IRoleManager(roleManager).POOL()) returns (uint256) {
+    ) external onlyRole(IRoleManager(roleManager).POOL()) returns (uint256, uint256) {
         refresh(id);
         Data.PoolData storage pool = pools[id];
         if(! pool.enable)
@@ -302,7 +302,10 @@ contract Core is Initializable, ContextUpgradeable {
             burnAmount = ICEToken(pool.ceToken).balanceBeforeScaledExcludingDeadTokens(user);
         } else {
             burnAmount = tokenAmount.mul(1e18).div(pool.ceScaled);
+           
         }
+        //maintaining precision and removing dust values
+        tokenAmount = burnAmount.mul(pool.ceScaled).div(1e18);
 
          
         if(chainLiquidity[chainId][id] < tokenAmount)
@@ -324,7 +327,7 @@ contract Core is Initializable, ContextUpgradeable {
         updateInterestRate(id);
         checkHealth(user);
         
-        return (burnAmount);
+        return (burnAmount, tokenAmount);
     }
 
     function withdrawDeadTokens(

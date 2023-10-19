@@ -244,7 +244,7 @@ contract Pool is
             
         }
 
-        uint256 burnAmount = ICore(core).withdraw(
+        (uint256 burnAmount, uint256 actualAmount) = ICore(core).withdraw(
             id,
             chainId,
             tokenAmount,
@@ -252,12 +252,12 @@ contract Pool is
             all
         );
 
-        tokenAmount -= fee;
+        actualAmount -= fee;
 
         bytes memory payload = abi.encodePacked(
             id,
             to,
-            tokenAmount
+            actualAmount
         );
         if(payload.length != 96)
             revert BadPayload(TAG, payload.length, 96);
@@ -275,12 +275,12 @@ contract Pool is
             _bytesToAddress(to),
             id,
             chainId,
-            tokenAmount,
+            actualAmount,
             burnAmount,
             route,
             fee
         );
-        emit Data.SendToken(_bytesToAddress(to), id, tokenAmount);
+        emit Data.SendToken(_bytesToAddress(to), id, actualAmount);
     }
 
     function withdrawDeadTokens(
