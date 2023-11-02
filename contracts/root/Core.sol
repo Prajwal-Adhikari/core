@@ -167,6 +167,9 @@ contract Core is Initializable, ContextUpgradeable {
                 );
             }
             pool.utilizationRatio = utilizationRatio;
+        } else {
+            pool.borrowInterestRate = 0;
+            pool.utilizationRatio = 0;
         }
 
         emit Data.InterestRateUpdated(pool.borrowInterestRate,pool.utilizationRatio);
