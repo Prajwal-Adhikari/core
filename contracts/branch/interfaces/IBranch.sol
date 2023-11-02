@@ -121,15 +121,6 @@ interface IBranch {
     ) external payable;
 
     /**
-     * @notice Emergency function to withdraw liquidity if case of any exploit
-     * This function can only be accessed by account with role EMERGENCY_WITHDRAW.
-     * @param id - token address to withdraw
-     * @param amount - amount of token to withdraw
-     * @param to - receipient address
-     **/
-    function emergencyWithdraw(bytes32 id, uint256 amount, address to) external;
-
-    /**
      * @notice Transfers token to the user.
      * This function can only be accessed by account with role ADAPTER.
      * @param payload - information containing token amount and receipient.

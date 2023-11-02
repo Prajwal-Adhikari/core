@@ -315,30 +315,6 @@ contract Branch is
     }
 
     /**
-     * @notice Emergency function to withdraw liquidity if case of any exploit
-     * This function can only be accessed by account with role EMERGENCY_WITHDRAW.
-     * @param id - id of the pool to withdraw
-     * @param amount - amount of token to withdraw
-     * @param to - receipient address
-     **/ 
-    function emergencyWithdraw(
-        bytes32 id,
-        uint256 amount,
-        address to
-    ) external onlyRole(IRoleManager(roleManager).EMERGENCY_WITHDRAW()) {
-        if(! pools[id].enable)
-            revert PoolNotEnabled(TAG, id);
-        address token = pools[id].token;
-        if (token == address(0)) {
-            (bool sent, ) = payable(to).call{value: amount}("");
-            if(! sent)
-                revert NativeTransferFailed(TAG);
-        } else {
-            IERC20Upgradeable(token).safeTransfer(to, amount);
-        }
-    }
-
-    /**
      * @notice Transfers token to the user.
      * This function can only be accessed by account with role ADAPTER.
      * @param payload - information containing token amount and receipient.
