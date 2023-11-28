@@ -553,8 +553,53 @@ describe("Ready", function () {
           
 
         })
+        it.only("test related to liquidity percentage when value is increased to 1.6", async function () {
 
+            fees = await routeA.connect(alice).estimateFees(1, 0);
+            await clientA.connect(alice).depositRequest(MATIC, toTokenAmount(10), LZO, 0, { value: fees })
+            await clientB.connect(bob).depositRequest(FTM, toTokenAmount(10), LZO, 0, { value: fees })
+            await clientB.connect(user3).depositRequest(FTM, toTokenAmount(10), LZO, 0, { value: fees })
+            await pool.connect(alice).borrow(FTM, BNB, toTokenAmount(5), ethers.utils.hexZeroPad(alice.address, 32), LZO, 0, { value: fees });
+            await printInfo()
+            console.log()
+            await this.oracle.setPrice([FTM], [toTokenAmount(1.6)])
+            await liquidationManager.connect(bob).liquidate(alice.address, MATIC, FTM,  1499999980974124810n);
+            await printInfo()
+            console.log()
+            let alice_deposit_balance = await ceMATIC.balanceOf(alice.address);
+            let alice_debt_balance = await debtFTM.balanceOf(alice.address);
+            console.log("Alice deposit Value :",alice_deposit_balance);
+            console.log("Alice debt Value :",alice_debt_balance);
+            let bob_Matic_balance = await ceMATIC.balanceOf(bob.address);
+            let bob_FTM_balance = await ceFTM.balanceOf(bob.address);
+            console.log("BOB Matic Value :",bob_Matic_balance);
+            console.log("BOB FTM Value :",bob_FTM_balance); 
+
+        })  
         
+        it.only("test related to liquidity percentage when value is increased to 1.8", async function () {
+
+            fees = await routeA.connect(alice).estimateFees(1, 0);
+            await clientA.connect(alice).depositRequest(MATIC, toTokenAmount(10), LZO, 0, { value: fees })
+            await clientB.connect(bob).depositRequest(FTM, toTokenAmount(10), LZO, 0, { value: fees })
+            await clientB.connect(user3).depositRequest(FTM, toTokenAmount(10), LZO, 0, { value: fees })
+            await pool.connect(alice).borrow(FTM, BNB, toTokenAmount(5), ethers.utils.hexZeroPad(alice.address, 32), LZO, 0, { value: fees });
+            await printInfo()
+            console.log()
+            await this.oracle.setPrice([FTM], [toTokenAmount(1.8)])
+            await expect(liquidationManager.connect(bob).liquidate(alice.address, MATIC, FTM,  1499999980974124810n)).to.be.revertedWithCustomError(liquidationManager,"ClosingFactotExceeded");
+            await printInfo()
+            console.log()
+            let alice_deposit_balance = await ceMATIC.balanceOf(alice.address);
+            let alice_debt_balance = await debtFTM.balanceOf(alice.address);
+            console.log("Alice deposit Value :",alice_deposit_balance);
+            console.log("Alice debt Value :",alice_debt_balance);
+            let bob_Matic_balance = await ceMATIC.balanceOf(bob.address);
+            let bob_FTM_balance = await ceFTM.balanceOf(bob.address);
+            console.log("BOB Matic Value :",bob_Matic_balance);
+            console.log("BOB FTM Value :",bob_FTM_balance); 
+    
+        })   
         
     })
 
