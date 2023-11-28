@@ -531,7 +531,19 @@ describe("Root Function Tests", function () {
 
         })
 
+        it("Should set stargate vault and router address", async() => {
+
+            const stargateRouterAddress = "0xbf22f0f184bCcbeA268dF387a49fF5238dD23E40"; //stargate eth router address  
+            const stargateVaultAddress = "0x82CbeCF39bEe528B5476FE6d1550af59a9dB6Fc0";  //stargate eth vault address 
+            await expect(clientA.connect(alice).setStargateRouterAndVault(stargateRouterAddress,stargateVaultAddress)).to.be.reverted;
+            await clientA.connect(developer).setStargateRouterAndVault(stargateRouterAddress,stargateVaultAddress);
+            expect(await clientA.stargateRouter()).to.equal(stargateRouterAddress);
+            expect(await clientA.stargateEthVault()).to.equal(stargateVaultAddress);
+
+        })
+
     });
+
 
     describe("2. Testing setting of functions of Adapter contract", () => {
 
@@ -568,44 +580,93 @@ describe("Root Function Tests", function () {
 
         it("Testing deposit in the same pool from different chain", async function () {
 
-        let feesA = await routeA.connect(alice).estimateFees(1, 1000000);
-        await clientA.connect(alice).depositRequest(MATIC, toTokenAmount(200000), LZO, 0, { value: feesA })
-        await clientB.connect(alice).depositRequest(MATIC, toTokenAmount(200000), LZO, 0, { value: feesA })
-        await clientC.connect(alice).depositRequest(MATIC, toTokenAmount(300000), LZO, 0, { value: feesA })
+        let feesA = await routeA.connect(alice).estimateFees(1,0);
+        await clientA.connect(alice).depositRequest(MATIC, toTokenAmount(20), LZO, 0, { value: feesA })
+        await clientB.connect(alice).depositRequest(MATIC, toTokenAmount(20), LZO, 0, { value: feesA })
+        await clientC.connect(alice).depositRequest(MATIC, toTokenAmount(30), LZO, 0, { value: feesA })
         let alice_balance = await ceMATIC.balanceOf(alice.address);
-        expect(alice_balance).to.equal("700000000000000000000000");
+        expect(alice_balance).to.equal("70000000000000000000");
 
         })
 
         it("Testing the CeSupply", async function () {
 
-            let feesA = await routeA.connect(alice).estimateFees(1, 1000000);
-            await clientA.connect(alice).depositRequest(MATIC, toTokenAmount(200000), LZO, 0, { value: feesA })
-            await clientB.connect(bob).depositRequest(MATIC, toTokenAmount(200000), LZO, 0, { value: feesA })
+            let feesA = await routeA.connect(alice).estimateFees(1, 0);
+            await clientA.connect(alice).depositRequest(MATIC, toTokenAmount(20), LZO, 0, { value: feesA })
+            await clientB.connect(bob).depositRequest(MATIC, toTokenAmount(20), LZO, 0, { value: feesA })
             let matic_reserve = await core.pools(MATIC);
-            expect(matic_reserve[7]).to.equal("400000000000000000000000");
+            expect(matic_reserve[7]).to.equal("40000000000000000000");
             
         })
 
         it("Testing liquidity in different chain of same pool", async function () {
 
-            let feesA = await routeA.connect(alice).estimateFees(1, 1000000);
-            await clientA.connect(alice).depositRequest(MATIC, toTokenAmount(2e5), LZO, 0, { value: feesA })
-            await clientB.connect(alice).depositRequest(MATIC, toTokenAmount(1e5), LZO, 0, { value: feesA })
-            await clientC.connect(alice).depositRequest(MATIC, toTokenAmount(3e5), LZO, 0, { value: feesA })
+            let feesA = await routeA.connect(alice).estimateFees(1, 0);
+            await clientA.connect(alice).depositRequest(MATIC, toTokenAmount(2), LZO, 0, { value: feesA })
+            await clientB.connect(alice).depositRequest(MATIC, toTokenAmount(1), LZO, 0, { value: feesA })
+            await clientC.connect(alice).depositRequest(MATIC, toTokenAmount(3), LZO, 0, { value: feesA })
             let alice_balance = await ceMATIC.balanceOf(alice.address);
-            expect(alice_balance).to.equal("600000000000000000000000");
+            expect(alice_balance).to.equal("6000000000000000000");
             let maticChainPoolliquidity = await core.chainLiquidity(MATIC,MATIC);
             let bnbChainPoolliquidity = await core.chainLiquidity(BNB,MATIC);
             let ftmChainPoolliquidity = await core.chainLiquidity(FTM,MATIC);
-            expect(ftmChainPoolliquidity).to.equal("200000000000000000000000");
-            expect(bnbChainPoolliquidity).to.equal("100000000000000000000000");
-            expect(maticChainPoolliquidity).to.equal("300000000000000000000000");
+            expect(ftmChainPoolliquidity).to.equal("2000000000000000000");
+            expect(bnbChainPoolliquidity).to.equal("1000000000000000000");
+            expect(maticChainPoolliquidity).to.equal("3000000000000000000");
             
         })
         
         
     });
+
+    describe("Testing the depositRequest function inside branch.sol contract", () => {  
+
+        it("Should revert if the protocol is paused", async () => {
+            expect(await clientA.protocolPause()).to.equal(false);
+            let fees = await routeA.connect(alice).estimateFees(1, 10);
+            await clientA.connect(alice).depositRequest(MATIC, toTokenAmount(10), LZO, 0, { value: fees });
+            await clientA.connect(developer).toggleProtocolStatus();
+            expect(await clientA.protocolPause()).to.equal(true);
+            await expect (clientA.connect(alice).depositRequest(MATIC,toTokenAmount(10),LZO,0,{value: fees})).to.be.revertedWithCustomError(clientA,"ProtocolPaused").withArgs("Branch")
+        })
+
+        it("Should revert if the deposit pause is enabled", async () => {
+            expect(await clientA.depositPause(MATIC)).to.equal(false);
+            let fees = await routeA.connect(alice).estimateFees(1, 10);
+            await clientA.connect(alice).depositRequest(MATIC, toTokenAmount(10), LZO, 0, { value: fees });
+            await clientA.connect(developer).setDepositPause(MATIC,true);
+            expect(await clientA.depositPause(MATIC)).to.equal(true);
+            await expect (clientA.connect(alice).depositRequest(MATIC, toTokenAmount(10), LZO, 0, { value: fees })).to.be.revertedWithCustomError(clientA,"DepositPaused").withArgs("Branch",MATIC)
+        })
+
+        it("Should revert if the pool is not enabled", async () => {
+
+            let fees = await routeA.connect(alice).estimateFees(1, 10);
+            await expect(clientA.connect(alice).setPool(FTM, ftm.address, true)).to.be.reverted;
+            await clientA.connect(developer).setPool(FTM, ftm.address, false);
+            const poolInfo = await clientA.pools(FTM);
+            expect(poolInfo.enable).to.equal(false);
+            await expect (clientA.connect(alice).depositRequest(FTM, toTokenAmount(10), LZO, 0, { value: fees })).to.be.revertedWithCustomError(clientA,"PoolNotEnabled").withArgs("Branch",FTM)
+            
+        })  
+
+        //events emitted check
+
+        //Deposit
+        it("Should emit Deposit event with args user,id,tokenAmount,route and airdropaAmount after successful deposit", async () => {
+            let fees = await routeA.connect(alice).estimateFees(1, 10);
+            await expect(clientA.connect(alice).depositRequest(MATIC, toTokenAmount(10), LZO, 0, { value: fees })).to.emit(clientA,"Deposit").withArgs(alice.address,MATIC,toTokenAmount(10),LZO,0);
+        })
+
+        //SendToken
+        it("Should emit SendToken event with args user, id and tokenAmount after successful deposit", async () => {
+            let fees = await routeA.connect(alice).estimateFees(1, 10);
+            await expect(clientA.connect(alice).depositRequest(MATIC, toTokenAmount(10), LZO, 0, { value: fees })).to.emit(clientA,"SendToken").withArgs(alice.address,MATIC,toTokenAmount(10));
+          
+        })
+
+
+    })
 
     describe("4. Testing the repay ", async () => {
 
@@ -645,6 +706,7 @@ describe("Root Function Tests", function () {
             await clientA.connect(alice).repayRequest(BNB, toTokenAmount(5.003), LZO, 0, { value: fees })
             let alicefactor = await core.healthFactor(alice.address);
             expect(alicefactor[1]).to.equal(0);
+
     
         })
 

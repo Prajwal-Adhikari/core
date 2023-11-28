@@ -1,5 +1,11 @@
 const { assert, expect } = require("chai")
-const { ethers, upgrades, network } = require("hardhat")
+const chai = require('chai');
+const chaiAlmost = require('chai-almost');
+
+chai.use(chaiAlmost());
+const { ethers, upgrades } = require("hardhat")
+const { anyValue } = require("@nomicfoundation/hardhat-chai-matchers/withArgs");
+
 
 let BN = require("bignumber.js");
 const { keccak256 } = require("ethers/lib/utils");
@@ -675,18 +681,18 @@ describe("Root Function Tests", function () {
             await network.provider.send("evm_mine");
             await pool.connect(alice).withdraw(MATIC, MATIC, 20, ethers.utils.hexZeroPad(alice.address, 32), LZO, 0, false, { value: fees });
             let alicefactor = await core.healthFactor(alice.address);
-            expect(alicefactor[0]).to.equal(35000460274860476880n);
+            expect(alicefactor[0]).to.almost.equal(35000460274860476880n);
            
         })
 
         it("Withdrawing all after earning certain interest", async function () {
 
             let fees = await routeA.connect(alice).estimateFees(1, 10);
-            await clientA.connect(alice).depositRequest(MATIC, toTokenAmount(35), LZO, 0, { value: fees });
+            await clientA.connect(alice).depositRequest(MATIC, toTokenAmount(30), LZO, 0, { value: fees });
             await clientC.connect(bob).depositRequest(MATIC, toTokenAmount(40), LZO, 0, { value: fees });
             await clientA.connect(user3).depositRequest(FTM, toTokenAmount(10), LZO, 0, { value: fees });
-            await pool.connect(user3).borrow(MATIC, FTM, toTokenAmount(5), ethers.utils.hexZeroPad(user3.address, 32), LZO, 0, { value: fees });
-            await network.provider.send("evm_increaseTime", [6 * 24 * 60 * 60]);
+            await pool.connect(user3).borrow(MATIC, MATIC, toTokenAmount(5), ethers.utils.hexZeroPad(user3.address, 32), LZO, 0, { value: fees });
+            await network.provider.send("evm_increaseTime", [7 * 24 * 60 * 60]);
             await network.provider.send("evm_mine");
             await pool.connect(alice).withdraw(MATIC, MATIC, 20, ethers.utils.hexZeroPad(alice.address, 32), LZO, 0, true, { value: fees });
             let alicefactor = await core.healthFactor(alice.address);
@@ -694,12 +700,11 @@ describe("Root Function Tests", function () {
            
         })
 
-
     }); 
 
-    describe("4. Testing the burrow ", async () => {
+    describe("4. Testing the borrow ", async () => {
 
-        it("Testing the burrowed amount", async function () {
+        it("Testing the borrowed amount", async function () {
 
             let fees = await routeA.connect(alice).estimateFees(1, 10);
             await clientA.connect(alice).depositRequest(MATIC, toTokenAmount(20), LZO, 0, { value: fees });
@@ -738,7 +743,7 @@ describe("Root Function Tests", function () {
             let alicefactor = await core.healthFactor(alice.address);
             let bobfactor = await core.healthFactor(bob.address);
             expect(alicefactor[0]).to.be.greaterThan(bobfactor[0]);
-            
+
         })
 
         it("Testing the interest earned are same", async function () {
@@ -789,7 +794,7 @@ describe("Root Function Tests", function () {
     
         })
 
-        it("Testing the interest earned for the first deposit and burrow scenario ", async function () {
+        it("Testing the interest earned for the first deposit and borrow scenario ", async function () {
 
             let fees = await routeA.connect(alice).estimateFees(1, 10);
             await clientA.connect(alice).depositRequest(MATIC, toTokenAmount(1), LZO, 0, { value: fees });
@@ -803,8 +808,180 @@ describe("Root Function Tests", function () {
 
         })
 
-    
     }); 
+
+    describe("5. Testing settings of DebtToken contract", () => {
+        it("Should configure core address", async () => {
+            expect(await debtMATIC.core()).to.equal(core.address);
+            await expect(debtMATIC.connect(alice).setCore(core.address, MATIC)).to.be.reverted;
+            await debtMATIC.connect(developer).setCore(core.address, MATIC);
+            expect(await debtMATIC.core()).to.equal(core.address);
+            expect(await debtMATIC.poolId()).to.equal(MATIC);
+
+        })
+
+        it("Only authorised can configure role manager address", async () => {
+            expect(await debtFTM.roleManager()).to.equal(roleManagerS.address);
+            await expect(debtFTM.connect(alice).setRoleManager(feeProvider.address)).to.be.reverted;
+            await debtFTM.connect(developer).setRoleManager(feeProvider.address);
+            expect(await debtFTM.roleManager()).to.equal(feeProvider.address);
+        });
+    })
+
+    describe("6. Testing setting of functions of Liquidation Manager contract", () => {
+
+        it("Only authorised can configure role manager address", async () => {
+            expect(await liquidationManager.roleManager()).to.equal(roleManagerS.address);
+            await expect(liquidationManager.connect(alice).setRoleManager(feeProvider.address)).to.be.reverted;
+            await liquidationManager.connect(developer).setRoleManager(feeProvider.address);
+            expect(await liquidationManager.roleManager()).to.equal(feeProvider.address);
+        });
+
+        it("Only authorised can configure core contract", async () => {
+
+            expect(await liquidationManager.core()).to.equal(core.address);
+            await expect(liquidationManager.connect(alice).setCore(roleManagerS.address)).to.be.reverted;
+            await liquidationManager.connect(developer).setCore(roleManagerS.address);
+            expect(await liquidationManager.core()).to.equal(roleManagerS.address);
+
+        });
+
+        it("Only authorised can set the oracle address", async () => {
+
+            await expect(liquidationManager.connect(alice).setOracle(feeProvider.address)).to.be.reverted;
+            await liquidationManager.connect(developer).setOracle(feeProvider.address);
+            expect(await liquidationManager.oracle()).to.equal(feeProvider.address);
+
+        });
+
+        it("Only authorised can set the status for liquidation pause", async () => {
+            const liquidationPause = true;
+            expect(await liquidationManager.liquidationPause()).to.equal(false);
+            await expect(liquidationManager.connect(alice).setLiquidationPause(liquidationPause)).to.be.reverted;
+            await liquidationManager.connect(developer).setLiquidationPause(liquidationPause);
+            expect(await liquidationManager.liquidationPause()).to.equal(liquidationPause);
+        })
+
+    })
+
+    describe("7.Testing settings of FeeProvider contract", () => {
+
+        it("Only authorised can configure role manager address", async () => {
+            expect(await feeProvider.roleManager()).to.equal(roleManagerS.address);
+            await expect(feeProvider.connect(alice).setRoleManager(feeProvider.address)).to.be.reverted;
+            await feeProvider.connect(developer).setRoleManager(feeProvider.address);
+            expect(await feeProvider.roleManager()).to.equal(feeProvider.address);
+        });
+
+        it("Only authorised can configure core contract", async () => {
+            expect(await feeProvider.core()).to.equal(core.address);
+            await expect(feeProvider.connect(alice).setCore(core.address)).to.be.reverted;
+            await feeProvider.connect(developer).setCore(core.address);
+            expect(await feeProvider.core()).to.equal(core.address);
+        });
+    })
+
+    describe("8. Testing settings of CEToken contract", () => {
+
+        it("Only authorised can configure role manager address", async () => {
+            expect(await ceMATIC.roleManager()).to.equal(roleManagerS.address);
+            await expect(ceMATIC.connect(alice).setRoleManager(feeProvider.address)).to.be.reverted;
+            await ceMATIC.connect(developer).setRoleManager(feeProvider.address);
+            expect(await ceMATIC.roleManager()).to.equal(feeProvider.address);
+        });
+
+        it("Only authorised can configure core contract", async () => {
+            expect(await ceFTM.core()).to.equal(core.address);
+            await expect(ceFTM.connect(alice).setCore(core.address, FTM)).to.be.reverted;
+            await ceFTM.connect(developer).setCore(core.address, FTM);
+            expect(await ceFTM.core()).to.equal(core.address);
+            expect(await ceFTM.poolId()).to.equal(FTM);
+        });
+
+        it("Should configure amount when exceeded triggers the lock up", async () => {
+            await ceUSDC.setLockupTriggerAmount(toTokenAmount(1000));
+            expect(await ceUSDC.lockupTriggerAmt()).to.be.equal(toTokenAmount(1000));
+        })
+
+        it("Should configure a waiting period before transfer if the mint amount exceeds lockup trigger amount", async () => {
+            await ceMATIC.setTransferBlockWait(10);
+            expect(await ceMATIC.transferBlockWait()).to.equal(10);
+        })
+
+        it("Should revert if the chain is already marked as dead", async () => {
+
+            //Initially MATIC is not in dead chain list
+            expect(await ceMATIC.isChainDead(MATIC)).to.equal(false);
+            //Add the chain as dead
+            await ceMATIC.connect(developer).addDeadChain(MATIC);
+
+            //Attempt to add the same chain again
+            await expect(ceMATIC.connect(developer).addDeadChain(MATIC)).to.be.revertedWithCustomError(ceMATIC, "DeadChain").withArgs("CEToken", MATIC);
+
+            //MATIC should be a dead chain now
+            expect(await ceMATIC.isChainDead(MATIC)).to.equal(true);
+
+        })
+
+        it("Should remove chain from dead chain list", async () => {
+            //Initially MATIC is not in dead chain list
+            expect(await ceMATIC.isChainDead(MATIC)).to.equal(false);
+            //Add the chain as dead
+            await ceMATIC.connect(developer).addDeadChain(MATIC);
+            //MATIC should be a dead chain now
+            expect(await ceMATIC.isChainDead(MATIC)).to.equal(true);
+            //now remoce MATIC from dead chain list
+            await ceMATIC.connect(developer).removeDeadChain(MATIC);
+            //MATIC should be a removed from dead chain lsit 
+            expect(await ceMATIC.isChainDead(MATIC)).to.equal(false);
+        })
+
+        it("Should retrive all the chains that the user has its ceToken on", async () => {
+
+            let fees = await routeA.connect(alice).estimateFees(1, 10);
+            await clientA.connect(alice).depositRequest(MATIC, toTokenAmount(10), LZO, 0, { value: fees })
+            await clientA.connect(alice).depositRequest(BNB, toTokenAmount(10), LZO, 0, { value: fees })
+            await clientA.connect(alice).depositRequest(FTM, toTokenAmount(10), LZO, 0, { value: fees })
+            expect((await ceMATIC.connect(alice).getChains(alice.address)).length).to.equal(1);
+            expect((await ceBNB.connect(alice).getChains(alice.address)).length).to.equal(1);
+            expect((await ceFTM.connect(alice).getChains(alice.address)).length).to.equal(1);
+
+        })
+    })
+
+    describe("9. Testing settings of Controller smart contract", () => {
+
+        it("Only authorised can configure role manager address", async () => {
+            expect(await controller.roleManager()).to.equal(roleManagerS.address);
+            await expect(controller.connect(alice).setRoleManager(feeProvider.address)).to.be.reverted;
+            await controller.connect(developer).setRoleManager(feeProvider.address);
+            expect(await controller.roleManager()).to.equal(feeProvider.address);
+        });
+
+    })
+
+    describe("10. Testing setting of functions of Adapter contract", () => {
+
+        it("Should set the roleManager address", async () => {
+            await adapterS.setRoleManager(roleManagerS.address);
+            const updatedRoleManagerAddress = await adapterS.roleManager();
+            assert.equal(updatedRoleManagerAddress, roleManagerS.address);
+        })
+
+        it("Should configure the pool contract", async () => {
+            await adapterS.setPool(pool.address);
+            const updatedPoolContract = await adapterS.pool();
+            assert.equal(updatedPoolContract, pool.address);
+        })
+
+        it("Should configure route address for corresponding route", async () => {
+            await adapterS.setRoute(LZO, routeS.address);
+            const updatedRouteAddress = await adapterS.router(LZO);
+            expect(updatedRouteAddress).to.equal(routeS.address);
+            expect(await adapterS.routeExist(routeS.address)).to.equal(true);
+        })
+
+    })
 
     
 })

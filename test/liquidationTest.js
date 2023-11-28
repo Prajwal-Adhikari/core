@@ -435,6 +435,7 @@ describe("Ready", function () {
     }
 
     async function printCEBalance() {
+
         console.log("print ceToken balance")
         let alice_balance = await ceFTM.balanceOf(alice.address);
         let bob_balance = await ceFTM.balanceOf(bob.address);
@@ -444,9 +445,11 @@ describe("Ready", function () {
         alice_balance = await debtFTM.balanceOf(alice.address);
         bob_balance = await debtFTM.balanceOf(bob.address);
         console.log(`debtToken alice: ${alice_balance} bob: ${bob_balance}`);
+        
     }
 
     async function liquidateMultipleTime(numberofTimes){
+
         for (let i = 0; i < numberofTimes; i++) {
             let alice_deposit_balances = await ceMATIC.balanceOf(alice.address);
             let alice_debt_balances = await debtFTM.balanceOf(alice.address);
@@ -458,7 +461,6 @@ describe("Ready", function () {
             console.log("BOB award ceMatic Value :",bob_Matic_balances);
             console.log("BOB ceFTM Value :",bob_FTM_balances);
             await liquidationManager.connect(bob).liquidate(alice.address, MATIC, FTM, 749999957191780830n);
-         
            
           }
     }
@@ -525,6 +527,7 @@ describe("Ready", function () {
             console.log()
 
         })
+
         it.only("test related to liquid percentage", async function () {
 
             fees = await routeA.connect(alice).estimateFees(1, 0);
