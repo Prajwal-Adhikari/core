@@ -8,13 +8,14 @@
 let { ethers, upgrades } = require("hardhat");
 
 let deployed = require("../../deployed2.json");
-
+const owner = "0x5BA85D71ef9aE0EdC180a6bf5e65F0a749f062DC";
 
 function getAddress(b, a) {
   return ethers.utils.solidityPack(['address', 'address'],
     [a, b]);
 }
 const FTM = ethers.utils.formatBytes32String("FTM");
+const USDC = ethers.utils.formatBytes32String("USDC");
 const LZO = ethers.utils.formatBytes32String("LZO");
 const AXL = ethers.utils.formatBytes32String("AXL");
 
@@ -24,9 +25,25 @@ async function main() {
   this.route = await ethers.getContractAt("LzRouteBranch", deployed.branches.ftm.route);
   this.adapter = await ethers.getContractAt("AdapterBranch", deployed.branches.ftm.adapter);
   this.axelar = await ethers.getContractAt("AxlRouteBranch", deployed.branches.ftm.axelar);
+  this.roleManager = await ethers.getContractAt("RoleManagerBranch", deployed.branches.ftm.roleManager);
+
+  // Grant roles
+  await (await this.roleManager.grantRole(await this.roleManager.SET_ADAPTER_METHOD(), owner)).wait();
+  await (await this.roleManager.grantRole(await this.roleManager.SET_BRANCH_METHOD(), owner)).wait();
+  await (await this.roleManager.grantRole(await this.roleManager.SET_ROUTE_METHOD(), owner)).wait();
+  await (await this.roleManager.grantRole(await this.roleManager.SET_POOL(), owner)).wait();
+  await (await this.roleManager.grantRole(await this.roleManager.PROTOCOL_PAUSE(), owner)).wait();
+  await (await this.roleManager.grantRole(await this.roleManager.EMERGENCY_WITHDRAW(), owner)).wait();
+  await (await this.roleManager.grantRole(await this.roleManager.SWAP(), owner)).wait();
+  await (await this.roleManager.grantRole(await this.roleManager.BRANCH(), deployed.branches.ftm.branch)).wait();
+  await (await this.roleManager.grantRole(await this.roleManager.ADAPTER(), deployed.branches.ftm.adapter)).wait();
+  await (await this.roleManager.grantRole(await this.roleManager.ROUTE(), deployed.branches.ftm.route)).wait();
+  await (await this.roleManager.grantRole(await this.roleManager.ROUTE(), deployed.branches.ftm.axelar)).wait();
+  console.log("here");
 
   await (await this.route.setTrustedRemote(deployed.chainId, getAddress(this.route.address, deployed.route))).wait();
   await (await this.branch.setPool(FTM, deployed.branches.ftm.FTM, true)).wait();
+  await (await this.branch.setPool(USDC, deployed.branches.ftm.USDC, true)).wait();
 
   // Configure Route in Adapter
   await (await this.adapter.setRoute(LZO, this.route.address)).wait();
@@ -36,7 +53,7 @@ async function main() {
   await (await this.route.setAdapter(this.adapter.address)).wait();
   await (await this.adapter.setBranch(this.branch.address)).wait();
 
-  await (await this.axelar.setDestChainNameAddress(deployed.chain, deployed.axelar)).wait();
+  await (await this.axelar.setRootChainNameAddress(deployed.chain, deployed.axelar)).wait();
 
   // Configure Route in Adapter
   await (await this.adapter.setRoute(AXL, this.axelar.address)).wait();

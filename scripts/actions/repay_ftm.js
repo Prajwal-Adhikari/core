@@ -2,7 +2,7 @@
 let deployed = require("../../deployed2.json");
 const FTM = ethers.utils.formatBytes32String("FTM");
 const LZO = ethers.utils.formatBytes32String("LZO");
-const owner = "0x68321A81bbF81c173c40add0d875B996480429A5";
+const owner = "0x5BA85D71ef9aE0EdC180a6bf5e65F0a749f062DC"; 
 
 let BN = require("bignumber.js");
 
@@ -14,10 +14,10 @@ async function main() {
   this.branch = await hre.ethers.getContractAt("Branch", deployed.branches.ftm.branch);
   this.route = await hre.ethers.getContractAt("LzRouteBranch", deployed.branches.ftm.route);
 
-  let fees = await this.route.estimateFees(1,1);
+  let fees = await this.route.estimateFees(2,0);
   console.log(fees);
 
-  await( await this.branch.repayRequest(FTM, toTokenAmount(2), LZO, 0, {value: fees})).wait();
+  await( await this.branch.repayRequest(FTM, toTokenAmount(10), LZO, 0, {value: fees})).wait();
   console.log("complete");
 }
 
