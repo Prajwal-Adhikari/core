@@ -183,12 +183,12 @@ contract LiquidationManager is
                 discount = config.liqMaxDiscount;
             }
 
-            uint256 numerator_a = config
+            uint256 numerator_a = (config
                 .liqClosingFac
-                .mul(1e18).add(currentLTV);
-            uint256 numerator_b = config
+                .add(currentLTV)).mul(1e18);
+            uint256 numerator_b = (config
                 .liqClosingFac
-                .mul(currentLTV).add(config.liqThreshold);
+                .mul(currentLTV)).add((config.liqThreshold).mul(1e18));
             if(numerator_a > numerator_b) {
                 liqPercent = numerator_a.sub(numerator_b).div(1e18 - config.liqThreshold);
             }
