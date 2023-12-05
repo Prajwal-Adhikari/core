@@ -62,6 +62,7 @@ contract Pool is
     error WithdrawPaused(string contractTAG, bytes32 chainId, bytes32 id);
     error BorrowPaused(string contractTAG, bytes32 chainId, bytes32 id);
     error BadPayload(string contractTAG, uint256 currentLength, uint256 requiredLength);
+    error InvalidTokenAmount(string contractTAG);
 
     /**
      * @dev Modifier that checks if caller has a specific role.
@@ -228,6 +229,9 @@ contract Pool is
         uint256 airdropAmount,
         bool all
     ) external payable nonReentrant {
+
+        if(tokenAmount == 0)
+            revert InvalidTokenAmount(TAG);
   
         if(protocolPause)
             revert ProtocolPaused(TAG);
@@ -292,6 +296,10 @@ contract Pool is
         uint256 airdropAmount,
         bool all
     ) external payable nonReentrant {
+
+        if(tokenAmount == 0)
+            revert InvalidTokenAmount(TAG);
+
         if(protocolPause)
             revert ProtocolPaused(TAG);
 
@@ -352,6 +360,10 @@ contract Pool is
         bytes32 route,
         uint256 airdropAmount
     ) external payable nonReentrant {
+
+        if(tokenAmount == 0)
+            revert InvalidTokenAmount(TAG);
+
         if(protocolPause)
             revert ProtocolPaused(TAG);
 
