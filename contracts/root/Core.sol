@@ -43,6 +43,8 @@ contract Core is Initializable, ContextUpgradeable {
     mapping(address => bytes32[]) public users; // Stores poolIds of collateral or borrowed assets by a user
     mapping(address => mapping(bytes32 => bool)) isPoolInList;
 
+    event AssetPrice(bytes32 id, uint256 assetPrice);
+
     error PoolNotEnabled(string contractTAG, bytes32 id);
     error NotEnoughLiquidity(string contractTAG, bytes32 chainId, bytes32 poolId, uint256 poolLiquidity, uint256 sentAmount);
     error LTVCheckFailed(string contractTAG, bytes32 poolId, uint256 tokenAmount, uint256 collateralValue, uint256 debtValue);
@@ -273,6 +275,8 @@ contract Core is Initializable, ContextUpgradeable {
         totalLiquidity[id] += tokenAmount;
         updateInterestRate(id);
         _addToken(user, id);
+        
+        emit AssetPrice(id, oracle.getSinglePrice(id));
        
         return ceAmount;
     }
@@ -329,6 +333,8 @@ contract Core is Initializable, ContextUpgradeable {
         totalLiquidity[id] -= tokenAmount;
         updateInterestRate(id);
         checkHealth(user);
+
+        emit AssetPrice(id, oracle.getSinglePrice(id));
         
         return (burnAmount, tokenAmount);
     }
@@ -372,6 +378,8 @@ contract Core is Initializable, ContextUpgradeable {
         totalLiquidity[id] -= tokenAmount;
         updateInterestRate(id);
         checkHealth(user);
+
+        emit AssetPrice(id, oracle.getSinglePrice(id));
         
         return (burnAmount);
     }
@@ -430,6 +438,8 @@ contract Core is Initializable, ContextUpgradeable {
         uint256 debt =  healthData.debtValue;
         if( collateral < debt)
             revert LTVCheckFailed(TAG, id, tokenAmount, collateral, debt);
+        
+        emit AssetPrice(id, oracle.getSinglePrice(id));
 
         return params.debtAmount;
     }
@@ -498,6 +508,8 @@ contract Core is Initializable, ContextUpgradeable {
         _removeToken(user, id);
         pool.debtSupply -= params.debtAmount;
         updateInterestRate(id);
+
+        emit AssetPrice(id, oracle.getSinglePrice(id));
 
         return (params.repayAmount, params.debtAmount, ceAmount);
     }
