@@ -194,7 +194,7 @@ interface ICore {
      * @param to - wallet address the user receive ceToken.
      * * @param to - pool id.
      **/
-    function handleTransfer(address from, address to, bytes32 id) external view;
+    function handleTransfer(address from, address to, bytes32 id) external;
 
     /**
      * @notice Returns list of the tokens the `user` has 
