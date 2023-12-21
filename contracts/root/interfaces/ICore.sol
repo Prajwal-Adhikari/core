@@ -244,8 +244,28 @@ interface ICore {
         bytes32 _poolId
     ) external view returns (Data.ConfigData memory config);
 
-
+    /**
+     * @notice Get the DT scaled amount.
+     * @param _poolId - The pool id .
+     **/
     function getDTScaled(bytes32 _poolId) external view returns (uint256);
 
+    /**
+     * @notice Get the CE scaled amount.
+     * @param _poolId - The pool id .
+     **/
     function getCEScaled(bytes32 _poolId) external view returns (uint256);
+
+     /**
+     * @notice Returns list of pool datas
+     * @param _poolIds - ids of the pool.
+     **/
+    function getPoolData(bytes32[] memory _poolIds) external view returns (Data.PoolData[] memory);
+
+
+    /**
+     * @notice Returns list of config datas
+     * @param _poolIds - ids of the pool.
+     **/
+    function getConfigData(bytes32[] memory _poolIds) external view returns (Data.ConfigData[] memory);
 }

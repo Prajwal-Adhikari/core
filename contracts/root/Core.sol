@@ -727,4 +727,37 @@ contract Core is Initializable, ContextUpgradeable {
     
         
     }
+
+    /**
+     * @notice Returns list of pool datas
+     * @param _poolIds - ids of the pool.
+     **/
+    function getPoolData(
+        bytes32[] memory _poolIds
+    ) external view returns (Data.PoolData[] memory) {
+        uint256 len = _poolIds.length;
+        Data.PoolData[] memory poolDatas = new Data.PoolData[](len);
+        for (uint256 i; i < len; i++) {
+            Data.PoolData memory pool = pools[_poolIds[i]];
+            poolDatas[i] = pool;
+        }
+        return poolDatas;
+    }
+
+    /**
+     * @notice Returns list of config datas
+     * @param _poolIds - ids of the pool.
+     **/
+    function getConfigData(
+        bytes32[] memory _poolIds
+    ) external view returns (Data.ConfigData[] memory) {
+        uint256 len = _poolIds.length;
+        Data.ConfigData[] memory configDatas = new Data.ConfigData[](len);
+        for (uint256 i; i < len; i++) {
+            Data.ConfigData memory config = configs[_poolIds[i]];
+            configDatas[i] = config;
+        }
+        return configDatas;
+    }
+
 }
