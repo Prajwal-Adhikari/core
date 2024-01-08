@@ -74,6 +74,23 @@ interface IPool {
     ) external;
 
     /**
+     * @notice Leverager method looping deposit and borrow of an asset
+     * This function can be accessed by anyone
+     * @param id - pool id of pool to borrow from
+     * @param chainId - chain id of chain to borrow from
+     * @param tokenAmount - total amount to loop
+     * @param borrowRatio - ratio of tokens to borrow
+     * @param loopCount - repeat count for loop
+     **/
+    function loop(
+        bytes32 id,
+        bytes32 chainId,
+        uint256 tokenAmount,
+        uint256 borrowRatio,
+        uint256 loopCount
+    ) external;
+
+    /**
      * @notice Swaps liquidity amount from one chain to another
      * This function can only be accessed by account with role SWAP.
      * @param id - pool id of the asset.

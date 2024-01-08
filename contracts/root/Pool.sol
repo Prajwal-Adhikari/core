@@ -63,6 +63,9 @@ contract Pool is
     error BorrowPaused(string contractTAG, bytes32 chainId, bytes32 id);
     error BadPayload(string contractTAG, uint256 currentLength, uint256 requiredLength);
     error InvalidTokenAmount(string contractTAG);
+	error InvalidRatio(string contractTAG);
+    error InvalidLoopCount(string contractTAG);
+
 
     /**
      * @dev Modifier that checks if caller has a specific role.
@@ -411,6 +414,69 @@ contract Pool is
             fee
         );
         emit Data.SendToken(_bytesToAddress(to), id, tokenAmount);
+    }
+
+    /**
+     * @notice Leverager method looping deposit and borrow of an asset
+     * This function can be accessed by anyone
+     * @param id - pool id of pool to borrow from
+     * @param chainId - chain id of chain to borrow from
+     * @param tokenAmount - total amount to loop
+     * @param borrowRatio - ratio of tokens to borrow
+     * @param loopCount - repeat count for loop
+     **/
+    function loop(
+        bytes32 id,
+        bytes32 chainId,
+        uint256 tokenAmount,
+        uint256 borrowRatio,
+        uint256 loopCount
+    ) external {
+        if (!(borrowRatio > 0 && borrowRatio <= 1e18))
+            revert InvalidRatio(TAG);
+        if (loopCount == 0)
+            revert InvalidLoopCount(TAG);
+        for (uint256 i = 0; i < loopCount; ) {
+            tokenAmount = tokenAmount.mul(borrowRatio).div(1e18);
+            uint256 fee;
+            if (feeEnable) {
+                fee = IFeeProvider(feeProvider).setFeeAmount(chainId, id, tokenAmount);
+            }
+
+            uint256 debtAmount = ICore(core).borrow(
+                id,
+                chainId,
+                tokenAmount,
+                _msgSender()
+            );
+
+            tokenAmount -= fee;
+
+            emit Data.Borrow(
+            _msgSender(),
+            _msgSender(),
+            id,
+            chainId,
+            tokenAmount,
+            debtAmount,
+            "",
+            fee
+            );
+
+            uint256 reward;
+            if (rewardEnable) {
+                reward = IFeeProvider(feeProvider).setRewardAmount(chainId, id, tokenAmount);
+            }
+
+            tokenAmount += reward;
+            uint256 ceAmount = ICore(core).deposit(id, chainId, _msgSender(), tokenAmount);
+
+            emit Data.Deposit(_msgSender(), id, chainId, tokenAmount.sub(reward), ceAmount, "", reward);
+            unchecked {
+				i++;
+			}
+
+        }
     }
 
     /**
