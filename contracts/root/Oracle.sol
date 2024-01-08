@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.17;
 
-import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
 import "./interfaces/IUniswapV3Factory.sol";
 import "./libraries/OracleLibrary.sol";
 import "./interfaces/IRoleManager.sol";
+import "./interfaces/IOffchainAggregator.sol";
 
 string constant TAG = "Oracle";
 
@@ -29,7 +29,7 @@ contract Oracle is Initializable, ContextUpgradeable {
     uint8 public constant ROOT_DECIMALS = 18;
     uint160 public acceptedDelayTime;
 
-    mapping(bytes32 => address) public aggregator;
+    mapping(bytes32 => address) public offChainAggregator;
     mapping(bytes32 => address) public assetAddress;
     mapping(bytes32 => bytes32) public stableCoinId;
     mapping(bytes32 => bool) public isStableCoin;
@@ -43,7 +43,6 @@ contract Oracle is Initializable, ContextUpgradeable {
 
     event SetPrice(bytes32 symbol, uint256 price);
 
-    error PriceNotSet(string contractTAG, bytes32 symbol);
     error ChainlinkMalfunction(string contractTAG, bytes32 symbol);
     error RoundNotComplete(string contractTAG, bytes32 symbol);
     error StaleData(string contractTAG, bytes32 symbol);
@@ -83,16 +82,16 @@ contract Oracle is Initializable, ContextUpgradeable {
     }
 
     /**
-     * @notice Configures aggregator address for a asset `_id` managed by Chainlink
+     * @notice Configures offchain aggregator address for a asset `_id` managed by Chainlink
      * This function can only be accessed by the account with role SET_ORACLE_METHOD.
      * @param _id - pool id of the asset
-     * @param _aggregator - address of the aggregator
+     * @param _offChainAggregator - address of the aggregator
      **/
-    function setAggregator(
+    function setOffChainAggregator(
         bytes32 _id,
-        address _aggregator
+        address _offChainAggregator
     ) external onlyRole(IRoleManager(roleManager).SET_ORACLE_METHOD()) {
-        aggregator[_id] = _aggregator;
+        offChainAggregator[_id] = _offChainAggregator;
     }
 
     /**
@@ -204,9 +203,9 @@ contract Oracle is Initializable, ContextUpgradeable {
                 }
             } else {
                 price = getPriceFromChainlink(_symbols[i]);
+                if(priceCheck(_symbols[i],price))
+                    price = getPriceFromDex(_symbols[i]);
             }
-            if(price == 0)
-                revert PriceNotSet(TAG, _symbols[i]);
             results[i] = price;
         }
     }
@@ -220,18 +219,36 @@ contract Oracle is Initializable, ContextUpgradeable {
     ) external view returns (uint256 result) {
             if (fetchFromDex[_symbol]) {
                 if (isStableCoin[_symbol]) {
-                    result = getPriceFromChainlink(_symbol);
+                    result = getPriceFromChainlink(_symbol);   
                 } else {
                     result = getPriceFromDex(_symbol);
                 }
             } else {
-                result = getPriceFromChainlink(_symbol);
+                result = getPriceFromChainlink(_symbol); 
+                if(priceCheck(_symbol,result))
+                    result = getPriceFromDex(_symbol);   
             }
-            if(result == 0)
-                revert PriceNotSet(TAG, _symbol);
             
         }
     
+    
+    /**
+    * @notice Returns bool after checking the min max and zero condition
+    * @param _symbol - pool id of the asset
+    * @param _price - price return by the chainlink
+    **/
+    function priceCheck(
+        bytes32 _symbol,
+        uint256 _price
+    ) public view returns (bool status) {
+        int256 finalPrice = int256(_price);
+        int192 _maxAnswer = IOffchainAggregator(offChainAggregator[_symbol]).maxAnswer();
+        int192 _minAnswer = IOffchainAggregator(offChainAggregator[_symbol]).minAnswer();
+        if(finalPrice == 0 || finalPrice == _maxAnswer || finalPrice == _minAnswer ){
+            return true;
+        }
+    }
+
     /**
     * @notice Returns price of the asset fetched from chainlink aggregator
     * @param _symbol - pool id of the asset
@@ -247,8 +264,8 @@ contract Oracle is Initializable, ContextUpgradeable {
             uint256 timeStamp,
             uint80 answeredInRound
         ) =
-         AggregatorV3Interface(
-            aggregator[_symbol]
+         IOffchainAggregator(
+            offChainAggregator[_symbol]
         ).latestRoundData();
 
         if(basePrice == 0)
@@ -263,7 +280,7 @@ contract Oracle is Initializable, ContextUpgradeable {
         if(answeredInRound < roundID)
             revert StaleData(TAG, _symbol);
 
-        uint8 quoteDecimals = AggregatorV3Interface(aggregator[_symbol])
+        uint8 quoteDecimals = IOffchainAggregator(offChainAggregator[_symbol])
             .decimals();
         uint256 quotePrice = _scalePrice(
             uint256(basePrice),
