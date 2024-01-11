@@ -354,7 +354,8 @@ contract Core is Initializable, ContextUpgradeable {
         chainLiquidity[chainId][id] -= tokenAmount;
         totalLiquidity[id] -= tokenAmount;
         updateInterestRate(id);
-        checkHealth(user);
+        if(! useAsCollateralDisabled[user][id])
+            checkHealth(user);
 
         emit AssetPrice(id, oracle.getSinglePrice(id));
         
@@ -399,7 +400,8 @@ contract Core is Initializable, ContextUpgradeable {
         chainLiquidity[chainId][id] -= tokenAmount;
         totalLiquidity[id] -= tokenAmount;
         updateInterestRate(id);
-        checkHealth(user);
+        if(! useAsCollateralDisabled[user][id])
+            checkHealth(user);
 
         emit AssetPrice(id, oracle.getSinglePrice(id));
         
@@ -594,7 +596,8 @@ contract Core is Initializable, ContextUpgradeable {
     function handleTransfer(address from, address to, bytes32 id) external {
         if(msg.sender != pools[id].ceToken)
             revert InvalidSender(TAG, msg.sender);
-        checkHealth(from);
+        if(! useAsCollateralDisabled[from][id])
+            checkHealth(from);
         _addToken(to, id);
         _removeToken(from, id);
     }
