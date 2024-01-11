@@ -120,6 +120,19 @@ interface ICore {
     function changePoolStatus(bytes32 id, bool enable) external;
 
     /**
+     * @notice Sets the status of the collateral usage of a user
+     * This function can only be accessed by the account with role POOL.
+     * @param user - address of the depositor
+     * @param poolId - id of the pool to change the status of
+     * @param status - status if true collateral usage is disabled
+     **/
+    function disableCollateralUsage(
+        address user,
+        bytes32 poolId,
+        bool status
+    ) external ;
+
+    /**
      * @notice Updates ceSupply and debtSupply of the pool
      * This function can only be accessed by account with role LIQUIDATION_MANAGER.
      * @param id - id of the pool
@@ -243,6 +256,13 @@ interface ICore {
     function configs(
         bytes32 _poolId
     ) external view returns (Data.ConfigData memory config);
+
+    /**
+     * @notice Get the collateral disabled status
+     * @param _user address of the depositor
+     * @param _poolId - The pool id .
+     **/
+    function useAsCollateralDisabled(address _user, bytes32 _poolId) external view returns (bool);
 
     /**
      * @notice Get the DT scaled amount.

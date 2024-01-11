@@ -32,6 +32,17 @@ interface IPool {
     function setAdapter(address adapterAddress) external;
 
     /**
+     * @notice Sets the status of the collateral usage of the depositor
+     * This function can only be accessed by the account with role POOL.
+     * @param poolId - id of the pool to change the status of
+     * @param status - status if true collateral usage is disabled
+     **/
+    function disableCollateralUsage(
+        bytes32 poolId,
+        bool status
+    ) external;
+
+    /**
      * @notice Sends a withdraw request of amount `ceAmount` to address `to` from pool with pool id `id`
      * in chain with chain id `chainId` to core contract
      * This function can be accessed by anyone

@@ -37,6 +37,8 @@ contract LiquidationManager is
     error CannotLiquidate(string contractTAG, uint256 currentHealthFactor);
     error ClosingFactotExceeded(string contractTAG);
     error LiquidationPaused(string contractTAG);
+    error CollateralUsageDisabled(string contractTAG, address user, bytes32 poolId );
+
     /**
      * @dev Modifier that checks if caller has a specific role.
      **/
@@ -157,6 +159,9 @@ contract LiquidationManager is
         // whether liquidation is enable or not
         if(liquidationPause)
             revert LiquidationPaused(TAG);
+
+        if(ICore(core).useAsCollateralDisabled(user, collateralId))
+            revert CollateralUsageDisabled(TAG,user,collateralId);
 
         // refresh the pool data
         ICore(core).refresh(collateralId);

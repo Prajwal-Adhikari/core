@@ -431,7 +431,7 @@ contract Pool is
         uint256 tokenAmount,
         uint256 borrowRatio,
         uint256 loopCount
-    ) external {
+    ) external nonReentrant {
         if (!(borrowRatio > 0 && borrowRatio <= 1e18))
             revert InvalidRatio(TAG);
         if (loopCount == 0)
@@ -552,6 +552,19 @@ contract Pool is
         ICore(core).swap(id,srcChainId,destChainId,tokenAmountInSrc,tokenAmountInDest);
         emit Data.Swap(reward);
         
+    }
+
+    /**
+     * @notice Sets the status of the collateral usage of the depositor
+     * This function can only be accessed by the account with role POOL.
+     * @param poolId - id of the pool to change the status of
+     * @param status - status if true collateral usage is disabled
+     **/
+    function disableCollateralUsage(
+        bytes32 poolId,
+        bool status
+    ) external {
+        ICore(core).disableCollateralUsage(_msgSender(), poolId, status);
     }
 
     /**

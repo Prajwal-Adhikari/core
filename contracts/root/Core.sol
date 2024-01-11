@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.8.17;
+pragma solidity 0.8.17; 
 
 import "@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -33,6 +33,7 @@ contract Core is Initializable, ContextUpgradeable {
     mapping(bytes32 => Data.PoolData) public pools;
     mapping(bytes32 => Data.ConfigData) public configs;
     mapping(bytes32 => uint256) public totalLiquidity; // Stores total liquidity within pool
+    mapping(address => mapping(bytes32 => bool)) public useAsCollateralDisabled;
 
     /** @notice key : [chainId][poolId]
     * @notice chainId = keccak256("FTM")
@@ -44,6 +45,7 @@ contract Core is Initializable, ContextUpgradeable {
     mapping(address => mapping(bytes32 => bool)) isPoolInList;
 
     event AssetPrice(bytes32 id, uint256 assetPrice);
+    event PoolUsedAsCollateralDisabled(address user, bytes32 poolId, bool status);
 
     error PoolNotEnabled(string contractTAG, bytes32 id);
     error NotEnoughLiquidity(string contractTAG, bytes32 chainId, bytes32 poolId, uint256 poolLiquidity, uint256 sentAmount);
@@ -96,6 +98,23 @@ contract Core is Initializable, ContextUpgradeable {
         IOracle _oracle
     ) external onlyRole(IRoleManager(roleManager).SET_CORE_METHOD()) {
         oracle = _oracle;
+    }
+
+    /**
+     * @notice Sets the status of the collateral usage of a user
+     * This function can only be accessed by the account with role POOL.
+     * @param user - address of the depositor
+     * @param poolId - id of the pool to change the status of
+     * @param status - status if true collateral usage is disabled
+     **/
+    function disableCollateralUsage(
+        address user,
+        bytes32 poolId,
+        bool status
+    ) external onlyRole(IRoleManager(roleManager).POOL()) {
+        useAsCollateralDisabled[user][poolId] = status;
+        checkHealth(user);
+        emit PoolUsedAsCollateralDisabled(user, poolId, status);
     }
 
     /**
@@ -230,13 +249,16 @@ contract Core is Initializable, ContextUpgradeable {
                     prices[i],
                     ids[i]
                 );
+                if (! useAsCollateralDisabled[user][ids[i]]) {
                 health.collateralValue = health.collateralValue.add(
                     collateralValue
                 );
-                health.debtValue = health.debtValue.add(debtValue);
                 health.ltsValue = health.ltsValue.add(
                     collateralValue.mul(configs[ids[i]].liqThreshold).div(1e18)
                 );
+                }
+                health.debtValue = health.debtValue.add(debtValue);
+                
             }
 
             if (health.ltsValue > 0) {
