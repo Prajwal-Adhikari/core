@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 pragma solidity >=0.5.0;
+import {Origin} from "@layerzerolabs/lz-evm-oapp-v2/contracts/oapp/OApp.sol";
 
 interface ILayerZeroReceiver {
     // @notice LayerZero endpoint will invoke this function to deliver the message on the destination
@@ -10,8 +11,18 @@ interface ILayerZeroReceiver {
     // @param _payload - the signed payload is the UA bytes has encoded to be sent
     function lzReceive(uint16 _srcChainId, bytes calldata _srcAddress, uint64 _nonce, bytes calldata _payload) external;
 
-    // @notice invoke this function will src chainId equal to dst chainId
+    // @notice invoke this function when src chainId equal to dst chainId
     // @param _srcChainId - the source endpoint identifier
     // @param _payload - the signed payload is the UA bytes has encoded to be sent
     function localReceive(uint16 _srcChainId, bytes calldata _payload) external;
+
+}
+
+interface ILayerZeroReceiverV2 {
+    // @notice invoke this function when src chainId equal to dst chainId
+    // @param _origin - the source endpoint identifier for V2
+    // @param _payload - the signed payload is the UA bytes has encoded to be sent
+    // @param _data - arbitrary data appended by the Executor
+    function localReceive(Origin calldata _origin, bytes calldata _payload, bytes calldata _data) external;
+
 }

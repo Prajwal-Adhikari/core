@@ -16,21 +16,21 @@ interface IRoute {
     function setAdapter(address adapterAddress) external;
 
     /**
-     * @notice Configures gas value.
+     * @notice Configures gas value for LayerZero V1
      * This function can only be accessed by the account with role of SET_ROUTE_METHOD
      * @param _gasUsage - value of the gas
      **/
     function setGasUsage(uint256 _gasUsage) external;
 
     /**
-     * @notice Configures name of the root chain and destination contract address
-     * This function can only be accessed by the account with role of SET_ROUTE_METHOD
-     * @param name - name of the root chain.
-     * @param addr - route address in the root chain
+     * @notice Configures gas value for LayerZero V2
+     * This function can only be accessed by the contract owner.
+     * @param _gas value of the gas
+     * @param _value value of the gas
      **/
-    function setRootChainNameAddress(
-        string calldata name,
-        string calldata addr
+    function setExecutorValues(
+        uint128 _gas,
+        uint128 _value
     ) external;
 
     /**
@@ -47,7 +47,7 @@ interface IRoute {
     ) external payable;
 
     /*
-     * @notice Encodes the message type and returns the cross chain messaging fee for LayerZero.
+     * @notice Encodes the message type and returns the cross chain messaging fee for LayerZero V1
      * @param funtionType - message type, either deposit,repay or swap information
      * @param airdropAmount - amount to be airdropped to destination chain
      **/
@@ -55,4 +55,16 @@ interface IRoute {
         uint8 functionType,
         uint256 airdropAmount
     ) external view returns (uint256);
+
+    /* @notice Quotes the gas needed to pay for the full omnichain transaction for LayerZero V2
+     * @return nativeFee Estimated gas fee in native gas.
+     * @return lzTokenFee Estimated gas fee in ZRO token.
+     */
+    function quote(
+        uint32 _dstEid, // Destination chain's endpoint ID.
+        bytes calldata _payload, // The message to send.
+        uint128 airdropAmount,
+        address airdropReceiver,
+        bool _payInLzToken // boolean for which token to return fee in
+    ) external view returns (uint256 , uint256);
 }
