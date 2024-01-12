@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.8.17;
+pragma solidity 0.8.22;
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {LzApp} from "../../communicationProtocol/layerZero/lzApp/LzApp.sol";
@@ -139,11 +139,11 @@ contract LzRouteBranch is Initializable, LzApp {
     ) public view returns (uint256) {
         bytes memory payload = "";
         if (functionType == TYPE_DEPOSIT) {
-            payload = abi.encode(TYPE_DEPOSIT, 1, msg.sender, 1, 1);
+            payload = abi.encode(TYPE_DEPOSIT, 1, msg.sender, 1);
         } else if (functionType == TYPE_REPAY) {
-            payload = abi.encode(TYPE_REPAY, 1, msg.sender, 1, 1);
+            payload = abi.encode(TYPE_REPAY, 1, msg.sender, 1);
         } else if (functionType == TYPE_SWAP) {
-            payload = abi.encode(TYPE_SWAP, 1, msg.sender, 1, 1);
+            payload = abi.encode(TYPE_SWAP, 1, msg.sender, 1);
         } else {
             revert UnsupportedFunctionType(TAG, functionType);
         }

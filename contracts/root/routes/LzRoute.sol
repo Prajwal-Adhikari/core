@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.8.17;
+pragma solidity 0.8.22;
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {LzApp} from "../../communicationProtocol/layerZero/lzApp/LzApp.sol";
 import "../interfaces/IAdapter.sol";
