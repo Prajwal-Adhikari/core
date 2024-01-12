@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.17;
 
+import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
 import "./interfaces/IUniswapV3Factory.sol";
 import "./libraries/OracleLibrary.sol";
 import "./interfaces/IRoleManager.sol";
-import "./interfaces/IOffchainAggregator.sol";
 
 string constant TAG = "Oracle";
 
@@ -29,7 +29,7 @@ contract Oracle is Initializable, ContextUpgradeable {
     uint8 public constant ROOT_DECIMALS = 18;
     uint160 public acceptedDelayTime;
 
-    mapping(bytes32 => address) public offChainAggregator;
+    mapping(bytes32 => address) public aggregator;
     mapping(bytes32 => address) public assetAddress;
     mapping(bytes32 => bytes32) public stableCoinId;
     mapping(bytes32 => bool) public isStableCoin;
@@ -37,6 +37,8 @@ contract Oracle is Initializable, ContextUpgradeable {
     mapping(bytes32 => uint256) public prices;
     mapping(bytes32 => uint24) public fee;
     mapping(bytes32 => uint32) public timeInterval;
+    mapping(bytes32 => uint256) public maxValue;
+    mapping(bytes32 => uint256) public minValue;
 
     address public dexFactoryAddress;
     address public roleManager;
@@ -82,16 +84,33 @@ contract Oracle is Initializable, ContextUpgradeable {
     }
 
     /**
-     * @notice Configures offchain aggregator address for a asset `_id` managed by Chainlink
+     * @notice Configures aggregator address for a asset `_id` managed by Chainlink
      * This function can only be accessed by the account with role SET_ORACLE_METHOD.
      * @param _id - pool id of the asset
-     * @param _offChainAggregator - address of the aggregator
+     * @param _aggregator - address of the aggregator
      **/
-    function setOffChainAggregator(
+    function setAggregator(
         bytes32 _id,
-        address _offChainAggregator
+        address _aggregator
     ) external onlyRole(IRoleManager(roleManager).SET_ORACLE_METHOD()) {
-        offChainAggregator[_id] = _offChainAggregator;
+        aggregator[_id] = _aggregator;
+    }
+
+    /**
+     * @notice Configures min max value to check against the oracle price
+     * @param _id - pool id of the asset
+     * @param _maxValue - accepted max value of asset
+     * @param _minValue - accepted min value of asset
+     **/
+    function setMinMax(
+        bytes32[] memory _id,
+        uint256[] memory _maxValue,
+        uint256[] memory _minValue
+    ) external onlyRole(IRoleManager(roleManager).SET_ORACLE_METHOD()) {
+        for (uint256 i; i < _id.length; i++) {
+            maxValue[_id[i]] = _maxValue[i];
+            minValue[_id[i]] = _minValue[i];
+        }
     }
 
     /**
@@ -155,7 +174,6 @@ contract Oracle is Initializable, ContextUpgradeable {
         bytes32 _id,
         uint24 _fee,
         uint32 _timeInterval
-
     ) external onlyRole(IRoleManager(roleManager).SET_ORACLE_METHOD()) {
         fee[_id] = _fee;
         timeInterval[_id] = _timeInterval;
@@ -199,7 +217,7 @@ contract Oracle is Initializable, ContextUpgradeable {
                 if (isStableCoin[_symbols[i]]) {
                     price = getPriceFromChainlink(_symbols[i]);
                 } else {
-                    price = getPriceFromDex(_symbols[i]);
+                    price = getPriceFromDex(_symbols[i]);     
                 }
             } else {
                 price = getPriceFromChainlink(_symbols[i]);
@@ -232,7 +250,7 @@ contract Oracle is Initializable, ContextUpgradeable {
         }
     
     
-    /**
+     /**
     * @notice Returns bool after checking the min max and zero condition
     * @param _symbol - pool id of the asset
     * @param _price - price return by the chainlink
@@ -241,10 +259,8 @@ contract Oracle is Initializable, ContextUpgradeable {
         bytes32 _symbol,
         uint256 _price
     ) public view returns (bool status) {
-        int256 finalPrice = int256(_price);
-        int192 _maxAnswer = IOffchainAggregator(offChainAggregator[_symbol]).maxAnswer();
-        int192 _minAnswer = IOffchainAggregator(offChainAggregator[_symbol]).minAnswer();
-        if(finalPrice == 0 || finalPrice == _maxAnswer || finalPrice == _minAnswer ){
+        
+        if(_price == 0 || _price == minValue[_symbol] || _price == maxValue[_symbol] ){
             return true;
         }
     }
@@ -264,8 +280,8 @@ contract Oracle is Initializable, ContextUpgradeable {
             uint256 timeStamp,
             uint80 answeredInRound
         ) =
-         IOffchainAggregator(
-            offChainAggregator[_symbol]
+         AggregatorV3Interface(
+            aggregator[_symbol]
         ).latestRoundData();
 
         if(basePrice == 0)
@@ -280,7 +296,7 @@ contract Oracle is Initializable, ContextUpgradeable {
         if(answeredInRound < roundID)
             revert StaleData(TAG, _symbol);
 
-        uint8 quoteDecimals = IOffchainAggregator(offChainAggregator[_symbol])
+        uint8 quoteDecimals = AggregatorV3Interface(aggregator[_symbol])
             .decimals();
         uint256 quotePrice = _scalePrice(
             uint256(basePrice),
