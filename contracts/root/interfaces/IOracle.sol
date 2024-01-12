@@ -12,15 +12,6 @@ interface IOracle  {
     function setRoleManager(address roleManagerAddress) external;
 
     /**
-     * @notice Configures router address of the dex
-     * This function can only be accessed by the account with role SET_ORACLE_METHOD.
-     * @param _dexFactoryAddress - address of the dex factory contract.
-     **/
-    function setDexFactoryAddress(
-        address _dexFactoryAddress
-    ) external;
-
-    /**
      * @notice Configures aggregator address for a asset `_id` managed by Chainlink
      * This function can only be accessed by the account with role SET_ORACLE_METHOD.
      * @param _id - pool id of the asset
@@ -29,6 +20,18 @@ interface IOracle  {
     function setAggregator(
         bytes32 _id,
         address _aggregator
+    ) external;
+
+     /**
+     * @notice Configures min max value to check against the oracle price
+     * @param _id - pool id of the asset
+     * @param _maxValue - accepted max value of asset
+     * @param _minValue - accepted min value of asset
+     **/
+    function setMinMax(
+        bytes32[] memory _id,
+        uint256[] memory _maxValue,
+        uint256[] memory _minValue
     ) external;
 
     /**
@@ -66,6 +69,27 @@ interface IOracle  {
     ) external;
 
     /**
+     * @notice Configures router address of the dex
+     * This function can only be accessed by the account with role SET_ORACLE_METHOD.
+     * @param _dexFactoryAddress - address of the dex factory contract.
+     **/
+    function setDexFactoryAddress(
+        address _dexFactoryAddress
+    ) external;
+
+    /**
+     * @notice Sets fee and time interval.
+     * @param _id - Pool id of the asset.
+     * @param _fee - Fee.
+     * @param _timeInterval - Time interval.
+     **/
+    function setFeeAndTimeInterval(
+        bytes32 _id,
+        uint24 _fee,
+        uint32 _timeInterval
+    ) external;
+
+    /**
     * @notice Configures if the asset's price is to be fetched from dex or chainlink
     * This function can only be accessed by the account with role SET_ORACLE_METHOD.
     * @param _id - pool id of the asset
@@ -74,6 +98,15 @@ interface IOracle  {
     function setPriceSource(
         bytes32 _id,
         bool _status
+    ) external;
+
+      /**
+     * @notice Configures the accepted delay time for the chainlink data
+     * This function can only be accessed by the account with role SET_ORACLE_METHOD.
+     * @param _maxDelayTime - max acceptable delayed time
+     **/
+    function setDelayTime(
+        uint160 _maxDelayTime
     ) external;
 
 
@@ -90,6 +123,16 @@ interface IOracle  {
     function getSinglePrice(
         bytes32 _symbol
     ) external view returns (uint256);
+
+    /**
+    * @notice Returns bool after checking the min max and zero condition
+    * @param _symbol - pool id of the asset
+    * @param _price - price return by the chainlink
+    **/
+    function priceCheck(
+        bytes32 _symbol,
+        uint256 _price
+    ) external view returns (bool status);
 
     /**
     * @notice Returns price of the asset fetched from chainlink aggregator
