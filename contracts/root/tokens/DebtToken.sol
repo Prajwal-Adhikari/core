@@ -5,6 +5,7 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
 import "../interfaces/IRoleManager.sol";
 import "../interfaces/ICore.sol";
+import "../interfaces/ICedroRewardController.sol";
 
 string constant TAG = "DebtToken";
 
@@ -17,6 +18,7 @@ contract DebtToken is ERC20Upgradeable {
 
     address public core;
     address public roleManager;
+    address public rewardController;
     bytes32 public poolId;
 
     error CannotTransferDebtToken(string contractTAG);
@@ -60,6 +62,16 @@ contract DebtToken is ERC20Upgradeable {
     ) external onlyRole(IRoleManager(roleManager).SET_CE_TOKEN_METHOD()) {
         core = coreAddress;
         poolId = id;
+    }
+
+    /**
+     * @notice Configures reward controller address
+     * This function can only be accessed by the account with role SET_CE_TOKEN_METHOD.
+     * @param rewardControllerAddress - address of the roleManager contract.
+     **/
+    function setRewardController(address rewardControllerAddress) external onlyRole(IRoleManager(roleManager).SET_CE_TOKEN_METHOD()) {
+        rewardController = rewardControllerAddress;
+
     }
 
     /**
@@ -110,6 +122,7 @@ contract DebtToken is ERC20Upgradeable {
      * @param amount - amount of the token.
      **/
     function mint(address to, uint256 amount) external onlyRole(IRoleManager(roleManager).MINT_BURN_CE_DEBT_TOKEN()) {
+        _handleReward(to);
         _mint(to, amount);
     }
 
@@ -120,6 +133,15 @@ contract DebtToken is ERC20Upgradeable {
      * @param amount - amount of the token.
      **/
     function burn(address from, uint256 amount) external onlyRole(IRoleManager(roleManager).MINT_BURN_CE_DEBT_TOKEN()) {
+        _handleReward(from);
         _burn(from, amount);
+    }
+
+    function _handleReward(address user) internal {
+        if(rewardController != address(0)){
+            uint256 userBalance = super.balanceOf(user);
+            uint256 currentTotalBalance  = super.totalSupply();
+            ICedroRewardController(rewardController).handleReward(user, userBalance, currentTotalBalance);
+        }
     }
 }

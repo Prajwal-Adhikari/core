@@ -15,9 +15,16 @@ interface ICEToken is IERC20 {
      * @notice Configures core address
      * This function can only be accessed by the account with role SET_CE_TOKEN_METHOD.
      * @param coreAddress - address of the roleManager contract.
+     * @param id - The pool id.
      **/
+    function setCore(address coreAddress, bytes32 id) external;
 
-    function setCore(address coreAddress) external;
+    /**
+     * @notice Configures reward controller address
+     * This function can only be accessed by the account with role SET_CE_TOKEN_METHOD.
+     * @param rewardControllerAddress - address of the roleManager contract.
+     **/
+    function setRewardController(address rewardControllerAddress) external;
 
     /**
      * @notice Configures a waiting period before transfer if
@@ -78,7 +85,11 @@ interface ICEToken is IERC20 {
      * @param amount - amount of the token.
      * @param chainId - key for the chain
      **/
-    function burnFromChain(address from, uint256 amount, bytes32 chainId) external;
+    function burnFromChain(
+        address from,
+        uint256 amount,
+        bytes32 chainId
+    ) external;
 
     /**
      * @notice Burns ceToken from address `from` i.e borrower and mints to `to` i.e liquidator
@@ -99,20 +110,43 @@ interface ICEToken is IERC20 {
      * @notice Gets the balance from address `user` before scaled deducting the dead token balance.
      * @param user - address of the user
      **/
-    function balanceBeforeScaledExcludingDeadTokens(address user) external view returns (uint256);
+    function balanceBeforeScaledExcludingDeadTokens(
+        address user
+    ) external view returns (uint256);
+
+    /**
+     * @notice Gets the total balance  before scaled excluding dead tokens
+     **/
+    function totalBalanceBeforeScaledExcludingDeadTokens()
+        external
+        view
+        returns (uint256);
 
     /**
      * @notice Gets the scaled CE token balance of the user excluding dead tokens
      * @param user - address of the user.
      **/
-    function balanceOfExcludingDeadTokens(address user) external view returns (uint256);
+    function balanceOfExcludingDeadTokens(
+        address user
+    ) external view returns (uint256);
+
+    /**
+     * @notice Gets the total scaled CE token balance
+     **/
+    function totalBalanceOfExcludingDeadTokens()
+        external
+        view
+        returns (uint256);
 
     /**
      * @notice Gets the balance of ceToken from address `user` in a particular chain
      * @param user - address of the user
      * @param chainId - key for the chain
      **/
-    function balancePerChain(address user, bytes32 chainId) external view returns (uint256);
+    function balancePerChain(
+        address user,
+        bytes32 chainId
+    ) external view returns (uint256);
 
     /**
      * @notice Gets the status of the chain

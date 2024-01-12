@@ -12,6 +12,21 @@ interface IDebtToken is IERC20 {
     function setRoleManager(address roleManagerAddress) external;
 
     /**
+     * @notice Configures core address
+     * This function can only be accessed by the account with role SET_CE_TOKEN_METHOD.
+     * @param coreAddress - address of the roleManager contract.
+     * @param id - The pool id.
+     **/
+    function setCore(address coreAddress, bytes32 id) external;
+
+    /**
+     * @notice Configures reward controller address
+     * This function can only be accessed by the account with role SET_CE_TOKEN_METHOD.
+     * @param rewardControllerAddress - address of the roleManager contract.
+     **/
+    function setRewardController(address rewardControllerAddress) external;
+
+    /**
      * @notice Mints debtToken to address `to`.
      * This function can only be accessed by account with role MINT_BURN_CE_DEBT_TOKEN.
      * @param to - address of the receipient.
@@ -26,7 +41,6 @@ interface IDebtToken is IERC20 {
      * @param amount - amount of the token.
      **/
     function burn(address from, uint256 amount) external;
-
 
     /**
      * @notice Get the balance from address `user` before scaled.

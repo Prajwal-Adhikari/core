@@ -5,6 +5,7 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
 import "../interfaces/IRoleManager.sol";
 import "../interfaces/ICore.sol";
+import "../interfaces/ICedroRewardController.sol";
 
 string constant TAG = "CEToken";
 
@@ -17,11 +18,13 @@ contract CEToken is ERC20Upgradeable {
     using SafeMathUpgradeable for uint256;
     address public core;
     address public roleManager;
+    address public rewardController;
     bytes32 public poolId;
     uint256 public transferBlockWait; //amount of blocks to wait before user can transfer minted ceToken
     uint256 public lockupTriggerAmt; //amount where lockup will kick in after cross-chain transfer
     mapping(address => uint256) public transferBlockRelease; //Block number
     mapping(address => mapping(bytes32 => uint256)) public balancePerChain; // user => chain => balance
+    mapping(bytes32 => uint256) public totalBalancePerChain; // chain => balance
     mapping(address => bytes32[]) public chains; //chainList of a user holding the asset from different chains
     mapping(address => mapping(bytes32 => bool)) public isChainInList;
     bytes32[] public deadChains;
@@ -84,6 +87,7 @@ contract CEToken is ERC20Upgradeable {
      * @notice Configures core address
      * This function can only be accessed by the account with role SET_CE_TOKEN_METHOD.
      * @param coreAddress - address of the roleManager contract.
+     * @param id - pool id.
      **/
     function setCore(
         address coreAddress,
@@ -91,6 +95,16 @@ contract CEToken is ERC20Upgradeable {
     ) external onlyRole(IRoleManager(roleManager).SET_CE_TOKEN_METHOD()) {
         core = coreAddress;
         poolId = id;
+    }
+
+    /**
+     * @notice Configures reward controller address
+     * This function can only be accessed by the account with role SET_CE_TOKEN_METHOD.
+     * @param rewardControllerAddress - address of the roleManager contract.
+     **/
+    function setRewardController(address rewardControllerAddress) external onlyRole(IRoleManager(roleManager).SET_CE_TOKEN_METHOD()) {
+        rewardController = rewardControllerAddress;
+
     }
 
     /**
@@ -147,6 +161,8 @@ contract CEToken is ERC20Upgradeable {
         uint256 ceScaled = ICore(core).getCEScaled(poolId);
         uint256 ceAmount = amount.mul(1e18).div(ceScaled);
         bytes32[] memory chainIds = chains[from];
+        _handleReward(from,to);
+       
 
         for (uint256 i; i < chainIds.length; i++) {
             amountPerChain = balancePerChain[from][chainIds[i]].mul(ceAmount).div(ceTokenBalance);
@@ -192,6 +208,17 @@ contract CEToken is ERC20Upgradeable {
         }
         return super.balanceOf(user).sub(deadBalance);
     }
+
+    /**
+     * @notice Gets the total balance  before scaled excluding dead tokens
+     **/
+    function totalBalanceBeforeScaledExcludingDeadTokens() public view returns (uint256) {
+        uint256 deadBalance;
+        for (uint256 i; i < deadChains.length; i++) {
+            deadBalance += totalBalancePerChain[deadChains[i]];
+        }
+        return super.totalSupply().sub(deadBalance);
+    }
     
     /**
      * @notice Gets the scaled CE token balance of the user excluding dead tokens
@@ -202,6 +229,14 @@ contract CEToken is ERC20Upgradeable {
     ) public view returns (uint256) {
         uint256 ceScaled = ICore(core).getCEScaled(poolId);
         return (balanceBeforeScaledExcludingDeadTokens(user).mul(ceScaled)).div(1e18);
+    }
+
+    /**
+     * @notice Gets the total scaled CE token balance
+     **/
+    function totalBalanceOfExcludingDeadTokens() public view returns (uint256) {
+        uint256 ceScaled = ICore(core).getCEScaled(poolId);
+        return (totalBalanceBeforeScaledExcludingDeadTokens().mul(ceScaled)).div(1e18);
     }
 
     
@@ -222,7 +257,9 @@ contract CEToken is ERC20Upgradeable {
         if (amount > lockupTriggerAmt) {
             transferBlockRelease[to] = block.number + transferBlockWait;
         }
+        _handleReward(to,to);
         balancePerChain[to][chainId] += amount;
+        totalBalancePerChain[chainId] += amount;
         _addChain(to, chainId);
         _mint(to, amount);
     }
@@ -239,13 +276,16 @@ contract CEToken is ERC20Upgradeable {
         if (amount > lockupTriggerAmt) {
             transferBlockRelease[to] = block.number + transferBlockWait;
         }
+
+        _handleReward(to,to);
         uint256 ceTokenBalance = super.balanceOf(to);
         bytes32[] memory chainIds = chains[to];
+        uint256 amountPerChain;
 
         for (uint256 i; i < chainIds.length; i++) {
-            balancePerChain[to][chainIds[i]] += balancePerChain[to][chainIds[i]]
-                .mul(amount)
-                .div(ceTokenBalance);
+            amountPerChain = balancePerChain[to][chainIds[i]].mul(amount).div(ceTokenBalance);
+            balancePerChain[to][chainIds[i]] += amountPerChain;
+            totalBalancePerChain[chainIds[i]] += amountPerChain;
         }
         _mint(to, amount);
     }
@@ -272,7 +312,9 @@ contract CEToken is ERC20Upgradeable {
         if (balancePerChain[from][chainId] < amount)
             revert NotEnoughAmountInChain(TAG, from, chainId);
 
+        _handleReward(from,from);
         balancePerChain[from][chainId] -= amount;
+        totalBalancePerChain[chainId] -= amount;
         if (balancePerChain[from][chainId] == 0) 
             _removeChain(from, chainId);
 
@@ -299,6 +341,8 @@ contract CEToken is ERC20Upgradeable {
         uint256 ceTokenBalance = balanceBeforeScaledExcludingDeadTokens(from);
         if (ceTokenBalance == 0)
             revert NotEnoughCeTokens(TAG, from);
+
+        _handleReward(from,from);
         uint256 amountPerChain;
         bytes32[] memory chainIds = chains[from];
 
@@ -308,6 +352,7 @@ contract CEToken is ERC20Upgradeable {
                 if (balancePerChain[from][chainIds[i]] < amountPerChain)
                     revert NotEnoughAmountInChain(TAG, from,chainIds[i]);
                 balancePerChain[from][chainIds[i]] -= amountPerChain;
+                totalBalancePerChain[chainIds[i]] -= amountPerChain;
                 if (balancePerChain[from][chainIds[i]] == 0) 
                     _removeChain(from, chainIds[i]);
             }
@@ -321,7 +366,7 @@ contract CEToken is ERC20Upgradeable {
      * This function can only be accessed by the account with role LIQUIDATION_MANAGER.
      * @param from - address of the borrower.
      * @param to - address of the liquidator.
-     * @param amount - amount of the token to be liquidated
+     * @param amount - amount of the token to be liquidated (ceAmount)
      **/
     function liquidate(
         address from,
@@ -329,10 +374,11 @@ contract CEToken is ERC20Upgradeable {
         uint256 amount
     ) external onlyRole(IRoleManager(roleManager).LIQUIDATION_MANAGER()) {
 
-        uint256 ceTokenBalance = balanceBeforeScaledExcludingDeadTokens(from);
         uint256 amountPerChain;
         bytes32[] memory chainIds = chains[from];
 
+        _handleReward(from, to);
+        uint256 ceTokenBalance = balanceBeforeScaledExcludingDeadTokens(from);
         for (uint256 i; i < chainIds.length; i++) {
             if (!isChainDead[chainIds[i]]){
                 amountPerChain = balancePerChain[from][chainIds[i]].mul(amount).div(ceTokenBalance);
@@ -407,6 +453,18 @@ contract CEToken is ERC20Upgradeable {
                 chains[user].pop();
                 isChainInList[user][chainId] = false;
                 break;
+            }
+        }
+    }
+
+    function _handleReward(address from, address to) internal {
+         if(rewardController != address(0)){
+            uint256 fromBalance = balanceBeforeScaledExcludingDeadTokens(from);
+            uint256 currentTotalBalance  = totalBalanceBeforeScaledExcludingDeadTokens();
+            ICedroRewardController(rewardController).handleReward(from, fromBalance, currentTotalBalance);
+            if(from != to){
+                uint256 toBalance = balanceBeforeScaledExcludingDeadTokens(to);
+                ICedroRewardController(rewardController).handleReward(to, toBalance, currentTotalBalance);
             }
         }
     }
