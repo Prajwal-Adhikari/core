@@ -26,6 +26,13 @@ interface ILiquidationManager {
     function setOracle(IOracle oracleAddress) external;
 
     /**
+     * @notice Sets status for liquidation pause.
+     * This function can only be accessed by the account with role SET_LIQUIDATION_METHOD
+     * @param pause - Status for liquidation pause.
+     **/
+    function setLiquidationPause(bool pause) external;
+
+    /**
      * @notice Liquidates the position of address `user`.
      * @param user - borrower address whose position is to be liquidated
      * @param collateralId - the pool id of the collateral asset of borrower

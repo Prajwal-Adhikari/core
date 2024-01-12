@@ -68,6 +68,26 @@ interface IFeeProvider {
     ) external returns (uint256);
 
     /**
+     * @notice Computes the global liquidity factor of an asset for a chain
+     * @param chainId id of the chain.
+     * @param poolId id of the pool.
+     **/
+    function getGlobalLiquidityFactor(
+        bytes32 chainId,
+        bytes32 poolId
+    ) external view returns (uint256);
+
+    /**
+     * @notice Returns the withdrawable amount of an asset for a chain without incurring fee
+     * @param chainId id of the chain.
+     * @param poolId id of the pool.
+     **/
+    function getWithdrawAbleAmountWithoutFee(
+        bytes32 chainId,
+        bytes32 poolId
+    ) external view returns (uint256); 
+
+    /**
      * @notice Returns the amount of fee while withdrawing/borrowing an asset from a chain
      * @param _chainId - id of the chain.
      * @param _poolId - id of the pool.
