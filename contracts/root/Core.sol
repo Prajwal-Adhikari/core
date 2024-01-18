@@ -55,6 +55,7 @@ contract Core is Initializable, ContextUpgradeable {
     error ChainNotDead(string contractTAG, bytes32 chainId);
     error ExcessLiquidityInDest(string contractTAG);
     error HighDiscountPercentage(string contractTAG);
+    error InvalidTokenAmount(string contractTAG);
 
     /**
      * @dev Modifier that checks if caller has a specific role.
@@ -200,8 +201,9 @@ contract Core is Initializable, ContextUpgradeable {
      * @notice Refreshes the parameters of the pool.
      * This function is public.
      * @param id - pool id
+     * @param id - chain id
      **/
-    function refresh(bytes32 id) public {
+    function refresh(bytes32 id, bytes32 chainId) public {
         Data.PoolData storage pool = pools[id];
         if (pool.ceSupply > 0) {
             // Calculating increased Debt factor from previous transaction till now
@@ -210,25 +212,24 @@ contract Core is Initializable, ContextUpgradeable {
                 .sub(pool.lastUpdateTime)
                 .mul(pool.borrowInterestRate)
                 .div(YEAR);
-            pool.dtScaled = pool.dtScaled.add(increasedDebtFactor);
-
-            uint256 increasedDebtAmount = increasedDebtFactor.mul(pool.debtSupply).div(1e18);
-            
-            uint256 tokenAmountTreasury = increasedDebtAmount
-                .mul(configs[id].treasuryPercent)
-                .div(1e18);
-            pool.ceScaled = pool.ceScaled.add(
-                increasedDebtAmount.sub(tokenAmountTreasury).mul(1e18).div(
-                    pool.ceSupply
-                )
-            );
-
-            uint256 ceAmountTreasury = tokenAmountTreasury.mul(1e18).div(
-                pool.ceScaled
-            );
-            ICEToken(pool.ceToken).mint(treasury, ceAmountTreasury);
-            pool.ceSupply = pool.ceSupply.add(ceAmountTreasury);
-            emit Data.MintToTreasury(id, tokenAmountTreasury, ceAmountTreasury);
+            if (increasedDebtFactor != 0) {
+                pool.dtScaled = pool.dtScaled.add(increasedDebtFactor);
+                uint256 increasedDebtAmount = increasedDebtFactor.mul(pool.debtSupply).div(1e18);
+                uint256 tokenAmountTreasury = increasedDebtAmount
+                    .mul(configs[id].treasuryPercent)
+                    .div(1e18);
+                pool.ceScaled = pool.ceScaled.add(
+                    increasedDebtAmount.sub(tokenAmountTreasury).mul(1e18).div(
+                        pool.ceSupply
+                    )
+                );
+                uint256 ceAmountTreasury = tokenAmountTreasury.mul(1e18).div(
+                    pool.ceScaled
+                );
+                ICEToken(pool.ceToken).mintInChain(treasury, ceAmountTreasury, chainId);
+                pool.ceSupply = pool.ceSupply.add(ceAmountTreasury);
+                emit Data.MintToTreasury(id, tokenAmountTreasury, ceAmountTreasury);
+            }
         }
         pool.lastUpdateTime = block.timestamp;
     }
@@ -284,13 +285,15 @@ contract Core is Initializable, ContextUpgradeable {
         bytes32 chainId,
         address user,
         uint256 tokenAmount
-    ) external onlyRole(IRoleManager(roleManager).POOL()) returns (uint256) {
-        refresh(id);
+    ) external onlyRole(IRoleManager(roleManager).POOL()) returns (uint256, uint256) {
+        refresh(id, chainId);
         Data.PoolData storage pool = pools[id];
         if(! pool.enable)
             revert PoolNotEnabled(TAG, id);
 
         uint256 ceAmount = tokenAmount.mul(1e18).div(pool.ceScaled);
+        //maintaining precision and removing dust values
+        tokenAmount = ceAmount.mul(pool.ceScaled).div(1e18);
         ICEToken(pool.ceToken).mintInChain(user, ceAmount, chainId);
         pool.ceSupply = pool.ceSupply.add(ceAmount);
         chainLiquidity[chainId][id] += tokenAmount;
@@ -300,7 +303,7 @@ contract Core is Initializable, ContextUpgradeable {
         
         emit AssetPrice(id, oracle.getSinglePrice(id));
        
-        return ceAmount;
+        return (ceAmount, tokenAmount);
     }
 
     /**
@@ -320,7 +323,7 @@ contract Core is Initializable, ContextUpgradeable {
         address user,
         bool all
     ) external onlyRole(IRoleManager(roleManager).POOL()) returns (uint256, uint256) {
-        refresh(id);
+        refresh(id, chainId);
         Data.PoolData storage pool = pools[id];
         if(! pool.enable)
             revert PoolNotEnabled(TAG, id);
@@ -333,21 +336,26 @@ contract Core is Initializable, ContextUpgradeable {
             burnAmount = tokenAmount.mul(1e18).div(pool.ceScaled);
            
         }
-        //maintaining precision and removing dust values
-        tokenAmount = burnAmount.mul(pool.ceScaled).div(1e18);
 
-         
-        if(chainLiquidity[chainId][id] < tokenAmount)
-            revert NotEnoughLiquidity(TAG, chainId, id, chainLiquidity[chainId][id], tokenAmount);
+        if(burnAmount == 0)
+            revert InvalidTokenAmount(TAG);
 
         uint256 balanceInChainId = ICEToken(pool.ceToken).balancePerChain(user, chainId);
         if (balanceInChainId >= burnAmount) {
             ICEToken(pool.ceToken).burnFromChain(user, burnAmount, chainId);
+        } else if (balanceInChainId == 0){
+            burnAmount = ICEToken(pool.ceToken).burn(user, burnAmount);
         } else {
             ICEToken(pool.ceToken).burnFromChain(user, balanceInChainId, chainId);
-            ICEToken(pool.ceToken).burn(user, burnAmount - balanceInChainId);
+            uint256 ceAmount = ICEToken(pool.ceToken).burn(user, burnAmount - balanceInChainId);
+            burnAmount = balanceInChainId.add(ceAmount); // for handling precision
+                    }
 
-        }
+        //maintaining precision and removing dust values
+        tokenAmount = burnAmount.mul(pool.ceScaled).div(1e18);
+
+        if(chainLiquidity[chainId][id] < tokenAmount)
+            revert NotEnoughLiquidity(TAG, chainId, id, chainLiquidity[chainId][id], tokenAmount);
         _removeToken(user, id);
 
         pool.ceSupply = pool.ceSupply.sub(burnAmount);
@@ -368,8 +376,8 @@ contract Core is Initializable, ContextUpgradeable {
         uint256 tokenAmount,
         address user,
         bool all
-    ) external onlyRole(IRoleManager(roleManager).POOL()) returns (uint256) {
-        refresh(id);
+    ) external onlyRole(IRoleManager(roleManager).POOL()) returns (uint256, uint256) {
+        refresh(id, chainId);
         Data.PoolData storage pool = pools[id];
         // require(pool.enable, string.concat(TAG, ": Not enable now"));
 
@@ -383,12 +391,17 @@ contract Core is Initializable, ContextUpgradeable {
         uint256 balanceInChainId = ICEToken(pool.ceToken).balancePerChain(user, chainId);
         if(all) {
             burnAmount = balanceInChainId;
-            tokenAmount = burnAmount.mul(pool.ceScaled).div(1e18);
         } else {
             burnAmount = tokenAmount.mul(1e18).div(pool.ceScaled); 
             if( balanceInChainId < burnAmount)
             revert NotEnoughLiquidity(TAG, chainId, id, balanceInChainId, burnAmount);
         }
+        
+        if(burnAmount == 0)
+            revert InvalidTokenAmount(TAG);
+
+        //maintaining precision and removing dust values
+        tokenAmount = burnAmount.mul(pool.ceScaled).div(1e18);
         if(chainLiquidity[chainId][id] < tokenAmount)
             revert NotEnoughLiquidity(TAG, chainId, id, chainLiquidity[chainId][id], tokenAmount);
 
@@ -405,7 +418,7 @@ contract Core is Initializable, ContextUpgradeable {
 
         emit AssetPrice(id, oracle.getSinglePrice(id));
         
-        return (burnAmount);
+        return (burnAmount, tokenAmount);
     }
 
     // avoid stack too deep error
@@ -418,7 +431,7 @@ contract Core is Initializable, ContextUpgradeable {
         Data.ConfigData memory config = configs[id];
         params.liquidity = chainLiquidity[chainId][id];
         params.debtAmount = tokenAmount.mul(1e18).div(pool.dtScaled);
-        
+        params.tokenAmount = params.debtAmount.mul(pool.dtScaled).div(1e18); // handling precision
         params.price = oracle.getSinglePrice(id);
         params.ltv = config.ltv;
         params.debtToken = pool.debtToken;
@@ -438,14 +451,16 @@ contract Core is Initializable, ContextUpgradeable {
         bytes32 chainId,
         uint256 tokenAmount,
         address user
-    ) external onlyRole(IRoleManager(roleManager).POOL()) returns (uint256) {
-        refresh(id);
+    ) external onlyRole(IRoleManager(roleManager).POOL()) returns (uint256, uint256) {
+        refresh(id, chainId);
         Data.BorrowParams memory params = _buildBorrowParams(
             id,
             chainId,
             tokenAmount
         );
         _addToken(user, id);
+
+        tokenAmount = params.tokenAmount;
 
         if(params.liquidity < tokenAmount)
             revert NotEnoughLiquidity(TAG, chainId, id, params.liquidity, tokenAmount);
@@ -465,7 +480,7 @@ contract Core is Initializable, ContextUpgradeable {
         
         emit AssetPrice(id, oracle.getSinglePrice(id));
 
-        return params.debtAmount;
+        return (params.debtAmount, tokenAmount);
     }
 
     // calculate repay info and avoid stack too deep error
@@ -503,7 +518,7 @@ contract Core is Initializable, ContextUpgradeable {
         onlyRole(IRoleManager(roleManager).POOL())
         returns (uint256, uint256, uint256)
     {
-        refresh(id);
+        refresh(id, chainId);
         Data.RepayParams memory params = _buildRepayParams(
             pools[id],
             user,
@@ -518,16 +533,17 @@ contract Core is Initializable, ContextUpgradeable {
             if (ceAmount > 0) {
                 ICEToken(params.ceToken).mintInChain(params.user, ceAmount, chainId);
                 pool.ceSupply = pool.ceSupply.add(ceAmount);
+                params.repayAmount += ceAmount.mul(params.ceScaled).div(1e18);
             }
         } else {
-            params.repayAmount = params.tokenAmount;
-            params.debtAmount = params.repayAmount.mul(1e18).div(
+            params.debtAmount = params.tokenAmount.mul(1e18).div(
                 params.dtScaled
             );
+            params.repayAmount = params.debtAmount.mul(params.dtScaled).div(1e18);
         }
       
-        chainLiquidity[chainId][id] += tokenAmount;
-        totalLiquidity[id] += tokenAmount;
+        chainLiquidity[chainId][id] += params.repayAmount;
+        totalLiquidity[id] += params.repayAmount;
         IDebtToken(params.debtToken).burn(params.user, params.debtAmount);
         _removeToken(user, id);
         pool.debtSupply -= params.debtAmount;

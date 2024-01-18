@@ -26,6 +26,17 @@ interface ILiquidationManager {
     function setOracle(IOracle oracleAddress) external;
 
     /**
+     * @notice Sets a unique chainId for an asset for refresh param
+     * This function can only be accessed by the account with role SET_LIQUIDATION_METHOD
+     * @param  poolIds - list of pool ids.
+     * @param  chainIds - list of chain ids.
+     **/
+    function setChainId(
+        bytes32[] memory poolIds,
+        bytes32[] memory chainIds
+    ) external;
+
+    /**
      * @notice Liquidates the position of address `user`.
      * @param user - borrower address whose position is to be liquidated
      * @param collateralId - the pool id of the collateral asset of borrower

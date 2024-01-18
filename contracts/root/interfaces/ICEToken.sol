@@ -58,14 +58,6 @@ interface ICEToken is IERC20 {
      * This function can only be accessed by the account with role MINT_BURN_CE_DEBT_TOKEN.
      * @param to - address of the receipient.
      * @param amount - amount of the token.
-     **/
-    function mint(address to, uint256 amount) external;
-
-    /**
-     * @notice Mints ceToken to address `to`.
-     * This function can only be accessed by the account with role MINT_BURN_CE_DEBT_TOKEN.
-     * @param to - address of the receipient.
-     * @param amount - amount of the token.
      * @param chainId - key for the chain
      **/
     function mintInChain(address to, uint256 amount, bytes32 chainId) external;
@@ -76,7 +68,7 @@ interface ICEToken is IERC20 {
      * @param from - address of the sender.
      * @param amount - amount of the token.
      **/
-    function burn(address from, uint256 amount) external;
+    function burn(address from, uint256 amount) external returns (uint256);
 
     /**
      * @notice Burns ceToken to address `from`.
@@ -98,7 +90,7 @@ interface ICEToken is IERC20 {
      * @param to - address of liquidator
      * @param amount - amount of the token.
      **/
-    function liquidate(address from, address to, uint256 amount) external;
+    function liquidate(address from, address to, uint256 amount) external returns (uint256);
 
     /**
      * @notice Gets the balance from address `user` before scaled.

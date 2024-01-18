@@ -41,7 +41,7 @@ interface ICore {
         bytes32 chainId,
         address user,
         uint256 tokenAmount
-    ) external returns (uint256);
+    ) external returns (uint256, uint256);
 
     /**
      * @notice Sends a withdraw request of amount `tokenAmount` to address `user` from pool with pool id `id`
@@ -77,7 +77,7 @@ interface ICore {
         uint256 tokenAmount,
         address user,
         bool all
-    ) external returns (uint256);
+    ) external returns (uint256, uint256);
 
     /**
      * @notice Sends a borrow request of amount `tokenAmount` to address `user` from pool with pool id `id`
@@ -93,7 +93,7 @@ interface ICore {
         bytes32 chainId,
         uint256 tokenAmount,
         address user
-    ) external returns (uint256);
+    ) external returns (uint256, uint256);
 
     /**
      * @notice Updates the global protocol states after receiving repay information
@@ -183,8 +183,9 @@ interface ICore {
      * @notice Refreshes the parameters of the pool.
      * This function is public.
      * @param id - pool id
+     * @param chainId - chain id
      **/
-    function refresh(bytes32 id) external;
+    function refresh(bytes32 id, bytes32 chainId) external;
 
     /**
      * @notice Updates the interest rate and utilization ratio of the pool.

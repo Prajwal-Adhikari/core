@@ -158,22 +158,23 @@ contract CEToken is ERC20Upgradeable {
             revert InsufficientBalance(TAG, from);
         }
         uint256 amountPerChain;
+        uint256 transferCeAmount;
         uint256 ceScaled = ICore(core).getCEScaled(poolId);
         uint256 ceAmount = amount.mul(1e18).div(ceScaled);
         bytes32[] memory chainIds = chains[from];
         _handleReward(from,to);
-       
 
         for (uint256 i; i < chainIds.length; i++) {
             amountPerChain = balancePerChain[from][chainIds[i]].mul(ceAmount).div(ceTokenBalance);
             balancePerChain[from][chainIds[i]] -= amountPerChain;
             balancePerChain[to][chainIds[i]] += amountPerChain;
+            transferCeAmount += amountPerChain; // for handling precision
             if (balancePerChain[from][chainIds[i]] == 0)
                 _removeChain(from, chainIds[i]);
             _addChain(to, chainIds[i]);
         }
 
-        super._transfer(from, to, ceAmount);
+        super._transfer(from, to, transferCeAmount);
 
         ICore(core).handleTransfer(from, to, poolId);
     }
@@ -265,32 +266,6 @@ contract CEToken is ERC20Upgradeable {
     }
 
     /**
-     * @notice Mints ceToken to address `to` during interest distribution proportionately accross chains
-     * This function can only be accessed by the account with role MINT_BURN_CE_DEBT_TOKEN.
-     * @param to - address of the receipient.
-     * @param amount - amount of the token.
-     **/
-    function mint(address to, uint256 amount) external onlyRole(IRoleManager(roleManager).MINT_BURN_CE_DEBT_TOKEN()) {
-        if( transferBlockRelease[to] == 2 ** 256 - 1)
-            revert UserIsCaged(TAG, to);
-        if (amount > lockupTriggerAmt) {
-            transferBlockRelease[to] = block.number + transferBlockWait;
-        }
-
-        _handleReward(to,to);
-        uint256 ceTokenBalance = super.balanceOf(to);
-        bytes32[] memory chainIds = chains[to];
-        uint256 amountPerChain;
-
-        for (uint256 i; i < chainIds.length; i++) {
-            amountPerChain = balancePerChain[to][chainIds[i]].mul(amount).div(ceTokenBalance);
-            balancePerChain[to][chainIds[i]] += amountPerChain;
-            totalBalancePerChain[chainIds[i]] += amountPerChain;
-        }
-        _mint(to, amount);
-    }
-
-    /**
      * @notice Burns ceToken from address `from` from chain with chain id `chainId` during withdraw if asset is available in the chain
      * This function can only be accessed by the account with role MINT_BURN_CE_DEBT_TOKEN.
      * @param from - address of the sender.
@@ -330,7 +305,7 @@ contract CEToken is ERC20Upgradeable {
     function burn(
         address from,
         uint256 amount
-    ) external onlyRole(IRoleManager(roleManager).MINT_BURN_CE_DEBT_TOKEN()) {
+    ) external onlyRole(IRoleManager(roleManager).MINT_BURN_CE_DEBT_TOKEN()) returns (uint256) {
         if (block.number <= transferBlockRelease[from])
             revert BurnTooSoonAfterMint(
                 TAG,
@@ -344,6 +319,7 @@ contract CEToken is ERC20Upgradeable {
 
         _handleReward(from,from);
         uint256 amountPerChain;
+        uint256 burnAmount;
         bytes32[] memory chainIds = chains[from];
 
         for (uint256 i; i < chainIds.length; i++) {
@@ -355,10 +331,12 @@ contract CEToken is ERC20Upgradeable {
                 totalBalancePerChain[chainIds[i]] -= amountPerChain;
                 if (balancePerChain[from][chainIds[i]] == 0) 
                     _removeChain(from, chainIds[i]);
+                burnAmount += amountPerChain; // for handling precision
             }
         }
 
-        _burn(from, amount);
+        _burn(from, burnAmount);
+        return burnAmount;
     }
 
     /**
@@ -372,9 +350,10 @@ contract CEToken is ERC20Upgradeable {
         address from,
         address to,
         uint256 amount
-    ) external onlyRole(IRoleManager(roleManager).LIQUIDATION_MANAGER()) {
+    ) external onlyRole(IRoleManager(roleManager).LIQUIDATION_MANAGER()) returns (uint256) {
 
         uint256 amountPerChain;
+        uint256 transferCeAmount;
         bytes32[] memory chainIds = chains[from];
 
         _handleReward(from, to);
@@ -386,13 +365,15 @@ contract CEToken is ERC20Upgradeable {
                     revert NotEnoughAmountInChain(TAG, from,chainIds[i]);
                 balancePerChain[from][chainIds[i]] -= amountPerChain;
                 balancePerChain[to][chainIds[i]] += amountPerChain;
+                transferCeAmount += amountPerChain; // for handling precision
                 if (balancePerChain[from][chainIds[i]] == 0)
                     _removeChain(from, chainIds[i]);
                 _addChain(to, chainIds[i]);
             }
         }
 
-        super._transfer(from, to, amount);
+        super._transfer(from, to, transferCeAmount);
+        return transferCeAmount;
     }
 
     /**

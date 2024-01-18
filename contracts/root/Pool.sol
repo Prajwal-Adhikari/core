@@ -282,7 +282,7 @@ contract Pool is
             _bytesToAddress(to),
             id,
             chainId,
-            actualAmount,
+            tokenAmount,
             burnAmount,
             route,
             fee
@@ -306,7 +306,7 @@ contract Pool is
         if(protocolPause)
             revert ProtocolPaused(TAG);
 
-        uint256 burnAmount = ICore(core).withdrawDeadTokens(
+        (uint256 burnAmount, uint256 actualAmount) = ICore(core).withdrawDeadTokens(
             id,
             chainId,
             tokenAmount,
@@ -317,9 +317,9 @@ contract Pool is
         bytes memory payload = abi.encodePacked(
             id,
             to,
-            tokenAmount
+            actualAmount
         );
-        // require(payload.length == 96, string.concat(TAG, ": Bad payload"));
+
         if(payload.length != 96)
             revert BadPayload(TAG, payload.length, 96);
 
@@ -341,7 +341,7 @@ contract Pool is
             route,
             0
         );
-        emit Data.SendToken(_bytesToAddress(to), id, tokenAmount);
+        emit Data.SendToken(_bytesToAddress(to), id, actualAmount);
     }
 
     /**
@@ -378,19 +378,19 @@ contract Pool is
             fee = IFeeProvider(feeProvider).setFeeAmount(chainId, id, tokenAmount);
         }
 
-        uint256 debtAmount = ICore(core).borrow(
+        (uint256 debtAmount, uint256 actualAmount) = ICore(core).borrow(
             id,
             chainId,
             tokenAmount,
             _msgSender()
         );
 
-        tokenAmount -= fee;
+        actualAmount -= fee;
 
         bytes memory payload = abi.encodePacked(
             id,
             to,
-            tokenAmount
+            actualAmount
         );
         if(payload.length != 96)
             revert BadPayload(TAG, payload.length, 96);
@@ -413,7 +413,7 @@ contract Pool is
             route,
             fee
         );
-        emit Data.SendToken(_bytesToAddress(to), id, tokenAmount);
+        emit Data.SendToken(_bytesToAddress(to), id, actualAmount);
     }
 
     /**
@@ -436,6 +436,9 @@ contract Pool is
             revert InvalidRatio(TAG);
         if (loopCount == 0)
             revert InvalidLoopCount(TAG);
+        
+        uint256 debtAmount;
+        uint256 ceAmount;
         for (uint256 i = 0; i < loopCount; ) {
             tokenAmount = tokenAmount.mul(borrowRatio).div(1e18);
             uint256 fee;
@@ -443,14 +446,12 @@ contract Pool is
                 fee = IFeeProvider(feeProvider).setFeeAmount(chainId, id, tokenAmount);
             }
 
-            uint256 debtAmount = ICore(core).borrow(
+            (debtAmount, tokenAmount) = ICore(core).borrow(
                 id,
                 chainId,
                 tokenAmount,
                 _msgSender()
             );
-
-            tokenAmount -= fee;
 
             emit Data.Borrow(
             _msgSender(),
@@ -462,14 +463,15 @@ contract Pool is
             "",
             fee
             );
-
+            
+            tokenAmount -= fee;
             uint256 reward;
             if (rewardEnable) {
                 reward = IFeeProvider(feeProvider).setRewardAmount(chainId, id, tokenAmount);
             }
 
             tokenAmount += reward;
-            uint256 ceAmount = ICore(core).deposit(id, chainId, _msgSender(), tokenAmount);
+            ( ceAmount, tokenAmount) = ICore(core).deposit(id, chainId, _msgSender(), tokenAmount);
 
             emit Data.Deposit(_msgSender(), id, chainId, tokenAmount.sub(reward), ceAmount, "", reward);
             unchecked {
@@ -500,7 +502,7 @@ contract Pool is
         }
 
         (uint256 repayAmount, uint256 debtAmount, uint256 ceAmount) = ICore(core).repay(id, chainId, user, tokenAmount.add(reward));
-        emit Data.Repay(user, id, chainId, repayAmount, debtAmount, ceAmount, route, reward);
+        emit Data.Repay(user, id, chainId, repayAmount.sub(reward), debtAmount, ceAmount, route, reward);
         emit Data.ReceiveToken(user, id, tokenAmount);
     }
 
@@ -523,9 +525,9 @@ contract Pool is
         if (rewardEnable) {
             reward = IFeeProvider(feeProvider).setRewardAmount(chainId, id, tokenAmount);
         }
-        uint256 ceAmount = ICore(core).deposit(id, chainId, user, tokenAmount.add(reward));
+        (uint256 ceAmount, uint256 actualAmount) = ICore(core).deposit(id, chainId, user, tokenAmount.add(reward));
         
-        emit Data.Deposit(user, id, chainId, tokenAmount, ceAmount, route, reward);
+        emit Data.Deposit(user, id, chainId, actualAmount.sub(reward), ceAmount, route, reward);
         emit Data.ReceiveToken(user, id, tokenAmount);
     }
 

@@ -33,11 +33,14 @@ contract LiquidationManager is
     address public core;
     IOracle public oracle;
     bool public liquidationPause;
+    mapping(bytes32 => bytes32) public chainId; // pool => chain
 
     error CannotLiquidate(string contractTAG, uint256 currentHealthFactor);
     error ClosingFactotExceeded(string contractTAG);
     error LiquidationPaused(string contractTAG);
     error CollateralUsageDisabled(string contractTAG, address user, bytes32 poolId );
+    error ChainIdNotConfigured(string contractTAG);
+    error ArrayLengthMismatched(string contractTAG);
 
     /**
      * @dev Modifier that checks if caller has a specific role.
@@ -104,6 +107,23 @@ contract LiquidationManager is
     }
 
     /**
+     * @notice Sets a unique chainId for an asset for refresh param
+     * This function can only be accessed by the account with role SET_LIQUIDATION_METHOD
+     * @param  poolIds - list of pool ids.
+     * @param  chainIds - list of chain ids.
+     **/
+    function setChainId(
+        bytes32[] memory poolIds,
+        bytes32[] memory chainIds
+    ) external onlyRole(IRoleManager(roleManager).SET_LIQUIDATION_METHOD()) {
+        if (poolIds.length != chainIds.length)
+            revert ArrayLengthMismatched(TAG);
+        for (uint256 i; i < poolIds.length; i++) {
+            chainId[poolIds[i]] = chainIds[i];
+        }
+    }
+
+    /**
      * e.g. borrower deposit A and borrow B
      * 1. calculate liqudate CEToken(A) amount from the underlying amount liquidator want to liquidate
      * 2. calculate DebtToken(B) amount from CEToken(A) borrower burn
@@ -163,9 +183,11 @@ contract LiquidationManager is
         if(ICore(core).useAsCollateralDisabled(user, collateralId))
             revert CollateralUsageDisabled(TAG,user,collateralId);
 
+        if (chainId[collateralId] == "" || chainId[debtId] == "" )
+            revert ChainIdNotConfigured(TAG);
         // refresh the pool data
-        ICore(core).refresh(collateralId);
-        ICore(core).refresh(debtId);
+        ICore(core).refresh(collateralId, chainId[collateralId]);
+        ICore(core).refresh(debtId, chainId[debtId]);
 
         // calculate borrower's data including total collateral and total debt
         Data.HealthData memory healthData = ICore(core).healthFactor(user);
@@ -219,7 +241,7 @@ contract LiquidationManager is
             user,
             params.burnBorrowerDebtAmount
         );
-        ICEToken(debtPool.ceToken).burn(
+        params.burnLiquidatorCEAmount = ICEToken(debtPool.ceToken).burn(
             msg.sender,
             params.burnLiquidatorCEAmount
         );
