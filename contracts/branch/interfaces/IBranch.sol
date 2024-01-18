@@ -39,6 +39,14 @@ interface IBranch {
     ) external;
 
     /**
+     * @notice Sets the forwarder address.
+     * @param forwarderAddress - Forwarder address.
+     **/
+    function setForwarder(
+        address forwarderAddress
+    ) external;
+
+    /**
      * @notice Configures pool status for deposit
      * This function can only be accessed by account with role PROTOCOL_PAUSE.
      * @param id - pool id of the asset.
@@ -126,4 +134,10 @@ interface IBranch {
      * @param payload - information containing token amount and receipient.
      **/
     function transferToken(bytes memory payload) external;
+
+    /**
+     * @notice Converts address to bytes32
+     * @param addr - token address to withdraw
+     **/
+    function addressToBytes32(address addr) external pure returns (bytes32);
 }

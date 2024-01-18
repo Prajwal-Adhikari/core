@@ -23,7 +23,7 @@ interface IRoute {
      * @param gasUsage - value of the gas
      **/
     function setGasUsage(uint256 gasUsage) external;
-
+    
     /**
      * @notice Configures gas value for LayerZero V2
      * This function can only be accessed by the contract owner.
@@ -31,6 +31,14 @@ interface IRoute {
      * @param _value value of the gas
      **/
     function setExecutorValues(uint128 _gas, uint128 _value) external;
+    
+    
+    /**
+     * @notice Assigns key to keep track of the communication route chosen
+     * This function can only be accessed by the account with role SET_ROUTE_METHOD.
+     * @param routeKey - protocol specific key for the route
+     **/
+    function setRoute(bytes32 routeKey) external;
 
     /**
      * @notice Links chainId with chain name.
@@ -38,7 +46,20 @@ interface IRoute {
      * @param chain - name of the chain.
      * @param id - chain id of the chain.
      **/
-    function setChainKeyID(bytes32 chain, uint16 id) external;
+     function setChainKeyID(bytes32 chain, uint16 id) external;
+
+    /**
+     * @notice Links chain key with chain name and destination contract
+     * This function can only be accessed by the account with role SET_ROUTE_METHOD.
+     * @param chainId id of the chain.
+     * @param name name of the chain.
+     * @param addr address of the destination contract
+     **/
+    function setDestChainIdNameAddress(
+        bytes32 chainId,
+        string calldata name,
+        string calldata addr
+    ) external;
 
     /**
      * @notice Sends payload to destination chain
@@ -49,6 +70,7 @@ interface IRoute {
      * @param airdropAmount - amount to be airdropped to destination chain
      * @param airdropReceiver - receiver of the airdrop
      **/
+
     function send(
         bytes memory payload,
         bytes32 chainId,
@@ -68,7 +90,7 @@ interface IRoute {
         uint256 airdropAmount
     ) external view returns (uint256);
 
-    /* @notice Quotes the gas needed to pay for the full omnichain transaction for LayerZero V2
+     /* @notice Quotes the gas needed to pay for the full omnichain transaction for LayerZero V2
      * @return nativeFee Estimated gas fee in native gas.
      * @return lzTokenFee Estimated gas fee in ZRO token.
      */

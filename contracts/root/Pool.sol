@@ -290,7 +290,19 @@ contract Pool is
         emit Data.SendToken(_bytesToAddress(to), id, actualAmount);
     }
 
-    function withdrawDeadTokens(
+    /**
+     * @notice Sends a withdraw request of amount `tokenAmount` of dead tokens to address `user` from pool with pool id `id`
+     * in chain with chain id `chainId`
+     * This function can be accessed by anyone
+     * @param id - pool id of pool to withdraw from
+     * @param chainId - chain id of chain to withdraw from
+     * @param tokenAmount - amount to withdraw
+     * @param to - withdraw address
+     * @param route - communication protocol
+     * @param airdropAmount - amount to be airdropped to destination chain
+     * @param all - true if withdraw all
+     **/
+     function withdrawDeadTokens(
         bytes32 id,
         bytes32 chainId,
         uint256 tokenAmount,

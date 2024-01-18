@@ -307,7 +307,7 @@ contract Core is Initializable, ContextUpgradeable {
     }
 
     /**
-     * @notice Sends a withdraw request of amount `ceAmount` to address `user` from pool with pool id `id`
+     * @notice  a withdraw request of amount `ceAmount` to address `user` from pool with pool id `id`
      * in chain with chain id `chainId`.
      * This function can only be accessed by account with role POOL.
      * @param id - pool id of pool to withdraw from
@@ -369,6 +369,17 @@ contract Core is Initializable, ContextUpgradeable {
         
         return (burnAmount, tokenAmount);
     }
+
+    /**
+     * @notice Sends a withdraw request of amount `tokenAmount` of dead tokens to address `user` from pool with pool id `id`
+     * in chain with chain id `chainId`
+     * This function can only be accessed by account with role POOL.
+     * @param id - pool id of pool to withdraw from
+     * @param chainId - chain id of chain to withdraw from
+     * @param tokenAmount - amount to withdraw
+     * @param user - withdraw address
+     * @param all - withdraw all
+     **/
 
     function withdrawDeadTokens(
         bytes32 id,

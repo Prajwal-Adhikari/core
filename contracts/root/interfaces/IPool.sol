@@ -32,6 +32,12 @@ interface IPool {
     function setAdapter(address adapterAddress) external;
 
     /**
+     * @notice Sets the forwarder address.
+     * @param forwarderAddress - Forwarder address.
+     **/
+    function setForwarder(address forwarderAddress) external;
+
+    /**
      * @notice Sets the status of the collateral usage of the depositor
      * This function can only be accessed by the account with role POOL.
      * @param poolId - id of the pool to change the status of
@@ -55,6 +61,28 @@ interface IPool {
      * @param all - true if withdraw all
      **/
     function withdraw(
+        bytes32 id,
+        bytes32 chainId,
+        uint256 tokenAmount,
+        bytes32 to,
+        bytes32 route,
+        uint256 airdropAmount,
+        bool all
+    ) external;
+
+       /**
+     * @notice Sends a withdraw request of amount `tokenAmount` of dead tokens to address `user` from pool with pool id `id`
+     * in chain with chain id `chainId`
+     * This function can be accessed by anyone
+     * @param id - pool id of pool to withdraw from
+     * @param chainId - chain id of chain to withdraw from
+     * @param tokenAmount - amount to withdraw
+     * @param to - withdraw address
+     * @param route - communication protocol
+     * @param airdropAmount - amount to be airdropped to destination chain
+     * @param all - true if withdraw all
+     **/
+     function withdrawDeadTokens(
         bytes32 id,
         bytes32 chainId,
         uint256 tokenAmount,

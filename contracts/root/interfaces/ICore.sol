@@ -203,6 +203,12 @@ interface ICore {
     ) external view returns (Data.HealthData memory health);
 
     /**
+     * @notice Check the health factor for a users borrow.
+     * @param user - The user's address .
+     **/
+    function checkHealth(address user) external view;
+
+    /**
      * @notice Reverts if the health factor is not less than MAX_HEALTH_FACTOR, then add the pool to user as collateral
      * @param from - wallet address the user send ceToken.
      * @param to - wallet address the user receive ceToken.

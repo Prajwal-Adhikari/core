@@ -92,11 +92,44 @@ interface ICEToken is IERC20 {
      **/
     function liquidate(address from, address to, uint256 amount) external returns (uint256);
 
+     /**
+     * @notice Adds a chain to a dead chain list.
+     * This function can only be accessed by the account with role SET_CE_TOKEN_METHOD.
+     * @param chainId - chain id of the dead chain
+     **/
+    function addDeadChain(
+       bytes32 chainId
+    ) external;
+
+
+    /**
+     * @notice Removes a chain from a dead chain list.
+     * This function can only be accessed by the account with role SET_CE_TOKEN_METHOD.
+     * @param chainId - chain id of the dead chain
+     **/
+    function removeDeadChain(
+       bytes32 chainId
+    ) external;
+
+    /**
+     * @notice Returns list of the chains the `user` has its ceTokens on
+     * @param user - address of the user
+     **/
+    function getChains(
+       address user
+    )  external view returns (bytes32[] memory);
+
     /**
      * @notice Gets the balance from address `user` before scaled.
      * @param user - address of the user
      **/
     function balanceBeforeScaled(address user) external view returns (uint256);
+
+     /**
+     * @notice Gets the scaled CE token balance of the user.
+     * @param user - address of the user.
+     **/
+    function balanceOf(address user) external view returns (uint256);
 
     /**
      * @notice Gets the balance from address `user` before scaled deducting the dead token balance.
