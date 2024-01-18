@@ -50,6 +50,7 @@ contract Oracle is Initializable, ContextUpgradeable {
     error StaleData(string contractTAG, bytes32 symbol);
     error PriceOutDated(string contractTAG, bytes32 symbol);
     error PoolNotExist(string contractTAG, bytes32 symbol);
+    error ArrayLengthMismatched(string contractTAG);
     
     /**
      * @dev Modifier that checks if caller has a specific role.
@@ -107,6 +108,8 @@ contract Oracle is Initializable, ContextUpgradeable {
         uint256[] memory _maxValue,
         uint256[] memory _minValue
     ) external onlyRole(IRoleManager(roleManager).SET_ORACLE_METHOD()) {
+        if(_id.length != _maxValue.length || _id.length != _minValue.length )
+            revert ArrayLengthMismatched(TAG);
         for (uint256 i; i < _id.length; i++) {
             maxValue[_id[i]] = _maxValue[i];
             minValue[_id[i]] = _minValue[i];

@@ -58,6 +58,9 @@ contract Branch is
     // Pool level pause
     mapping(bytes32 => bool) public depositPause;
     mapping(bytes32 => bool) public repayPause;
+    mapping(bytes32 => bool) public depositCapReached;
+    mapping(bytes32 => uint256) public capAmount;
+
 
     // Protocol level pause for all pools
     bool public protocolPause;
@@ -86,8 +89,10 @@ contract Branch is
     error NativeTransferFailed(string contractTAG);
     error BadPayload(string contractTAG, uint256 currentLength, uint256 requiredLength);
     error PoolNotEnabled(string contractTAG, bytes32 poolID);
+    error DepositCapReached(string contractTAG, bytes32 poolID);
     error InvalidTokenAmount(string contractTAG);
     error InvalidReceipientAddress(string contractTAG);
+    error ArrayLengthMismatched(string contractTAG);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -217,6 +222,35 @@ contract Branch is
     }
 
     /**
+     * @notice Toggles the status of the deposit on and off for a particular asset
+     * This function can only be accessed by account with role PROTOCOL_PAUSE.
+     * @param id - pool id
+     **/
+    function toggleDepositCapStatus(bytes32 id)
+        external
+        onlyRole(IRoleManager(roleManager).PROTOCOL_PAUSE())
+    {
+        depositCapReached[id] = !depositCapReached[id];
+    }
+
+    /**
+     * @notice Sets the cap amount for deposit for different assets
+     * This function can only be accessed by account with role SET_BRANCH_METHOD.
+     * @param id - list of pool id of the assets.
+     * @param amount - list of cap amount of the pool.
+     **/
+    function setCapAmount(
+        bytes32[] memory id,
+        uint256[] memory amount
+    ) external onlyRole(IRoleManager(roleManager).SET_BRANCH_METHOD()) {
+        if (id.length != amount.length)
+            revert ArrayLengthMismatched(TAG);
+        for (uint256 i; i < id.length; i++) {
+            capAmount[id[i]] = amount[i];
+        }
+    }
+
+    /**
      * @notice Sends deposit information message to the Root.
      * This function can be accessed by the user.
      * @param id - pool id of the pool of the deposited amount
@@ -236,7 +270,20 @@ contract Branch is
             revert DepositPaused(TAG, id);
         if(! pools[id].enable)
             revert PoolNotEnabled(TAG, id);
+        if(amount == 0)
+            revert InvalidTokenAmount(TAG);
+        if(depositCapReached[id])
+            revert DepositCapReached(TAG, id);
+        uint256 liquidity;
         _pay(pools[id].token, amount, id, TYPE_DEPOSIT, route, airdropAmount);
+        if(pools[id].token == address(0)){
+            liquidity = address(this).balance;
+        }else{
+            liquidity = IERC20Upgradeable(pools[id].token).balanceOf(address(this));
+        }
+        if (liquidity > capAmount[id]) {
+            depositCapReached[id] = true;
+        }
         emit Deposit(_msgSender(), id, amount, route, airdropAmount);
         emit SendToken(_msgSender(), id, amount);
     }
@@ -261,6 +308,8 @@ contract Branch is
             revert DepositPaused(TAG, id);
         if(! pools[id].enable)
             revert PoolNotEnabled(TAG, id);
+        if(amount == 0)
+            revert InvalidTokenAmount(TAG);
         _pay(pools[id].token, amount, id, TYPE_REPAY, route, airdropAmount);
         emit Repay(_msgSender(), id, amount, route, airdropAmount);
         emit SendToken(_msgSender(), id, amount);
