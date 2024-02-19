@@ -278,7 +278,7 @@ contract Oracle is Initializable, ContextUpgradeable {
         uint256 _price
     ) public view returns (bool status) {
         
-        if(_price == 0 || _price == minValue[_symbol] || _price == maxValue[_symbol] ){
+        if(_price == 0 || _price <= minValue[_symbol] || _price >= maxValue[_symbol] ) {
             return true;
         }
     }
