@@ -27,7 +27,6 @@ interface DexRouter {
 **/
 contract Oracle is Initializable, ContextUpgradeable {
     uint8 public constant ROOT_DECIMALS = 18;
-    uint160 public acceptedDelayTime;
 
     mapping(bytes32 => address) public aggregator;
     mapping(bytes32 => address) public assetAddress;
@@ -39,6 +38,8 @@ contract Oracle is Initializable, ContextUpgradeable {
     mapping(bytes32 => uint32) public timeInterval;
     mapping(bytes32 => uint256) public maxValue;
     mapping(bytes32 => uint256) public minValue;
+    mapping(bytes32 => uint256) public heartBeatValue;
+    
 
     address public dexFactoryAddress;
     address public roleManager;
@@ -114,6 +115,22 @@ contract Oracle is Initializable, ContextUpgradeable {
         for (uint256 i; i < _id.length; i++) {
             maxValue[_id[i]] = _maxValue[i];
             minValue[_id[i]] = _minValue[i];
+        }
+    }
+
+    /**
+     * @notice Configures heart beat value to check against the oracle price
+     * @param _id - pool id of the asset
+     * @param _heartBeatValue - accepted max delay time of asset
+     **/
+    function setHeartBeat(
+        bytes32[] memory _id,
+        uint256[] memory _heartBeatValue
+    ) external onlyRole(IRoleManager(roleManager).SET_ORACLE_METHOD()) {
+        if(_id.length != _heartBeatValue.length)
+            revert ArrayLengthMismatched(TAG);
+        for (uint256 i; i < _id.length; i++) {
+            heartBeatValue[_id[i]] = _heartBeatValue[i];
         }
     }
 
@@ -194,17 +211,6 @@ contract Oracle is Initializable, ContextUpgradeable {
         bool _status
     ) external onlyRole(IRoleManager(roleManager).SET_ORACLE_METHOD()) {
         fetchFromDex[_id] = _status;
-    }
-
-    /**
-     * @notice Configures the accepted delay time for the chainlink data
-     * This function can only be accessed by the account with role SET_ORACLE_METHOD.
-     * @param _maxDelayTime - max acceptable delayed time
-     **/
-    function setDelayTime(
-        uint160 _maxDelayTime
-    ) external onlyRole(IRoleManager(roleManager).SET_ORACLE_METHOD()) {
-        acceptedDelayTime = _maxDelayTime;
     }
 
     /**
@@ -308,7 +314,7 @@ contract Oracle is Initializable, ContextUpgradeable {
         if(timeStamp == 0)
             revert RoundNotComplete(TAG, _symbol);
         
-        if (timeStamp < block.timestamp - acceptedDelayTime)
+        if (timeStamp < block.timestamp - heartBeatValue[_symbol])
             revert PriceOutDated(TAG, _symbol);
 
         if(answeredInRound < roundID)
