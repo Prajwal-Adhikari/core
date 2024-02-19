@@ -27,7 +27,6 @@ interface DexRouter {
 **/
 contract Oracle is Initializable, ContextUpgradeable {
     uint8 public constant ROOT_DECIMALS = 18;
-    uint160 public acceptedDelayTime;
 
     mapping(bytes32 => address) public aggregator;
     mapping(bytes32 => address) public assetAddress;
@@ -39,6 +38,8 @@ contract Oracle is Initializable, ContextUpgradeable {
     mapping(bytes32 => uint32) public timeInterval;
     mapping(bytes32 => uint256) public maxValue;
     mapping(bytes32 => uint256) public minValue;
+    mapping(bytes32 => uint256) public heartBeatValue;
+    
 
     address public dexFactoryAddress;
     address public roleManager;
@@ -50,6 +51,7 @@ contract Oracle is Initializable, ContextUpgradeable {
     error StaleData(string contractTAG, bytes32 symbol);
     error PriceOutDated(string contractTAG, bytes32 symbol);
     error PoolNotExist(string contractTAG, bytes32 symbol);
+    error PriceNotValid(string contractTAG, bytes32 symbol);
     error ArrayLengthMismatched(string contractTAG);
     
     /**
@@ -113,6 +115,22 @@ contract Oracle is Initializable, ContextUpgradeable {
         for (uint256 i; i < _id.length; i++) {
             maxValue[_id[i]] = _maxValue[i];
             minValue[_id[i]] = _minValue[i];
+        }
+    }
+
+    /**
+     * @notice Configures heart beat value to check against the oracle price
+     * @param _id - pool id of the asset
+     * @param _heartBeatValue - accepted max delay time of asset
+     **/
+    function setHeartBeat(
+        bytes32[] memory _id,
+        uint256[] memory _heartBeatValue
+    ) external onlyRole(IRoleManager(roleManager).SET_ORACLE_METHOD()) {
+        if(_id.length != _heartBeatValue.length)
+            revert ArrayLengthMismatched(TAG);
+        for (uint256 i; i < _id.length; i++) {
+            heartBeatValue[_id[i]] = _heartBeatValue[i];
         }
     }
 
@@ -196,21 +214,10 @@ contract Oracle is Initializable, ContextUpgradeable {
     }
 
     /**
-     * @notice Configures the accepted delay time for the chainlink data
-     * This function can only be accessed by the account with role SET_ORACLE_METHOD.
-     * @param _maxDelayTime - max acceptable delayed time
-     **/
-    function setDelayTime(
-        uint160 _maxDelayTime
-    ) external onlyRole(IRoleManager(roleManager).SET_ORACLE_METHOD()) {
-        acceptedDelayTime = _maxDelayTime;
-    }
-
-    /**
     * @notice Returns price of assets
     * @param _symbols - list of the asset's pool id
     **/
-    function getPrices(
+     function getPrices(
         bytes32[] memory _symbols
     ) external view returns (uint256[] memory results) {
         results = new uint256[](_symbols.length);
@@ -219,13 +226,19 @@ contract Oracle is Initializable, ContextUpgradeable {
             if (fetchFromDex[_symbols[i]]) {
                 if (isStableCoin[_symbols[i]]) {
                     price = getPriceFromChainlink(_symbols[i]);
+                    if(priceCheck(_symbols[i],price))
+                        revert PriceNotValid(TAG, _symbols[i]);
                 } else {
-                    price = getPriceFromDex(_symbols[i]);     
+                    price = getPriceFromDex(_symbols[i]);
+                    if(priceCheck(_symbols[i],price))
+                        revert PriceNotValid(TAG, _symbols[i]);     
                 }
             } else {
                 price = getPriceFromChainlink(_symbols[i]);
                 if(priceCheck(_symbols[i],price))
                     price = getPriceFromDex(_symbols[i]);
+                    if(priceCheck(_symbols[i],price))
+                        revert PriceNotValid(TAG, _symbols[i]); 
             }
             results[i] = price;
         }
@@ -240,17 +253,25 @@ contract Oracle is Initializable, ContextUpgradeable {
     ) external view returns (uint256 result) {
             if (fetchFromDex[_symbol]) {
                 if (isStableCoin[_symbol]) {
-                    result = getPriceFromChainlink(_symbol);   
+                    result = getPriceFromChainlink(_symbol);
+                    if(priceCheck(_symbol,result))
+                        revert PriceNotValid(TAG, _symbol);
+                       
                 } else {
                     result = getPriceFromDex(_symbol);
+                    if(priceCheck(_symbol,result))
+                        revert PriceNotValid(TAG, _symbol);
                 }
             } else {
                 result = getPriceFromChainlink(_symbol); 
-                if(priceCheck(_symbol,result))
-                    result = getPriceFromDex(_symbol);   
+                if(priceCheck(_symbol,result)){
+                    result = getPriceFromDex(_symbol);
+                    if(priceCheck(_symbol,result))
+                        revert PriceNotValid(TAG, _symbol); 
+                }  
             }
             
-        }
+    }
     
     
      /**
@@ -263,7 +284,7 @@ contract Oracle is Initializable, ContextUpgradeable {
         uint256 _price
     ) public view returns (bool status) {
         
-        if(_price == 0 || _price == minValue[_symbol] || _price == maxValue[_symbol] ){
+        if(_price == 0 || _price <= minValue[_symbol] || _price >= maxValue[_symbol] ) {
             return true;
         }
     }
@@ -287,13 +308,13 @@ contract Oracle is Initializable, ContextUpgradeable {
             aggregator[_symbol]
         ).latestRoundData();
 
-        if(basePrice == 0)
+        if(basePrice <= 0)
             revert ChainlinkMalfunction(TAG, _symbol);
 
         if(timeStamp == 0)
             revert RoundNotComplete(TAG, _symbol);
         
-        if (timeStamp < block.timestamp - acceptedDelayTime)
+        if (timeStamp < block.timestamp - heartBeatValue[_symbol])
             revert PriceOutDated(TAG, _symbol);
 
         if(answeredInRound < roundID)
