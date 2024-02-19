@@ -302,7 +302,7 @@ contract Oracle is Initializable, ContextUpgradeable {
             aggregator[_symbol]
         ).latestRoundData();
 
-        if(basePrice == 0)
+        if(basePrice <= 0)
             revert ChainlinkMalfunction(TAG, _symbol);
 
         if(timeStamp == 0)
