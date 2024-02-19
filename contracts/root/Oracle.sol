@@ -50,6 +50,7 @@ contract Oracle is Initializable, ContextUpgradeable {
     error StaleData(string contractTAG, bytes32 symbol);
     error PriceOutDated(string contractTAG, bytes32 symbol);
     error PoolNotExist(string contractTAG, bytes32 symbol);
+    error PriceNotValid(string contractTAG, bytes32 symbol);
     error ArrayLengthMismatched(string contractTAG);
     
     /**
@@ -210,7 +211,7 @@ contract Oracle is Initializable, ContextUpgradeable {
     * @notice Returns price of assets
     * @param _symbols - list of the asset's pool id
     **/
-    function getPrices(
+     function getPrices(
         bytes32[] memory _symbols
     ) external view returns (uint256[] memory results) {
         results = new uint256[](_symbols.length);
@@ -219,13 +220,19 @@ contract Oracle is Initializable, ContextUpgradeable {
             if (fetchFromDex[_symbols[i]]) {
                 if (isStableCoin[_symbols[i]]) {
                     price = getPriceFromChainlink(_symbols[i]);
+                    if(priceCheck(_symbols[i],price))
+                        revert PriceNotValid(TAG, _symbols[i]);
                 } else {
-                    price = getPriceFromDex(_symbols[i]);     
+                    price = getPriceFromDex(_symbols[i]);
+                    if(priceCheck(_symbols[i],price))
+                        revert PriceNotValid(TAG, _symbols[i]);     
                 }
             } else {
                 price = getPriceFromChainlink(_symbols[i]);
                 if(priceCheck(_symbols[i],price))
                     price = getPriceFromDex(_symbols[i]);
+                    if(priceCheck(_symbols[i],price))
+                        revert PriceNotValid(TAG, _symbols[i]); 
             }
             results[i] = price;
         }
@@ -240,17 +247,25 @@ contract Oracle is Initializable, ContextUpgradeable {
     ) external view returns (uint256 result) {
             if (fetchFromDex[_symbol]) {
                 if (isStableCoin[_symbol]) {
-                    result = getPriceFromChainlink(_symbol);   
+                    result = getPriceFromChainlink(_symbol);
+                    if(priceCheck(_symbol,result))
+                        revert PriceNotValid(TAG, _symbol);
+                       
                 } else {
                     result = getPriceFromDex(_symbol);
+                    if(priceCheck(_symbol,result))
+                        revert PriceNotValid(TAG, _symbol);
                 }
             } else {
                 result = getPriceFromChainlink(_symbol); 
-                if(priceCheck(_symbol,result))
-                    result = getPriceFromDex(_symbol);   
+                if(priceCheck(_symbol,result)){
+                    result = getPriceFromDex(_symbol);
+                    if(priceCheck(_symbol,result))
+                        revert PriceNotValid(TAG, _symbol); 
+                }  
             }
             
-        }
+    }
     
     
      /**
