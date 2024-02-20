@@ -334,7 +334,7 @@ contract Branch is
         uint16 dstPoolId,
         address destination,
         uint256 amountMin
-    ) external payable onlyRole(IRoleManager(roleManager).SWAP()) {
+    ) external payable nonReentrant onlyRole(IRoleManager(roleManager).SWAP()) {
         if(msg.value == 0)
             revert InsufficientValue(TAG, msg.value, 0);
         if(qty == 0)
@@ -370,7 +370,7 @@ contract Branch is
      **/
     function transferToken(
         bytes memory payload
-    ) external onlyRole(IRoleManager(roleManager).ADAPTER()) {
+    ) external nonReentrant onlyRole(IRoleManager(roleManager).ADAPTER()) {
         if(protocolPause)
             revert ProtocolPaused(TAG);
 
