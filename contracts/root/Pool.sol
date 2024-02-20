@@ -444,8 +444,13 @@ contract Pool is
         uint256 borrowRatio,
         uint256 loopCount
     ) external nonReentrant {
+
+        if(tokenAmount == 0)
+            revert InvalidTokenAmount(TAG);
+
         if (!(borrowRatio > 0 && borrowRatio <= 1e18))
             revert InvalidRatio(TAG);
+            
         if (loopCount == 0)
             revert InvalidLoopCount(TAG);
         
