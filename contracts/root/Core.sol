@@ -74,7 +74,7 @@ contract Core is Initializable, ContextUpgradeable, ReentrancyGuardUpgradeable {
     /**
      * @notice Initilize the contract.
      * @param treasuryAddress - The address of treasury contract.
-     * @param roleManagerAddress - The EOA of role manager.
+     * @param roleManagerAddress - Address of the roleManager contract.
      **/
     function initialize(address treasuryAddress, address roleManagerAddress) public initializer {
         treasury = treasuryAddress;
@@ -617,7 +617,7 @@ contract Core is Initializable, ContextUpgradeable, ReentrancyGuardUpgradeable {
      * @notice Reverts if the health factor is not less than MAX_HEALTH_FACTOR, then add the pool to user as collateral
      * @param from - wallet address the user send ceToken.
      * @param to - wallet address the user receive ceToken.
-     * * @param to - pool id.
+     * @param id - pool id of the asset.
      **/
     function handleTransfer(address from, address to, bytes32 id) external {
         if(msg.sender != pools[id].ceToken)

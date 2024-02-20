@@ -96,7 +96,7 @@ contract CEToken is ERC20Upgradeable,ReentrancyGuardUpgradeable {
     /**
      * @notice Configures core address
      * This function can only be accessed by the account with role SET_CE_TOKEN_METHOD.
-     * @param coreAddress - address of the roleManager contract.
+     * @param coreAddress - address of the core contract.
      * @param id - pool id.
      **/
     function setCore(

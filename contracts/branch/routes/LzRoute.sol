@@ -114,7 +114,7 @@ contract LzRouteBranch is Initializable, LzApp {
     }
 
     /**
-     * @dev Receive a cross chain message sent from the branch of chain with chain id `_srcChainId`.
+     * @dev Receive a cross chain message sent from the root with chain id.
      *
      **/
     function _blockingLzReceive(

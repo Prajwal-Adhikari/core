@@ -51,7 +51,7 @@ contract FeeProvider is Initializable, ContextUpgradeable {
 
     /**
      * @notice Initilize the contract.
-     * @param roleManagerAddress - The EOA of role manager.
+     * @param roleManagerAddress - Address of the roleManager contract.
      **/
     function initialize(address roleManagerAddress) public initializer {
         roleManager = roleManagerAddress;

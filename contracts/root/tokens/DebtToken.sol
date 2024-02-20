@@ -32,7 +32,7 @@ contract DebtToken is ERC20Upgradeable,ReentrancyGuardUpgradeable {
      * @notice Initilize the contract.
      * @param name_ - The token name.
      * @param symbol_ - The token symbol.
-     * @param roleManagerAddress - The EOA of role manager.
+     * @param roleManagerAddress - Address of the roleManager contract.
      **/
     function initialize(
         string memory name_,

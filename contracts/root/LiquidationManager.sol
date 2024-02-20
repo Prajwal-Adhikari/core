@@ -36,7 +36,7 @@ contract LiquidationManager is
     mapping(bytes32 => bytes32) public chainId; // pool => chain
 
     error CannotLiquidate(string contractTAG, uint256 currentHealthFactor);
-    error ClosingFactotExceeded(string contractTAG);
+    error ClosingFactorExceeded(string contractTAG);
     error LiquidationPaused(string contractTAG);
     error CollateralUsageDisabled(string contractTAG, address user, bytes32 poolId );
     error ChainIdNotConfigured(string contractTAG);
@@ -57,7 +57,7 @@ contract LiquidationManager is
 
     /**
      * @notice Initilize the contract.
-     * @param roleManagerAddress - The EOA of role manager.
+     * @param roleManagerAddress - Address of the roleManager contract.
      **/
     function initialize(address roleManagerAddress) public initializer {
         __ReentrancyGuard_init();
@@ -235,8 +235,8 @@ contract LiquidationManager is
             discount
         );
         if(healthData.collateralValue.mul(liqPercent).div(1e18) < params.liqValue)
-            revert ClosingFactotExceeded(TAG);
-        // mint and burn CEToken and DebtToken then update supply
+            revert ClosingFactorExceeded(TAG);
+        // burn CEToken and DebtToken then update supply
         IDebtToken(debtPool.debtToken).burn(
             user,
             params.burnBorrowerDebtAmount

@@ -82,7 +82,7 @@ contract Pool is
     /**
      * @notice Initilize the contract.
      * @param forwarder - The address of forwarder contract.
-     * @param roleManagerAddress - The EOA of role manager.
+     * @param roleManagerAddress - Address of the roleManager contract.
      **/
     function initialize(
         address forwarder,

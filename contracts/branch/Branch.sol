@@ -102,7 +102,7 @@ contract Branch is
     /**
      * @notice Sets the roleManager address.
      * @param forwarder - Address of the forwarder.
-     * @param roleManagerAddress - Role manager address.
+     * @param roleManagerAddress - Address of the roleManager contract.
      **/
     function initialize(
         address forwarder,
@@ -412,6 +412,8 @@ contract Branch is
      * @param amount amount of token deposited / repaid
      * @param id pool id of the pool
      * @param functionType type of function
+     * @param route - communication protocol
+     * @param  airdropAmount - amount to be airdropped to destination chain
      **/
     function _pay(
         address token,
