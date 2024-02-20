@@ -536,7 +536,7 @@ contract Pool is
         address user,
         uint256 tokenAmount,
         bytes32 route
-    ) internal {
+    ) internal nonReentrant {
         uint256 reward;
         if (rewardEnable) {
             reward = IFeeProvider(feeProvider).setRewardAmount(chainId, id, tokenAmount);

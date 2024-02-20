@@ -3,6 +3,7 @@ pragma solidity 0.8.22;
 
 import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "../interfaces/IRoleManager.sol";
 import "../interfaces/ICore.sol";
 import "../interfaces/ICedroRewardController.sol";
@@ -14,7 +15,7 @@ string constant TAG = "CEToken";
  * @notice Each token that is deposited will have it's own CE Token.
  * @notice CE Token is the equivalent to Liquidity Pool(LP) Token.
  **/
-contract CEToken is ERC20Upgradeable {
+contract CEToken is ERC20Upgradeable,ReentrancyGuardUpgradeable {
     using SafeMathUpgradeable for uint256;
     address public core;
     address public roleManager;
@@ -22,6 +23,15 @@ contract CEToken is ERC20Upgradeable {
     bytes32 public poolId;
     uint256 public transferBlockWait; //amount of blocks to wait before user can transfer minted ceToken
     uint256 public lockupTriggerAmt; //amount where lockup will kick in after cross-chain transfer
+
+    struct LocalBalance{ //data to send for data calculation
+        uint256 fromBalance;
+        uint256 toBalance;
+        uint256 currentTotalBalance; 
+    }
+
+    LocalBalance private data;
+
     mapping(address => uint256) public transferBlockRelease; //Block number
     mapping(address => mapping(bytes32 => uint256)) public balancePerChain; // user => chain => balance
     mapping(bytes32 => uint256) public totalBalancePerChain; // chain => balance
@@ -63,7 +73,7 @@ contract CEToken is ERC20Upgradeable {
      * @notice Initilize the contract.
      * @param name_ - The token name.
      * @param symbol_ - The token symbol.
-     * @param roleManagerAddress - The EOA of role manager.
+     * @param roleManagerAddress - Address of the roleManager contract
      **/
     function initialize(
         string memory name_,
@@ -98,7 +108,7 @@ contract CEToken is ERC20Upgradeable {
     }
 
     /**
-     * @notice Configures reward controller address
+     * @notice Configures data controller address
      * This function can only be accessed by the account with role SET_CE_TOKEN_METHOD.
      * @param rewardControllerAddress - address of the roleManager contract.
      **/
@@ -149,7 +159,7 @@ contract CEToken is ERC20Upgradeable {
         address from,
         address to,
         uint256 amount
-    ) internal override {
+    ) internal nonReentrant override {
         if(block.number <= transferBlockRelease[from])
             revert TransferTooSoonAfterMint(TAG, block.number, transferBlockRelease[from]);
 
@@ -157,12 +167,15 @@ contract CEToken is ERC20Upgradeable {
         if (ceTokenBalance == 0){
             revert InsufficientBalance(TAG, from);
         }
+
         uint256 amountPerChain;
         uint256 transferCeAmount;
         uint256 ceScaled = ICore(core).getCEScaled(poolId);
         uint256 ceAmount = amount.mul(1e18).div(ceScaled);
         bytes32[] memory chainIds = chains[from];
-        _handleReward(from,to);
+        
+       
+        data = LocalBalance({fromBalance: balanceBeforeScaledExcludingDeadTokens(from),toBalance: balanceBeforeScaledExcludingDeadTokens(to),currentTotalBalance:totalBalanceBeforeScaledExcludingDeadTokens()});
 
         for (uint256 i; i < chainIds.length; i++) {
             amountPerChain = balancePerChain[from][chainIds[i]].mul(ceAmount).div(ceTokenBalance);
@@ -177,6 +190,10 @@ contract CEToken is ERC20Upgradeable {
         super._transfer(from, to, transferCeAmount);
 
         ICore(core).handleTransfer(from, to, poolId);
+
+        _handleReward(from, data.fromBalance, data.currentTotalBalance);
+        if(from != to)
+            _handleReward( to, data.toBalance, data.currentTotalBalance);
     }
 
     /**
@@ -252,17 +269,18 @@ contract CEToken is ERC20Upgradeable {
         address to,
         uint256 amount,
         bytes32 chainId
-    ) external onlyRole(IRoleManager(roleManager).MINT_BURN_CE_DEBT_TOKEN()) {
+    ) external nonReentrant onlyRole(IRoleManager(roleManager).MINT_BURN_CE_DEBT_TOKEN()) {
         if (transferBlockRelease[to] == 2 ** 256 - 1) 
             revert UserIsCaged(TAG, to);
         if (amount > lockupTriggerAmt) {
             transferBlockRelease[to] = block.number + transferBlockWait;
         }
-        _handleReward(to,to);
+        data = LocalBalance({fromBalance:0,toBalance:balanceBeforeScaledExcludingDeadTokens(to),currentTotalBalance:totalBalanceBeforeScaledExcludingDeadTokens()});
         balancePerChain[to][chainId] += amount;
         totalBalancePerChain[chainId] += amount;
         _addChain(to, chainId);
         _mint(to, amount);
+        _handleReward( to, data.toBalance, data.currentTotalBalance);
     }
 
     /**
@@ -276,7 +294,7 @@ contract CEToken is ERC20Upgradeable {
         address from,
         uint256 amount,
         bytes32 chainId
-    ) external onlyRole(IRoleManager(roleManager).MINT_BURN_CE_DEBT_TOKEN()) {
+    ) external nonReentrant onlyRole(IRoleManager(roleManager).MINT_BURN_CE_DEBT_TOKEN()) {
         if (block.number <= transferBlockRelease[from])
             revert BurnTooSoonAfterMint(
                 TAG,
@@ -286,14 +304,15 @@ contract CEToken is ERC20Upgradeable {
 
         if (balancePerChain[from][chainId] < amount)
             revert NotEnoughAmountInChain(TAG, from, chainId);
+        data = LocalBalance({fromBalance:balanceBeforeScaledExcludingDeadTokens(from),toBalance:0,currentTotalBalance:totalBalanceBeforeScaledExcludingDeadTokens()});
 
-        _handleReward(from,from);
         balancePerChain[from][chainId] -= amount;
         totalBalancePerChain[chainId] -= amount;
         if (balancePerChain[from][chainId] == 0) 
             _removeChain(from, chainId);
 
         _burn(from, amount);
+        _handleReward(from,data.fromBalance,data.currentTotalBalance );
     }
 
     /**
@@ -305,7 +324,7 @@ contract CEToken is ERC20Upgradeable {
     function burn(
         address from,
         uint256 amount
-    ) external onlyRole(IRoleManager(roleManager).MINT_BURN_CE_DEBT_TOKEN()) returns (uint256) {
+    ) external nonReentrant onlyRole(IRoleManager(roleManager).MINT_BURN_CE_DEBT_TOKEN()) returns (uint256) {
         if (block.number <= transferBlockRelease[from])
             revert BurnTooSoonAfterMint(
                 TAG,
@@ -316,8 +335,8 @@ contract CEToken is ERC20Upgradeable {
         uint256 ceTokenBalance = balanceBeforeScaledExcludingDeadTokens(from);
         if (ceTokenBalance == 0)
             revert NotEnoughCeTokens(TAG, from);
-
-        _handleReward(from,from);
+        
+        data =LocalBalance({fromBalance:balanceBeforeScaledExcludingDeadTokens(from),toBalance:0,currentTotalBalance:totalBalanceBeforeScaledExcludingDeadTokens()});
         uint256 amountPerChain;
         uint256 burnAmount;
         bytes32[] memory chainIds = chains[from];
@@ -336,6 +355,7 @@ contract CEToken is ERC20Upgradeable {
         }
 
         _burn(from, burnAmount);
+        _handleReward(from,data.fromBalance,data.currentTotalBalance );
         return burnAmount;
     }
 
@@ -350,13 +370,14 @@ contract CEToken is ERC20Upgradeable {
         address from,
         address to,
         uint256 amount
-    ) external onlyRole(IRoleManager(roleManager).LIQUIDATION_MANAGER()) returns (uint256) {
+    ) external nonReentrant onlyRole(IRoleManager(roleManager).LIQUIDATION_MANAGER()) returns (uint256) {
 
         uint256 amountPerChain;
         uint256 transferCeAmount;
         bytes32[] memory chainIds = chains[from];
-
-        _handleReward(from, to);
+        
+        data = LocalBalance({fromBalance: balanceBeforeScaledExcludingDeadTokens(from),toBalance: balanceBeforeScaledExcludingDeadTokens(to),currentTotalBalance:totalBalanceBeforeScaledExcludingDeadTokens()});
+        
         uint256 ceTokenBalance = balanceBeforeScaledExcludingDeadTokens(from);
         for (uint256 i; i < chainIds.length; i++) {
             if (!isChainDead[chainIds[i]]){
@@ -373,6 +394,9 @@ contract CEToken is ERC20Upgradeable {
         }
 
         super._transfer(from, to, transferCeAmount);
+        _handleReward(from, data.fromBalance, data.currentTotalBalance);
+        if(from != to)
+            _handleReward( to, data.toBalance, data.currentTotalBalance);   
         return transferCeAmount;
     }
 
@@ -438,16 +462,10 @@ contract CEToken is ERC20Upgradeable {
         }
     }
 
-    function _handleReward(address from, address to) internal {
-         if(rewardController != address(0)){
-            uint256 fromBalance = balanceBeforeScaledExcludingDeadTokens(from);
-            uint256 currentTotalBalance  = totalBalanceBeforeScaledExcludingDeadTokens();
-            ICedroRewardController(rewardController).handleReward(from, fromBalance, currentTotalBalance);
-            if(from != to){
-                uint256 toBalance = balanceBeforeScaledExcludingDeadTokens(to);
-                ICedroRewardController(rewardController).handleReward(to, toBalance, currentTotalBalance);
-            }
+     function _handleReward(address user,uint256 userBalance,uint256 currentTotalBalance) internal {
+        if (rewardController != address(0)) {
+            ICedroRewardController(rewardController).handleReward(user, userBalance, currentTotalBalance);
         }
-    }
+     }
 
 }
