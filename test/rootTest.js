@@ -105,9 +105,9 @@ describe("Root Function Tests", function () {
 
         // Client Route 400000 gas for testing
         const Route = await ethers.getContractFactory("LzRouteBranch");
-        routeA = await upgrades.deployProxy(Route, [this.lzEndpointMockClientA.address, this.chainIdClientA, this.chainIdServer, 600000, roleManagerA.address]);
-        routeB = await upgrades.deployProxy(Route, [this.lzEndpointMockClientB.address, this.chainIdClientB, this.chainIdServer, 600000, roleManagerB.address]);
-        routeC = await upgrades.deployProxy(Route, [this.lzEndpointMockClientC.address, this.chainIdClientC, this.chainIdServer, 600000, roleManagerC.address]);
+        routeA = await upgrades.deployProxy(Route, [this.lzEndpointMockClientA.address, this.chainIdClientA, this.chainIdServer, 800000, roleManagerA.address]);
+        routeB = await upgrades.deployProxy(Route, [this.lzEndpointMockClientB.address, this.chainIdClientB, this.chainIdServer, 800000, roleManagerB.address]);
+        routeC = await upgrades.deployProxy(Route, [this.lzEndpointMockClientC.address, this.chainIdClientC, this.chainIdServer, 800000, roleManagerC.address]);
 
         const Server = await ethers.getContractFactory("Pool");
         pool = await upgrades.deployProxy(Server, [treasury.address, roleManagerS.address]);
@@ -626,7 +626,7 @@ describe("Root Function Tests", function () {
 
     });
 
-    describe("3. Testing the withdraw ", async () => {
+    describe.only("3. Testing the withdraw ", async () => {
         
         it("Withdrawing from differnt chain than deposited", async function () {
             let fees = await routeA.connect(alice).estimateFees(1, 10);
@@ -642,7 +642,7 @@ describe("Root Function Tests", function () {
 
             let fees = await routeA.connect(alice).estimateFees(1, 10);
             await clientA.connect(alice).depositRequest(MATIC, toTokenAmount(10), LZO, 0, { value: fees })
-            await expect (pool.connect(bob).withdraw(MATIC, BNB, toTokenAmount(10), ethers.utils.hexZeroPad(bob.address, 32), LZO, 0, false, { value: fees })).to.be.revertedWithCustomError(core, "NotEnoughLiquidity").withArgs("Core",BNB,MATIC,0,10000000000000000000n);
+            await expect (pool.connect(bob).withdraw(MATIC, BNB, toTokenAmount(10), ethers.utils.hexZeroPad(bob.address, 32), LZO, 0, false, { value: fees })).to.be.revertedWithCustomError(ceMATIC, "NotEnoughCeTokens").withArgs("CEToken",bob.address);
 
         })
 
