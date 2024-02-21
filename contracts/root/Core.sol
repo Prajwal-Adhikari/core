@@ -45,6 +45,12 @@ contract Core is Initializable, ContextUpgradeable, ReentrancyGuardUpgradeable {
     mapping(address => bytes32[]) public users; // Stores poolIds of collateral or borrowed assets by a user
     mapping(address => mapping(bytes32 => bool)) isPoolInList;
 
+    //Variables for readonly method for calculating interest amounts
+    mapping(address => mapping(bytes32 => uint256)) public totalDepositPerPoolPerUser;
+    mapping(address => mapping(bytes32 => uint256)) public totalWithdrawPerPoolPerUser;
+    mapping(address => mapping(bytes32 => uint256)) public totalBorrowPerPoolPerUser;
+    mapping(address => mapping(bytes32 => uint256)) public totalRepayPerPoolPerUser;
+
     event AssetPrice(bytes32 id, uint256 assetPrice);
     event PoolUsedAsCollateralDisabled(address user, bytes32 poolId, bool status);
 
@@ -295,6 +301,7 @@ contract Core is Initializable, ContextUpgradeable, ReentrancyGuardUpgradeable {
         uint256 ceAmount = tokenAmount.mul(1e18).div(pool.ceScaled);
         //maintaining precision and removing dust values
         tokenAmount = ceAmount.mul(pool.ceScaled).div(1e18);
+        totalDepositPerPoolPerUser[user][id] += tokenAmount;
         pool.ceSupply = pool.ceSupply.add(ceAmount);
         chainLiquidity[chainId][id] += tokenAmount;
         totalLiquidity[id] += tokenAmount;
@@ -354,6 +361,7 @@ contract Core is Initializable, ContextUpgradeable, ReentrancyGuardUpgradeable {
 
         //maintaining precision and removing dust values
         tokenAmount = burnAmount.mul(pool.ceScaled).div(1e18);
+        totalWithdrawPerPoolPerUser[user][id] += tokenAmount;
 
         if(chainLiquidity[chainId][id] < tokenAmount)
             revert NotEnoughLiquidity(TAG, chainId, id, chainLiquidity[chainId][id], tokenAmount);
@@ -414,6 +422,7 @@ contract Core is Initializable, ContextUpgradeable, ReentrancyGuardUpgradeable {
 
         //maintaining precision and removing dust values
         tokenAmount = burnAmount.mul(pool.ceScaled).div(1e18);
+        totalWithdrawPerPoolPerUser[user][id] += tokenAmount;
         if(chainLiquidity[chainId][id] < tokenAmount)
             revert NotEnoughLiquidity(TAG, chainId, id, chainLiquidity[chainId][id], tokenAmount);
 
@@ -471,6 +480,7 @@ contract Core is Initializable, ContextUpgradeable, ReentrancyGuardUpgradeable {
         _addToken(user, id);
 
         tokenAmount = params.tokenAmount;
+        totalBorrowPerPoolPerUser[user][id] += tokenAmount;
 
         if(params.liquidity < tokenAmount)
             revert NotEnoughLiquidity(TAG, chainId, id, params.liquidity, tokenAmount);
@@ -536,14 +546,16 @@ contract Core is Initializable, ContextUpgradeable, ReentrancyGuardUpgradeable {
         );
         Data.PoolData storage pool = pools[id];
         uint256 ceAmount = 0;
-        if (params.tokenAmount >= params.repayAmount) {
+        if (params.tokenAmount > params.repayAmount) {
             ceAmount = params.tokenAmount.sub(params.repayAmount).mul(1e18).div(
                 params.ceScaled
             );
             if (ceAmount > 0) {
+                totalDepositPerPoolPerUser[user][id] += params.tokenAmount - params.repayAmount;
                 ICEToken(params.ceToken).mintInChain(params.user, ceAmount, chainId);
                 pool.ceSupply = pool.ceSupply.add(ceAmount);
                 params.repayAmount += ceAmount.mul(params.ceScaled).div(1e18);
+                _addToken(user, id);
             }
         } else {
             params.debtAmount = params.tokenAmount.mul(1e18).div(
@@ -551,7 +563,7 @@ contract Core is Initializable, ContextUpgradeable, ReentrancyGuardUpgradeable {
             );
             params.repayAmount = params.debtAmount.mul(params.dtScaled).div(1e18);
         }
-      
+        totalRepayPerPoolPerUser[user][id] += params.repayAmount;
         chainLiquidity[chainId][id] += params.repayAmount;
         totalLiquidity[id] += params.repayAmount;
         pool.debtSupply -= params.debtAmount;
@@ -618,12 +630,15 @@ contract Core is Initializable, ContextUpgradeable, ReentrancyGuardUpgradeable {
      * @param from - wallet address the user send ceToken.
      * @param to - wallet address the user receive ceToken.
      * @param id - pool id of the asset.
+     * @param amount - tokenAmount of ceToken transfer.
      **/
-    function handleTransfer(address from, address to, bytes32 id) external {
+    function handleTransfer(address from, address to, bytes32 id, uint256 amount) external {
         if(msg.sender != pools[id].ceToken)
             revert InvalidSender(TAG, msg.sender);
         if(! useAsCollateralDisabled[from][id])
             checkHealth(from);
+        totalDepositPerPoolPerUser[to][id] = amount;
+        totalWithdrawPerPoolPerUser[from][id] = amount;
         _addToken(to, id);
         _removeToken(from, id);
     }
@@ -653,6 +668,28 @@ contract Core is Initializable, ContextUpgradeable, ReentrancyGuardUpgradeable {
      **/
     function removeTokenForBorrower(address user, bytes32 id) external onlyRole(IRoleManager(roleManager).LIQUIDATION_MANAGER()){
         _removeToken(user, id);
+    }
+
+    /**
+     * @notice Adds amount to user deposit per pool
+     * This function can only be accessed by account with role LIQUIDATION_MANAGER.
+     * @param user - address of the liquidator
+     * @param id - pool id of the asset
+     * @param amount - amount of the asset
+     **/
+    function updateDepositAmount(address user, bytes32 id, uint256 amount) external onlyRole(IRoleManager(roleManager).LIQUIDATION_MANAGER()){
+        totalDepositPerPoolPerUser[user][id] += amount;
+    }
+
+    /**
+     * @notice Adds amount to user withdraw per pool
+     * This function can only be accessed by account with role LIQUIDATION_MANAGER.
+     * @param user - address of the liquidator
+     * @param id - pool id of the asset
+     * @param amount - amount of the asset
+     **/
+    function updateWithdrawAmount(address user, bytes32 id, uint256 amount) external onlyRole(IRoleManager(roleManager).LIQUIDATION_MANAGER()){
+        totalWithdrawPerPoolPerUser[user][id] += amount;
     }
 
     /**
@@ -777,6 +814,32 @@ contract Core is Initializable, ContextUpgradeable, ReentrancyGuardUpgradeable {
         return  ICEToken(pool.ceToken).balanceOfExcludingDeadTokens(_user);
     
         
+    }
+
+    /**
+     * @notice Returns list of pool datas
+     * @param _poolIds - ids of the pool.
+     **/
+    function getInterestAmount(
+        address user,
+        bytes32[] memory _poolIds
+    ) external view returns (uint256[] memory, uint256[] memory) {
+        uint256 len = _poolIds.length;
+        uint256[] memory depositInterest = new uint256[](len);
+        uint256[] memory borrowInterest = new uint256[](len);
+        for (uint256 i; i < len; i++) {
+            
+            
+            Data.PoolData memory pool = pools[_poolIds[i]];
+            uint256 excessDeposit =  ICEToken(pool.ceToken).balanceOf(user).add(totalWithdrawPerPoolPerUser[user][_poolIds[i]]);
+            excessDeposit -= totalDepositPerPoolPerUser[user][_poolIds[i]];
+            uint256 excessBorrow = IDebtToken(pool.debtToken).balanceOf(user).add(totalRepayPerPoolPerUser[user][_poolIds[i]]);
+            excessBorrow -= totalBorrowPerPoolPerUser[user][_poolIds[i]];
+            depositInterest[i] = excessDeposit;
+            borrowInterest[i] = excessBorrow;
+        }
+
+        return (depositInterest,borrowInterest);
     }
 
     /**

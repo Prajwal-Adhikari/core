@@ -212,9 +212,28 @@ interface ICore {
      * @notice Reverts if the health factor is not less than MAX_HEALTH_FACTOR, then add the pool to user as collateral
      * @param from - wallet address the user send ceToken.
      * @param to - wallet address the user receive ceToken.
-     * * @param to - pool id.
+     * @param to - pool id.
+     * @param amount - tokenAmount of ceToken transfer.
      **/
-    function handleTransfer(address from, address to, bytes32 id) external;
+    function handleTransfer(address from, address to, bytes32 id, uint256 amount) external;
+
+   /**
+     * @notice Adds amount to user deposit per pool
+     * This function can only be accessed by account with role LIQUIDATION_MANAGER.
+     * @param user - address of the liquidator
+     * @param id - pool id of the asset
+     * @param amount - amount of the asset
+     **/
+    function updateDepositAmount(address user, bytes32 id, uint256 amount) external;
+
+    /**
+     * @notice Adds amount to user withdraw per pool
+     * This function can only be accessed by account with role LIQUIDATION_MANAGER.
+     * @param user - address of the liquidator
+     * @param id - pool id of the asset
+     * @param amount - amount of the asset
+     **/
+    function updateWithdrawAmount(address user, bytes32 id, uint256 amount) external;
 
     /**
      * @notice Returns list of the tokens the `user` has 
@@ -295,4 +314,13 @@ interface ICore {
      * @param _poolIds - ids of the pool.
      **/
     function getConfigData(bytes32[] memory _poolIds) external view returns (Data.ConfigData[] memory);
+
+    /**
+     * @notice Returns list of pool datas
+     * @param _poolIds - ids of the pool.
+     **/
+    function getInterestAmount(
+        address user,
+        bytes32[] memory _poolIds
+    ) external view returns (uint256[] memory, uint256[] memory);
 }
