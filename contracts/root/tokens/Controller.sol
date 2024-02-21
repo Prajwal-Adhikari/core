@@ -86,7 +86,7 @@ contract Controller is ContextUpgradeable {
      **/
     function cageUser(address user) external onlyRole(IRoleManager(roleManager).SET_CONTROLLER_METHOD()) {
         for (uint256 i; i < ceTokens.length; i++) {
-            ICEToken(ceTokens[i]).setTransferBlockRelease(user, 2 ** 256 - 1);
+            ICEToken(ceTokens[i]).setTransferTimestampRelease(user, 2 ** 256 - 1);
         }
         emit CagedUser(user);
     }
@@ -97,7 +97,7 @@ contract Controller is ContextUpgradeable {
      **/
     function releaseCage(address user) external onlyRole(IRoleManager(roleManager).SET_CONTROLLER_METHOD()) {
         for (uint256 i; i < ceTokens.length; i++) {
-            ICEToken(ceTokens[i]).setTransferBlockRelease(user, block.number);
+            ICEToken(ceTokens[i]).setTransferTimestampRelease(user, block.timestamp);
         }
         emit ReleaseCage(user);
     }

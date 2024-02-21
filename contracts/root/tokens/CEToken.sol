@@ -21,7 +21,7 @@ contract CEToken is ERC20Upgradeable,ReentrancyGuardUpgradeable {
     address public roleManager;
     address public rewardController;
     bytes32 public poolId;
-    uint256 public transferBlockWait; //amount of blocks to wait before user can transfer minted ceToken
+    uint256 public transferTimestampWait; //amount of timestamp to wait before user can transfer minted ceToken
     uint256 public lockupTriggerAmt; //amount where lockup will kick in after cross-chain transfer
 
     struct LocalBalance{ //data to send for data calculation
@@ -32,7 +32,7 @@ contract CEToken is ERC20Upgradeable,ReentrancyGuardUpgradeable {
 
     LocalBalance private data;
 
-    mapping(address => uint256) public transferBlockRelease; //Block number
+    mapping(address => uint256) public transferTimestampRelease; //Block Timestamp
     mapping(address => mapping(bytes32 => uint256)) public balancePerChain; // user => chain => balance
     mapping(bytes32 => uint256) public totalBalancePerChain; // chain => balance
     mapping(address => bytes32[]) public chains; //chainList of a user holding the asset from different chains
@@ -42,14 +42,14 @@ contract CEToken is ERC20Upgradeable,ReentrancyGuardUpgradeable {
 
     error TransferTooSoonAfterMint(
         string contractTAG,
-        uint256 currentBlock,
-        uint256 releaseBlock
+        uint256 currentTimestamp,
+        uint256 releaseTimestamp
     );
     error UserIsCaged(string contractTAG, address toUser);
     error BurnTooSoonAfterMint(
         string contractTAG,
-        uint256 currentBlock,
-        uint256 releaseBlock
+        uint256 currentTimestamp,
+        uint256 releaseTimestamp
     );
     error NotEnoughAmountInChain(string contractTAG, address user, bytes32 chainId);
     error DeadChain(string contractTAG, bytes32 chainId);
@@ -121,23 +121,23 @@ contract CEToken is ERC20Upgradeable,ReentrancyGuardUpgradeable {
      * @notice Configures a waiting period before transfer if
      * the mint amount exceeds lockup trigger amount
      * This function can only be accessed by the account with role SET_CE_TOKEN_METHOD.
-     * @param num - number of blocks to wait.
+     * @param num - number of timestamps to wait.
      **/
-    function setTransferBlockWait(uint256 num) external onlyRole(IRoleManager(roleManager).SET_CE_TOKEN_METHOD()) {
-        transferBlockWait = num;
+    function settransferTimestampWait(uint256 num) external onlyRole(IRoleManager(roleManager).SET_CE_TOKEN_METHOD()) {
+        transferTimestampWait = num;
     }
 
     /**
      * @notice Configures the release period for user before transfer
      * This function can only be accessed by the account with role CONTROLLER.
      * @param user - address of a user
-     * @param blockNumber - number of the block upto which transfer is freezed
+     * @param blockTimestamp - timetsamp of the block upto which transfer is freezed
      **/
-    function setTransferBlockRelease(
+    function setTransferTimestampRelease(
         address user,
-        uint256 blockNumber
+        uint256 blockTimestamp
     ) external onlyRole(IRoleManager(roleManager).CONTROLLER()) {
-        transferBlockRelease[user] = blockNumber;
+        transferTimestampRelease[user] = blockTimestamp;
     }
 
     /**
@@ -160,8 +160,8 @@ contract CEToken is ERC20Upgradeable,ReentrancyGuardUpgradeable {
         address to,
         uint256 amount
     ) internal nonReentrant override {
-        if(block.number <= transferBlockRelease[from])
-            revert TransferTooSoonAfterMint(TAG, block.number, transferBlockRelease[from]);
+        if(block.timestamp <= transferTimestampRelease[from])
+            revert TransferTooSoonAfterMint(TAG, block.timestamp, transferTimestampRelease[from]);
 
         uint256 ceTokenBalance = super.balanceOf(from);
         if (ceTokenBalance == 0){
@@ -270,10 +270,10 @@ contract CEToken is ERC20Upgradeable,ReentrancyGuardUpgradeable {
         uint256 amount,
         bytes32 chainId
     ) external nonReentrant onlyRole(IRoleManager(roleManager).MINT_BURN_CE_DEBT_TOKEN()) {
-        if (transferBlockRelease[to] == 2 ** 256 - 1) 
+        if (transferTimestampRelease[to] == 2 ** 256 - 1) 
             revert UserIsCaged(TAG, to);
         if (amount > lockupTriggerAmt) {
-            transferBlockRelease[to] = block.number + transferBlockWait;
+            transferTimestampRelease[to] = block.timestamp + transferTimestampWait;
         }
         data = LocalBalance({fromBalance:0,toBalance:balanceBeforeScaledExcludingDeadTokens(to),currentTotalBalance:totalBalanceBeforeScaledExcludingDeadTokens()});
         balancePerChain[to][chainId] += amount;
@@ -295,11 +295,11 @@ contract CEToken is ERC20Upgradeable,ReentrancyGuardUpgradeable {
         uint256 amount,
         bytes32 chainId
     ) external nonReentrant onlyRole(IRoleManager(roleManager).MINT_BURN_CE_DEBT_TOKEN()) {
-        if (block.number <= transferBlockRelease[from])
+        if (block.timestamp <= transferTimestampRelease[from])
             revert BurnTooSoonAfterMint(
                 TAG,
-                block.number,
-                transferBlockRelease[from]
+                block.timestamp,
+                transferTimestampRelease[from]
             );
 
         if (balancePerChain[from][chainId] < amount)
@@ -325,11 +325,11 @@ contract CEToken is ERC20Upgradeable,ReentrancyGuardUpgradeable {
         address from,
         uint256 amount
     ) external nonReentrant onlyRole(IRoleManager(roleManager).MINT_BURN_CE_DEBT_TOKEN()) returns (uint256) {
-        if (block.number <= transferBlockRelease[from])
+        if (block.timestamp <= transferTimestampRelease[from])
             revert BurnTooSoonAfterMint(
                 TAG,
-                block.number,
-                transferBlockRelease[from]
+                block.timestamp,
+                transferTimestampRelease[from]
             );
 
         uint256 ceTokenBalance = balanceBeforeScaledExcludingDeadTokens(from);

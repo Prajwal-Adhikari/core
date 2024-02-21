@@ -30,19 +30,19 @@ interface ICEToken is IERC20 {
      * @notice Configures a waiting period before transfer if
      * the mint amount exceeds lockup trigger amount
      * This function can only be accessed by the account with role SET_CE_TOKEN_METHOD.
-     * @param num - number of blocks to wait.
+     * @param num - number of timestamps to wait.
      **/
-    function setTransferBlockWait(uint256 num) external;
+    function settransferTimestampWait(uint256 num) external;
 
     /**
      * @notice Configures the release period for user before transfer
      * This function can only be accessed by the account with role CONTROLLER.
      * @param user - address of a user
-     * @param blockNumber - number of the block upto which transfer is freezed
+     * @param blockTimestamp - timetsamp of the block upto which transfer is freezed
      **/
-    function setTransferBlockRelease(
+    function setTransferTimestampRelease(
         address user,
-        uint256 blockNumber
+        uint256 blockTimestamp
     ) external;
 
     /**
