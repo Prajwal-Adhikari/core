@@ -33,6 +33,7 @@ contract Core is Initializable, ContextUpgradeable, ReentrancyGuardUpgradeable {
     */
     mapping(bytes32 => Data.PoolData) public pools;
     mapping(bytes32 => Data.ConfigData) public configs;
+    mapping(bytes32 => bool) public poolInitialized;
     mapping(bytes32 => uint256) public totalLiquidity; // Stores total liquidity within pool
     mapping(address => mapping(bytes32 => bool)) public useAsCollateralDisabled;
 
@@ -55,6 +56,7 @@ contract Core is Initializable, ContextUpgradeable, ReentrancyGuardUpgradeable {
     event PoolUsedAsCollateralDisabled(address user, bytes32 poolId, bool status);
 
     error PoolNotEnabled(string contractTAG, bytes32 id);
+    error PoolAlreadyInitialized(string contractTAG, bytes32 id);
     error NotEnoughLiquidity(string contractTAG, bytes32 chainId, bytes32 poolId, uint256 poolLiquidity, uint256 sentAmount);
     error LTVCheckFailed(string contractTAG, bytes32 poolId, uint256 tokenAmount, uint256 collateralValue, uint256 debtValue);
     error HealthFactorCheckFailed(string contractTAG, address user);
@@ -141,7 +143,8 @@ contract Core is Initializable, ContextUpgradeable, ReentrancyGuardUpgradeable {
     ) external onlyRole(IRoleManager(roleManager).INIT_POOL()) {
         if (config.liqMaxDiscount > 2e17)
             revert HighDiscountPercentage(TAG);
-
+        if (poolInitialized[id])
+            revert PoolAlreadyInitialized(TAG, id);
         updateInterestRate(id);
         configs[id] = config;
         Data.PoolData storage pool = pools[id];
@@ -149,6 +152,23 @@ contract Core is Initializable, ContextUpgradeable, ReentrancyGuardUpgradeable {
         pool.debtToken = _debtToken;
         pool.ceScaled = 1e18;
         pool.dtScaled = 1e18;
+        poolInitialized[id] = true;
+    }
+
+    /**
+     * @notice Changes the configuration of the pool
+     * This function can only be accessed by account with role INIT_POOL.
+     * @param id - id of the pool
+     * @param config - a ConfigData struct containing the interest rate and liqudation variables.
+     **/
+    function changePoolConfiguration(
+        bytes32 id,
+        Data.ConfigData memory config
+    ) external onlyRole(IRoleManager(roleManager).INIT_POOL()) {
+        if (config.liqMaxDiscount > 2e17)
+            revert HighDiscountPercentage(TAG);
+        updateInterestRate(id);
+        configs[id] = config;
     }
 
     /**
@@ -416,7 +436,7 @@ contract Core is Initializable, ContextUpgradeable, ReentrancyGuardUpgradeable {
             if( balanceInChainId < burnAmount)
             revert NotEnoughLiquidity(TAG, chainId, id, balanceInChainId, burnAmount);
         }
-        
+
         if(burnAmount == 0)
             revert InvalidTokenAmount(TAG);
 

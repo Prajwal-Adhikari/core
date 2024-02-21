@@ -26,6 +26,17 @@ interface ICore {
     ) external;
 
     /**
+     * @notice Changes the configuration of the pool
+     * This function can only be accessed by account with role INIT_POOL.
+     * @param id - id of the pool
+     * @param config - a ConfigData struct containing the interest rate and liqudation variables.
+     **/
+    function changePoolConfiguration(
+        bytes32 id,
+        Data.ConfigData memory config
+    ) external;
+
+    /**
      * @notice Updates the global protocol states after receiving deposit information
      * of amount `tokenAmount` from address `user` for pool with pool id 'id' from
      * chain with chain id `chainId`.
