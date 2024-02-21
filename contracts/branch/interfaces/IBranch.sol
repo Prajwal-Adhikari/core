@@ -70,13 +70,6 @@ interface IBranch {
     function toggleProtocolStatus() external;
 
     /**
-     * @notice Toggles the status of the deposit on and off for a particular asset
-     * This function can only be accessed by account with role PROTOCOL_PAUSE.
-     * @param id - pool id
-     **/
-    function toggleDepositCapStatus(bytes32 id) external;
-
-    /**
      * @notice Sets the cap amount for deposit for different assets
      * This function can only be accessed by account with role SET_BRANCH_METHOD.
      * @param id - list of pool id of the assets.

@@ -58,9 +58,7 @@ contract Branch is
     // Pool level pause
     mapping(bytes32 => bool) public depositPause;
     mapping(bytes32 => bool) public repayPause;
-    mapping(bytes32 => bool) public depositCapReached;
     mapping(bytes32 => uint256) public capAmount;
-
 
     // Protocol level pause for all pools
     bool public protocolPause;
@@ -89,7 +87,7 @@ contract Branch is
     error NativeTransferFailed(string contractTAG);
     error BadPayload(string contractTAG, uint256 currentLength, uint256 requiredLength);
     error PoolNotEnabled(string contractTAG, bytes32 poolID);
-    error DepositCapReached(string contractTAG, bytes32 poolID);
+    error LiquidityCapReached(string contractTAG, bytes32 poolID);
     error InvalidTokenAmount(string contractTAG);
     error InvalidReceipientAddress(string contractTAG);
     error ArrayLengthMismatched(string contractTAG);
@@ -222,18 +220,6 @@ contract Branch is
     }
 
     /**
-     * @notice Toggles the status of the deposit on and off for a particular asset
-     * This function can only be accessed by account with role PROTOCOL_PAUSE.
-     * @param id - pool id
-     **/
-    function toggleDepositCapStatus(bytes32 id)
-        external
-        onlyRole(IRoleManager(roleManager).PROTOCOL_PAUSE())
-    {
-        depositCapReached[id] = !depositCapReached[id];
-    }
-
-    /**
      * @notice Sets the cap amount for deposit for different assets
      * This function can only be accessed by account with role SET_BRANCH_METHOD.
      * @param id - list of pool id of the assets.
@@ -272,8 +258,6 @@ contract Branch is
             revert PoolNotEnabled(TAG, id);
         if(amount == 0)
             revert InvalidTokenAmount(TAG);
-        if(depositCapReached[id])
-            revert DepositCapReached(TAG, id);
         uint256 liquidity;
         _pay(pools[id].token, amount, id, TYPE_DEPOSIT, route, airdropAmount);
         if(pools[id].token == address(0)){
@@ -282,7 +266,7 @@ contract Branch is
             liquidity = IERC20Upgradeable(pools[id].token).balanceOf(address(this));
         }
         if (liquidity > capAmount[id]) {
-            depositCapReached[id] = true;
+            revert LiquidityCapReached(TAG, id);
         }
         emit Deposit(_msgSender(), id, amount, route, airdropAmount);
         emit SendToken(_msgSender(), id, amount);
@@ -310,7 +294,16 @@ contract Branch is
             revert PoolNotEnabled(TAG, id);
         if(amount == 0)
             revert InvalidTokenAmount(TAG);
+        uint256 liquidity;
         _pay(pools[id].token, amount, id, TYPE_REPAY, route, airdropAmount);
+        if(pools[id].token == address(0)){
+            liquidity = address(this).balance;
+        }else{
+            liquidity = IERC20Upgradeable(pools[id].token).balanceOf(address(this));
+        }
+        if (liquidity > capAmount[id]) {
+            revert LiquidityCapReached(TAG, id);
+        }
         emit Repay(_msgSender(), id, amount, route, airdropAmount);
         emit SendToken(_msgSender(), id, amount);
     }
@@ -343,6 +336,8 @@ contract Branch is
             revert PoolNotEnabled(TAG, id);
 
         if (pools[id].token == address(0)) {
+            if (msg.value <= qty) 
+                revert InsufficientValue(TAG, msg.value, qty);
             // wrap the ETH into WETH
             IStargateEthVault(stargateEthVault).deposit{value: qty}();
             IStargateEthVault(stargateEthVault).approve(stargateRouter, qty);
