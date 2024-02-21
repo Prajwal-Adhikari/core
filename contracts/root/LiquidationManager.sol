@@ -245,6 +245,7 @@ contract LiquidationManager is
             msg.sender,
             params.burnLiquidatorCEAmount
         );
+        ICore(core).updateWithdrawAmount(msg.sender, debtId, params.burnLiquidatorCEAmount.mul(debtPool.ceScaled).div(1e18));
 
         ICore(core).updateCeAndDebtSupply(
             debtId,
@@ -252,7 +253,10 @@ contract LiquidationManager is
             debtPool.debtSupply.sub(params.burnBorrowerDebtAmount)
         );
 
-        ICEToken(collateralPool.ceToken).liquidate(user,msg.sender, params.liqBorrowerCEAmount);
+        params.liqBorrowerCEAmount = ICEToken(collateralPool.ceToken).liquidate(user,msg.sender, params.liqBorrowerCEAmount);
+        params.liqBorrowerCEAmount = params.liqBorrowerCEAmount.mul(collateralPool.ceScaled).div(1e18);
+        ICore(core).updateWithdrawAmount(user, collateralId, params.liqBorrowerCEAmount);
+        ICore(core).updateDepositAmount(msg.sender, collateralId, params.liqBorrowerCEAmount);
     
         ICore(core).addTokenForLiquidator(msg.sender, collateralId);
         ICore(core).removeTokenForBorrower(user,collateralId);
