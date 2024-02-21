@@ -189,7 +189,7 @@ contract CEToken is ERC20Upgradeable,ReentrancyGuardUpgradeable {
 
         super._transfer(from, to, transferCeAmount);
 
-        ICore(core).handleTransfer(from, to, poolId);
+        ICore(core).handleTransfer(from, to, poolId, transferCeAmount.mul(ceScaled).div(1e18));
 
         _handleReward(from, data.fromBalance, data.currentTotalBalance);
         if(from != to)
@@ -336,7 +336,7 @@ contract CEToken is ERC20Upgradeable,ReentrancyGuardUpgradeable {
         if (ceTokenBalance == 0)
             revert NotEnoughCeTokens(TAG, from);
         
-        data =LocalBalance({fromBalance:balanceBeforeScaledExcludingDeadTokens(from),toBalance:0,currentTotalBalance:totalBalanceBeforeScaledExcludingDeadTokens()});
+        data = LocalBalance({fromBalance:balanceBeforeScaledExcludingDeadTokens(from),toBalance:0,currentTotalBalance:totalBalanceBeforeScaledExcludingDeadTokens()});
         uint256 amountPerChain;
         uint256 burnAmount;
         bytes32[] memory chainIds = chains[from];
@@ -355,7 +355,7 @@ contract CEToken is ERC20Upgradeable,ReentrancyGuardUpgradeable {
         }
 
         _burn(from, burnAmount);
-        _handleReward(from,data.fromBalance,data.currentTotalBalance );
+        _handleReward(from,data.fromBalance,data.currentTotalBalance);
         return burnAmount;
     }
 
