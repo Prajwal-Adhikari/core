@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.22;
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {LzApp} from "../../communicationProtocol/layerZero/lzApp/LzApp.sol";
 import "../interfaces/IAdapter.sol";
@@ -115,7 +114,7 @@ contract LzRouteBranch is Initializable, LzApp {
     }
 
     /**
-     * @dev Receive a cross chain message sent from the branch of chain with chain id `_srcChainId`.
+     * @dev Receive a cross chain message sent from the root with chain id.
      *
      **/
     function _blockingLzReceive(

@@ -2,7 +2,6 @@
 pragma solidity 0.8.22;
 import "@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
 import "./interfaces/ICEToken.sol";
@@ -83,7 +82,7 @@ contract Pool is
     /**
      * @notice Initilize the contract.
      * @param forwarder - The address of forwarder contract.
-     * @param roleManagerAddress - The EOA of role manager.
+     * @param roleManagerAddress - Address of the roleManager contract.
      **/
     function initialize(
         address forwarder,
@@ -444,8 +443,13 @@ contract Pool is
         uint256 borrowRatio,
         uint256 loopCount
     ) external nonReentrant {
+
+        if(tokenAmount == 0)
+            revert InvalidTokenAmount(TAG);
+
         if (!(borrowRatio > 0 && borrowRatio <= 1e18))
             revert InvalidRatio(TAG);
+            
         if (loopCount == 0)
             revert InvalidLoopCount(TAG);
         
@@ -532,7 +536,7 @@ contract Pool is
         address user,
         uint256 tokenAmount,
         bytes32 route
-    ) internal {
+    ) internal nonReentrant {
         uint256 reward;
         if (rewardEnable) {
             reward = IFeeProvider(feeProvider).setRewardAmount(chainId, id, tokenAmount);

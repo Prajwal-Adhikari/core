@@ -42,7 +42,6 @@ contract LzRouteV2Branch is OApp {
     ) OApp(_endpoint, _owner) {
         if(_gasUsage < 600000)
             revert InsufficientGas(TAG);
-        executorGas = _gasUsage;
         roleManager = _roleManager;
         rootChainId = _rootChainId;
         localChainId = _localChainId;

@@ -3,6 +3,7 @@ pragma solidity 0.8.22;
 
 import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "../interfaces/IRoleManager.sol";
 import "../interfaces/ICore.sol";
 import "../interfaces/ICedroRewardController.sol";
@@ -13,7 +14,7 @@ string constant TAG = "DebtToken";
  * @title Debt (DT) Token
  * @notice Each token that is deposited will have it's own DT Token.
  **/
-contract DebtToken is ERC20Upgradeable {
+contract DebtToken is ERC20Upgradeable,ReentrancyGuardUpgradeable {
     using SafeMathUpgradeable for uint256;
 
     address public core;
@@ -31,7 +32,7 @@ contract DebtToken is ERC20Upgradeable {
      * @notice Initilize the contract.
      * @param name_ - The token name.
      * @param symbol_ - The token symbol.
-     * @param roleManagerAddress - The EOA of role manager.
+     * @param roleManagerAddress - Address of the roleManager contract.
      **/
     function initialize(
         string memory name_,
@@ -121,9 +122,12 @@ contract DebtToken is ERC20Upgradeable {
      * @param to - address of the receipient.
      * @param amount - amount of the token.
      **/
-    function mint(address to, uint256 amount) external onlyRole(IRoleManager(roleManager).MINT_BURN_CE_DEBT_TOKEN()) {
-        _handleReward(to);
+    function mint(address to, uint256 amount) external nonReentrant onlyRole(IRoleManager(roleManager).MINT_BURN_CE_DEBT_TOKEN()) {
+        uint256 userBalance = super.balanceOf(to);
+        uint256 currentTotalSupply  = super.totalSupply();
         _mint(to, amount);
+        _handleReward(to,userBalance,currentTotalSupply);
+       
     }
 
     /**
@@ -132,15 +136,15 @@ contract DebtToken is ERC20Upgradeable {
      * @param from - address of the sender.
      * @param amount - amount of the token.
      **/
-    function burn(address from, uint256 amount) external onlyRole(IRoleManager(roleManager).MINT_BURN_CE_DEBT_TOKEN()) {
-        _handleReward(from);
+    function burn(address from, uint256 amount) external nonReentrant onlyRole(IRoleManager(roleManager).MINT_BURN_CE_DEBT_TOKEN()) {
+        uint256 userBalance = super.balanceOf(from);
+        uint256 currentTotalSupply  = super.totalSupply();
         _burn(from, amount);
+        _handleReward(from,userBalance,currentTotalSupply);
     }
 
-    function _handleReward(address user) internal {
+    function _handleReward(address user,uint256 userBalance,uint256 currentTotalBalance) internal {
         if(rewardController != address(0)){
-            uint256 userBalance = super.balanceOf(user);
-            uint256 currentTotalBalance  = super.totalSupply();
             ICedroRewardController(rewardController).handleReward(user, userBalance, currentTotalBalance);
         }
     }

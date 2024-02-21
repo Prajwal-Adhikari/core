@@ -34,7 +34,7 @@ contract Controller is ContextUpgradeable {
 
     /**
      * @notice Initilize the contract.
-     * @param roleManagerAddress - The EOA of role manager.
+     * @param roleManagerAddress - Address of the roleManager contract.
      **/
     function initialize(
         address roleManagerAddress
@@ -45,7 +45,7 @@ contract Controller is ContextUpgradeable {
 
     /**
      * @notice Sets the roleManager address.
-     * @param roleManagerAddress - Role manager address.
+     * @param roleManagerAddress - Address of the roleManager contract.
      **/
     function setRoleManager(address roleManagerAddress) external onlyRole(IRoleManager(roleManager).DEFAULT_ADMIN_ROLE()) {
         roleManager = roleManagerAddress;

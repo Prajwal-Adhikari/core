@@ -4,6 +4,7 @@ pragma solidity 0.8.22;
 import "@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "./interfaces/ICEToken.sol";
 import "./interfaces/IDebtToken.sol";
 import "./interfaces/IOracle.sol";
@@ -17,7 +18,7 @@ string constant TAG = "Core";
  * @notice Core stores all the global data
  * @notice Most of the lending and borrowing logic like interest rate calculation, checks, is in Core.
  **/
-contract Core is Initializable, ContextUpgradeable {
+contract Core is Initializable, ContextUpgradeable, ReentrancyGuardUpgradeable {
     using SafeMathUpgradeable for uint256;
 
     IOracle public oracle;
@@ -73,7 +74,7 @@ contract Core is Initializable, ContextUpgradeable {
     /**
      * @notice Initilize the contract.
      * @param treasuryAddress - The address of treasury contract.
-     * @param roleManagerAddress - The EOA of role manager.
+     * @param roleManagerAddress - Address of the roleManager contract.
      **/
     function initialize(address treasuryAddress, address roleManagerAddress) public initializer {
         treasury = treasuryAddress;
@@ -285,7 +286,7 @@ contract Core is Initializable, ContextUpgradeable {
         bytes32 chainId,
         address user,
         uint256 tokenAmount
-    ) external onlyRole(IRoleManager(roleManager).POOL()) returns (uint256, uint256) {
+    ) external nonReentrant onlyRole(IRoleManager(roleManager).POOL()) returns (uint256, uint256) {
         refresh(id, chainId);
         Data.PoolData storage pool = pools[id];
         if(! pool.enable)
@@ -294,10 +295,10 @@ contract Core is Initializable, ContextUpgradeable {
         uint256 ceAmount = tokenAmount.mul(1e18).div(pool.ceScaled);
         //maintaining precision and removing dust values
         tokenAmount = ceAmount.mul(pool.ceScaled).div(1e18);
-        ICEToken(pool.ceToken).mintInChain(user, ceAmount, chainId);
         pool.ceSupply = pool.ceSupply.add(ceAmount);
         chainLiquidity[chainId][id] += tokenAmount;
         totalLiquidity[id] += tokenAmount;
+        ICEToken(pool.ceToken).mintInChain(user, ceAmount, chainId);
         updateInterestRate(id);
         _addToken(user, id);
         
@@ -322,7 +323,7 @@ contract Core is Initializable, ContextUpgradeable {
         uint256 tokenAmount,
         address user,
         bool all
-    ) external onlyRole(IRoleManager(roleManager).POOL()) returns (uint256, uint256) {
+    ) external nonReentrant onlyRole(IRoleManager(roleManager).POOL()) returns (uint256, uint256) {
         refresh(id, chainId);
         Data.PoolData storage pool = pools[id];
         if(! pool.enable)
@@ -387,7 +388,7 @@ contract Core is Initializable, ContextUpgradeable {
         uint256 tokenAmount,
         address user,
         bool all
-    ) external onlyRole(IRoleManager(roleManager).POOL()) returns (uint256, uint256) {
+    ) external nonReentrant onlyRole(IRoleManager(roleManager).POOL()) returns (uint256, uint256) {
         refresh(id, chainId);
         Data.PoolData storage pool = pools[id];
         // require(pool.enable, string.concat(TAG, ": Not enable now"));
@@ -416,13 +417,11 @@ contract Core is Initializable, ContextUpgradeable {
         if(chainLiquidity[chainId][id] < tokenAmount)
             revert NotEnoughLiquidity(TAG, chainId, id, chainLiquidity[chainId][id], tokenAmount);
 
-        ICEToken(pool.ceToken).burnFromChain(user, burnAmount, chainId);
-
-        _removeToken(user, id);
-
         pool.ceSupply = pool.ceSupply.sub(burnAmount);
         chainLiquidity[chainId][id] -= tokenAmount;
         totalLiquidity[id] -= tokenAmount;
+        ICEToken(pool.ceToken).burnFromChain(user, burnAmount, chainId);
+        _removeToken(user, id);
         updateInterestRate(id);
         if(! useAsCollateralDisabled[user][id])
             checkHealth(user);
@@ -462,7 +461,7 @@ contract Core is Initializable, ContextUpgradeable {
         bytes32 chainId,
         uint256 tokenAmount,
         address user
-    ) external onlyRole(IRoleManager(roleManager).POOL()) returns (uint256, uint256) {
+    ) external nonReentrant onlyRole(IRoleManager(roleManager).POOL()) returns (uint256, uint256) {
         refresh(id, chainId);
         Data.BorrowParams memory params = _buildBorrowParams(
             id,
@@ -475,13 +474,12 @@ contract Core is Initializable, ContextUpgradeable {
 
         if(params.liquidity < tokenAmount)
             revert NotEnoughLiquidity(TAG, chainId, id, params.liquidity, tokenAmount);
-
-        IDebtToken(params.debtToken).mint(user, params.debtAmount);
+ 
         pools[id].debtSupply += params.debtAmount;
-        updateInterestRate(id);
         chainLiquidity[chainId][id] -= tokenAmount;
         totalLiquidity[id] -= tokenAmount;
-
+        IDebtToken(params.debtToken).mint(user, params.debtAmount);
+        updateInterestRate(id);
         Data.HealthData memory healthData = healthFactor(user);
 
         uint256 collateral = healthData.collateralValue.mul(params.ltv).div(1e18);
@@ -526,6 +524,7 @@ contract Core is Initializable, ContextUpgradeable {
         uint256 tokenAmount
     )
         external
+        nonReentrant
         onlyRole(IRoleManager(roleManager).POOL())
         returns (uint256, uint256, uint256)
     {
@@ -555,9 +554,9 @@ contract Core is Initializable, ContextUpgradeable {
       
         chainLiquidity[chainId][id] += params.repayAmount;
         totalLiquidity[id] += params.repayAmount;
+        pool.debtSupply -= params.debtAmount;
         IDebtToken(params.debtToken).burn(params.user, params.debtAmount);
         _removeToken(user, id);
-        pool.debtSupply -= params.debtAmount;
         updateInterestRate(id);
 
         emit AssetPrice(id, oracle.getSinglePrice(id));
@@ -596,7 +595,7 @@ contract Core is Initializable, ContextUpgradeable {
         bytes32 destChainId,
         uint256 tokenAmountInSrc,
         uint256 tokenAmountInDest
-    ) external onlyRole(IRoleManager(roleManager).POOL()) {
+    ) external nonReentrant onlyRole(IRoleManager(roleManager).POOL()) {
         if (tokenAmountInDest > tokenAmountInSrc) {
             revert ExcessLiquidityInDest(TAG);
         }
@@ -618,7 +617,7 @@ contract Core is Initializable, ContextUpgradeable {
      * @notice Reverts if the health factor is not less than MAX_HEALTH_FACTOR, then add the pool to user as collateral
      * @param from - wallet address the user send ceToken.
      * @param to - wallet address the user receive ceToken.
-     * * @param to - pool id.
+     * @param id - pool id of the asset.
      **/
     function handleTransfer(address from, address to, bytes32 id) external {
         if(msg.sender != pools[id].ceToken)

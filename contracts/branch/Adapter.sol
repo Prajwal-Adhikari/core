@@ -40,7 +40,7 @@ contract AdapterBranch is Initializable, ContextUpgradeable {
 
     /**
      * @notice Sets the roleManager address.
-     * @param roleManagerAddress - Role manager address.
+     * @param roleManagerAddress - Address of the roleManager contract.
      **/
     function initialize(address roleManagerAddress) public initializer {
         roleManager = roleManagerAddress;
