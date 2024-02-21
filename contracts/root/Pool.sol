@@ -260,6 +260,9 @@ contract Pool is
 
         actualAmount -= fee;
 
+        if(actualAmount == 0)
+            revert InvalidTokenAmount(TAG);
+
         bytes memory payload = abi.encodePacked(
             id,
             to,
@@ -324,6 +327,9 @@ contract Pool is
             _msgSender(),
             all
         );
+
+        if(actualAmount == 0)
+            revert InvalidTokenAmount(TAG);
 
         bytes memory payload = abi.encodePacked(
             id,
@@ -397,6 +403,8 @@ contract Pool is
         );
 
         actualAmount -= fee;
+        if(actualAmount == 0)
+            revert InvalidTokenAmount(TAG);
 
         bytes memory payload = abi.encodePacked(
             id,
