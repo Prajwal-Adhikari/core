@@ -346,6 +346,23 @@ contract FeeProvider is Initializable, ContextUpgradeable {
         return excessLiquidity.mul(DENOMINATOR).div(excessFactor);
     }
 
+    /**
+     * @notice Computes the rewards across chain for an asset
+     * @param chainIds list of id of the chains.
+     * @param poolId id of the pool.
+     **/
+    function getPoolReward(
+        bytes32[] memory chainIds,
+        bytes32 poolId
+    ) external view returns (uint256[] memory) {
+        uint256 len = chainIds.length;
+        uint256[] memory rewards = new uint256[](len);
+        for (uint256 i; i < len; i++) {
+            rewards[i] = feeAmount[chainIds[i]][poolId];
+        }
+        return rewards;
+    }
+
     function _getTrapezoidArea(
         uint256 lambda,
         uint256 yOffset,

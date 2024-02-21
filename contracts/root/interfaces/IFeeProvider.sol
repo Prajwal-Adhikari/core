@@ -122,4 +122,14 @@ interface IFeeProvider {
         bytes32 poolId,
         uint256 amount
     ) external view returns (uint256);
+
+    /**
+     * @notice Computes the rewards across chain for an asset
+     * @param chainIds list of id of the chains.
+     * @param poolId id of the pool.
+     **/
+    function getPoolReward(
+        bytes32[] memory chainIds,
+        bytes32 poolId
+    ) external view returns (uint256[] memory);
 }
