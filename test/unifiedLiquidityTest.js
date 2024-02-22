@@ -99,9 +99,9 @@ describe("Ready", function () {
 
         // Client Route 400000 gas for testing
         const Route = await ethers.getContractFactory("LzRouteBranch");
-        routeA = await upgrades.deployProxy(Route, [this.lzEndpointMockClientA.address, this.chainIdClientA, this.chainIdServer, 600000, roleManagerA.address]);
-        routeB = await upgrades.deployProxy(Route, [this.lzEndpointMockClientB.address, this.chainIdClientB, this.chainIdServer, 600000, roleManagerB.address]);
-        routeC = await upgrades.deployProxy(Route, [this.lzEndpointMockClientC.address, this.chainIdClientC, this.chainIdServer, 600000, roleManagerC.address]);
+        routeA = await upgrades.deployProxy(Route, [this.lzEndpointMockClientA.address, this.chainIdClientA, this.chainIdServer, 800000, roleManagerA.address]);
+        routeB = await upgrades.deployProxy(Route, [this.lzEndpointMockClientB.address, this.chainIdClientB, this.chainIdServer, 800000, roleManagerB.address]);
+        routeC = await upgrades.deployProxy(Route, [this.lzEndpointMockClientC.address, this.chainIdClientC, this.chainIdServer, 800000, roleManagerC.address]);
 
         const Server = await ethers.getContractFactory("Pool");
         pool = await upgrades.deployProxy(Server, [treasury.address, roleManagerS.address]);
@@ -130,6 +130,11 @@ describe("Ready", function () {
 
         // Set roleManager contract in all other contracts
         await setRoleManager();
+
+        // Set liquidity cap ammount 
+        await clientA.setCapAmount([MATIC,FTM,BNB],[toTokenAmount(9000000000),toTokenAmount(9000000000),toTokenAmount(9000000000)]);
+        await clientB.setCapAmount([MATIC,FTM,BNB],[toTokenAmount(9000000000),toTokenAmount(9000000000),toTokenAmount(9000000000)]);
+        await clientC.setCapAmount([MATIC,FTM,BNB],[toTokenAmount(9000000000),toTokenAmount(9000000000),toTokenAmount(9000000000)]);
 
         // Configure Branch in Adapter
         await adapterA.setBranch(clientA.address);
@@ -184,6 +189,7 @@ describe("Ready", function () {
         await this.oracle.setPrice([MATIC, FTM, BNB, USDC], [toTokenAmount(1), toTokenAmount(1), toTokenAmount(1), toTokenAmount(1)])
         await liquidationManager.setOracle(this.oracle.address);
         await liquidationManager.setCore(core.address);
+        await liquidationManager.setChainId([MATIC,FTM,BNB],[MATIC,FTM,BNB]);
 
         // alice account only has the permission to init pool
         await core.connect(alice).initPool(MATIC, [toTokenAmount(0.5), toTokenAmount(0.1), toTokenAmount(0.5), 0, toTokenAmount(0.5), toTokenAmount(0.8), toTokenAmount(0.1), toTokenAmount(0.1), toTokenAmount(0.15)], ceMATIC.address, debtMATIC.address);
@@ -497,7 +503,7 @@ describe("Ready", function () {
     });
     describe("2.Testing the liquidation", () => {
         
-        it.only("Testing the liqudity", async function(){
+        it("Testing the liqudity", async function(){
 
             fees = await routeA.connect(alice).estimateFees(1, 0);
             await clientA.connect(bob).depositRequest(MATIC, toTokenAmount(1), LZO, 0, { value: fees })
