@@ -572,10 +572,10 @@ contract Core is Initializable, ContextUpgradeable, ReentrancyGuardUpgradeable {
             );
             if (ceAmount > 0) {
                 totalDepositPerPoolPerUser[user][id] += params.tokenAmount - params.repayAmount;
-                ICEToken(params.ceToken).mintInChain(params.user, ceAmount, chainId);
                 pool.ceSupply = pool.ceSupply.add(ceAmount);
                 params.repayAmount += ceAmount.mul(params.ceScaled).div(1e18);
                 _addToken(user, id);
+                ICEToken(params.ceToken).mintInChain(params.user, ceAmount, chainId);
             }
         } else {
             params.debtAmount = params.tokenAmount.mul(1e18).div(
@@ -848,8 +848,6 @@ contract Core is Initializable, ContextUpgradeable, ReentrancyGuardUpgradeable {
         uint256[] memory depositInterest = new uint256[](len);
         uint256[] memory borrowInterest = new uint256[](len);
         for (uint256 i; i < len; i++) {
-            
-            
             Data.PoolData memory pool = pools[_poolIds[i]];
             uint256 excessDeposit =  ICEToken(pool.ceToken).balanceOf(user).add(totalWithdrawPerPoolPerUser[user][_poolIds[i]]);
             excessDeposit -= totalDepositPerPoolPerUser[user][_poolIds[i]];
@@ -858,7 +856,6 @@ contract Core is Initializable, ContextUpgradeable, ReentrancyGuardUpgradeable {
             depositInterest[i] = excessDeposit;
             borrowInterest[i] = excessBorrow;
         }
-
         return (depositInterest,borrowInterest);
     }
 
