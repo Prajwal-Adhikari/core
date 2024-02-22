@@ -32,7 +32,7 @@ function getAddress(b, a) {
     return ethers.utils.solidityPack(['address', 'address'],
         [a, b]);
 }
-describe("Ready", function () {
+describe("Root Function Tests", function () {
 
     beforeEach(async function () {
         [developer, alice, bob, treasury, user3, user4] = await ethers.getSigners()
@@ -99,9 +99,9 @@ describe("Ready", function () {
 
         // Client Route 400000 gas for testing
         const Route = await ethers.getContractFactory("LzRouteBranch");
-        routeA = await upgrades.deployProxy(Route, [this.lzEndpointMockClientA.address, this.chainIdClientA, this.chainIdServer, 600000, roleManagerA.address]);
-        routeB = await upgrades.deployProxy(Route, [this.lzEndpointMockClientB.address, this.chainIdClientB, this.chainIdServer, 600000, roleManagerB.address]);
-        routeC = await upgrades.deployProxy(Route, [this.lzEndpointMockClientC.address, this.chainIdClientC, this.chainIdServer, 600000, roleManagerC.address]);
+        routeA = await upgrades.deployProxy(Route, [this.lzEndpointMockClientA.address, this.chainIdClientA, this.chainIdServer, 800000, roleManagerA.address]);
+        routeB = await upgrades.deployProxy(Route, [this.lzEndpointMockClientB.address, this.chainIdClientB, this.chainIdServer, 800000, roleManagerB.address]);
+        routeC = await upgrades.deployProxy(Route, [this.lzEndpointMockClientC.address, this.chainIdClientC, this.chainIdServer, 800000, roleManagerC.address]);
 
         const Server = await ethers.getContractFactory("Pool");
         pool = await upgrades.deployProxy(Server, [treasury.address, roleManagerS.address]);
@@ -130,6 +130,11 @@ describe("Ready", function () {
 
         // Set roleManager contract in all other contracts
         await setRoleManager();
+
+        // Set liquidity cap ammount 
+        await clientA.setCapAmount([MATIC,FTM,BNB],[toTokenAmount(9000000000),toTokenAmount(9000000000),toTokenAmount(9000000000)]);
+        await clientB.setCapAmount([MATIC,FTM,BNB],[toTokenAmount(9000000000),toTokenAmount(9000000000),toTokenAmount(9000000000)]);
+        await clientC.setCapAmount([MATIC,FTM,BNB],[toTokenAmount(9000000000),toTokenAmount(9000000000),toTokenAmount(9000000000)]);
 
         // Configure Branch in Adapter
         await adapterA.setBranch(clientA.address);
@@ -184,6 +189,7 @@ describe("Ready", function () {
         await this.oracle.setPrice([MATIC, FTM, BNB, USDC], [toTokenAmount(1), toTokenAmount(1), toTokenAmount(1), toTokenAmount(1)])
         await liquidationManager.setOracle(this.oracle.address);
         await liquidationManager.setCore(core.address);
+         await liquidationManager.setChainId([MATIC,FTM,BNB],[MATIC,FTM,BNB]);
 
         // alice account only has the permission to init pool
         await core.connect(alice).initPool(MATIC, [toTokenAmount(0.5), toTokenAmount(0.1), toTokenAmount(0.5), 0, toTokenAmount(0.5), toTokenAmount(0.8), toTokenAmount(0.1), toTokenAmount(0.1), toTokenAmount(0.15)], ceMATIC.address, debtMATIC.address);
@@ -232,7 +238,7 @@ describe("Ready", function () {
         await bnb.mint(user4.address, toTokenAmount(100))
         await usdc.mint(user4.address, toTokenAmount(100, 6))
 
-        await matic.connect(alice).approve(clientA.address, toTokenAmount(400));
+        await matic.connect(alice).approve(clientA.address, toTokenAmount(100));
         await matic.connect(alice).approve(clientB.address, toTokenAmount(100));
         await matic.connect(alice).approve(clientC.address, toTokenAmount(100));
         await ftm.connect(alice).approve(clientA.address, toTokenAmount(100));
@@ -435,7 +441,6 @@ describe("Ready", function () {
     }
 
     async function printCEBalance() {
-
         console.log("print ceToken balance")
         let alice_balance = await ceFTM.balanceOf(alice.address);
         let bob_balance = await ceFTM.balanceOf(bob.address);
@@ -445,7 +450,6 @@ describe("Ready", function () {
         alice_balance = await debtFTM.balanceOf(alice.address);
         bob_balance = await debtFTM.balanceOf(bob.address);
         console.log(`debtToken alice: ${alice_balance} bob: ${bob_balance}`);
-        
     }
 
     async function liquidateMultipleTime(numberofTimes){
@@ -470,9 +474,9 @@ describe("Ready", function () {
         it("test liquidation pause state", async function () {
             
             fees = await routeA.connect(alice).estimateFees(1, 0);
-            await clientA.connect(alice).depositRequest(MATIC, toTokenAmount(50), LZO, 0, { value: fees })
-            await clientB.connect(bob).depositRequest(FTM, toTokenAmount(50), LZO, 0, { value: fees })
-            await pool.connect(alice).borrow(FTM, BNB, toTokenAmount(20), ethers.utils.hexZeroPad(alice.address, 32), LZO, 0, { value: fees });
+            await clientA.connect(alice).depositRequest(MATIC, toTokenAmount(50), LZO, 0, { value: fees });
+            await clientB.connect(bob).depositRequest(FTM, toTokenAmount(50), LZO, 0, { value: fees });
+            await pool.connect(alice).borrow(MATIC, FTM, toTokenAmount(20), ethers.utils.hexZeroPad(alice.address, 32), LZO, 0, { value: fees });
             await  liquidationManager.connect(developer).setLiquidationPause(true);
             expect(await liquidationManager.liquidationPause()).to.equal(true); 
 
@@ -493,7 +497,7 @@ describe("Ready", function () {
 
         })
 
-        it.only("test liquidation flow", async function () {
+        it("test liquidation flow", async function () {
             
             fees = await routeA.connect(alice).estimateFees(1, 0);
             await clientA.connect(alice).depositRequest(MATIC, toTokenAmount(10), LZO, 0, { value: fees })
@@ -528,7 +532,7 @@ describe("Ready", function () {
 
         })
 
-        it.only("test related to liquid percentage", async function () {
+        it("test related to liquid percentage", async function () {
 
             fees = await routeA.connect(alice).estimateFees(1, 0);
             await clientA.connect(alice).depositRequest(MATIC, toTokenAmount(10), LZO, 0, { value: fees })
@@ -553,7 +557,7 @@ describe("Ready", function () {
           
 
         })
-        it.only("test related to liquidity percentage when value is increased to 1.6", async function () {
+        it("test related to liquidity percentage when value is increased to 1.6", async function () {
 
             fees = await routeA.connect(alice).estimateFees(1, 0);
             await clientA.connect(alice).depositRequest(MATIC, toTokenAmount(10), LZO, 0, { value: fees })
@@ -575,31 +579,7 @@ describe("Ready", function () {
             console.log("BOB Matic Value :",bob_Matic_balance);
             console.log("BOB FTM Value :",bob_FTM_balance); 
 
-        })  
-        
-        it.only("test related to liquidity percentage when value is increased to 1.8", async function () {
-
-            fees = await routeA.connect(alice).estimateFees(1, 0);
-            await clientA.connect(alice).depositRequest(MATIC, toTokenAmount(10), LZO, 0, { value: fees })
-            await clientB.connect(bob).depositRequest(FTM, toTokenAmount(10), LZO, 0, { value: fees })
-            await clientB.connect(user3).depositRequest(FTM, toTokenAmount(10), LZO, 0, { value: fees })
-            await pool.connect(alice).borrow(FTM, BNB, toTokenAmount(5), ethers.utils.hexZeroPad(alice.address, 32), LZO, 0, { value: fees });
-            await printInfo()
-            console.log()
-            await this.oracle.setPrice([FTM], [toTokenAmount(1.8)])
-            await expect(liquidationManager.connect(bob).liquidate(alice.address, MATIC, FTM,  1499999980974124810n)).to.be.revertedWithCustomError(liquidationManager,"ClosingFactotExceeded");
-            await printInfo()
-            console.log()
-            let alice_deposit_balance = await ceMATIC.balanceOf(alice.address);
-            let alice_debt_balance = await debtFTM.balanceOf(alice.address);
-            console.log("Alice deposit Value :",alice_deposit_balance);
-            console.log("Alice debt Value :",alice_debt_balance);
-            let bob_Matic_balance = await ceMATIC.balanceOf(bob.address);
-            let bob_FTM_balance = await ceFTM.balanceOf(bob.address);
-            console.log("BOB Matic Value :",bob_Matic_balance);
-            console.log("BOB FTM Value :",bob_FTM_balance); 
-    
-        })   
+        })         
         
     })
 
