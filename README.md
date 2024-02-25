@@ -17,7 +17,7 @@ A Branch handles asset pools on each chain it is deployed to. That means when a 
 ## **Messenger**
 Messenger is a stack of multiple generic cross-chain messaging protocols. Messenger analyses different factors like estimated transaction cost, speed, security, etc. to choose a messaging protocol from the stack for a given transaction. The advantage of having a cross-chain messaging protocol aggregator is that it provides another degree of freedom to the user. Users can choose the protocol they want or let Cedro choose it based on their priorities for cost, speed, security, etc. Once a protocol is chosen, it is used to send the desired cross-chain message to/from the Root.
 ## **Root**
-The Root is deployed in a single chain and is the point of connection for all of the Branches. Every Brach is connected to the Root in a bidirectional manner using Messenger.
+The Root is deployed in a single chain and is the point of connection for all of the Branches. Every Branch is connected to the Root in a bidirectional manner using Messenger.
 
 Root stores all the protocol's global variables, including the total deposited amount across multiple chains, total borrowed amount, Total protocol liquidity, etc. So whenever a user deposits an asset on Chain A, the information is passed to the Root chain, to update the user's liquidity and asset liquidity. Storing such information in the Root helps the protocol be simpler, more organized, and less prone to attacks.
 

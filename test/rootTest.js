@@ -137,6 +137,11 @@ describe("Root Function Tests", function () {
         // Set roleManager contract in all other contracts
         await setRoleManager();
 
+        // Set liquidity cap ammount 
+        await clientA.setCapAmount([MATIC,FTM,BNB],[toTokenAmount(9000000000),toTokenAmount(9000000000),toTokenAmount(9000000000)]);
+        await clientB.setCapAmount([MATIC,FTM,BNB],[toTokenAmount(9000000000),toTokenAmount(9000000000),toTokenAmount(9000000000)]);
+        await clientC.setCapAmount([MATIC,FTM,BNB],[toTokenAmount(9000000000),toTokenAmount(9000000000),toTokenAmount(9000000000)]);
+
         // Configure Branch in Adapter
         await adapterA.setBranch(clientA.address);
         await adapterB.setBranch(clientB.address);
@@ -190,6 +195,7 @@ describe("Root Function Tests", function () {
         await this.oracle.setPrice([MATIC, FTM, BNB, AVAX], [toTokenAmount(1), toTokenAmount(1), toTokenAmount(1), toTokenAmount(1)])
         await liquidationManager.setOracle(this.oracle.address);
         await liquidationManager.setCore(core.address);
+        await liquidationManager.setChainId([MATIC,FTM,BNB],[MATIC,FTM,BNB]);
 
         // alice account only has the permission to init pool
         await core.connect(alice).initPool(MATIC, [toTokenAmount(0.5), toTokenAmount(0.1), toTokenAmount(0.5), 0, toTokenAmount(0.5), toTokenAmount(0.5), toTokenAmount(0.1), toTokenAmount(0.1), toTokenAmount(0.15)], ceMATIC.address, debtMATIC.address);
@@ -626,7 +632,7 @@ describe("Root Function Tests", function () {
 
     });
 
-    describe.only("3. Testing the withdraw ", async () => {
+    describe("3. Testing the withdraw ", async () => {
         
         it("Withdrawing from differnt chain than deposited", async function () {
             let fees = await routeA.connect(alice).estimateFees(1, 10);
@@ -670,7 +676,7 @@ describe("Root Function Tests", function () {
            
         })
 
-        it("Withdrawing certain amount after earning certain interest", async function () {
+        it.only("Withdrawing certain amount after earning certain interest", async function () {
 
             let fees = await routeA.connect(alice).estimateFees(1, 10);
             await clientA.connect(alice).depositRequest(MATIC, toTokenAmount(35), LZO, 0, { value: fees });
