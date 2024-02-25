@@ -32,7 +32,7 @@ interface ICEToken is IERC20 {
      * This function can only be accessed by the account with role SET_CE_TOKEN_METHOD.
      * @param num - number of timestamps to wait.
      **/
-    function settransferTimestampWait(uint256 num) external;
+    function setTransferTimestampWait(uint256 num) external;
 
     /**
      * @notice Configures the release period for user before transfer

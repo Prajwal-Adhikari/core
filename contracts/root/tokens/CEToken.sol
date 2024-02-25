@@ -123,7 +123,7 @@ contract CEToken is ERC20Upgradeable,ReentrancyGuardUpgradeable {
      * This function can only be accessed by the account with role SET_CE_TOKEN_METHOD.
      * @param num - number of timestamps to wait.
      **/
-    function settransferTimestampWait(uint256 num) external onlyRole(IRoleManager(roleManager).SET_CE_TOKEN_METHOD()) {
+    function setTransferTimestampWait(uint256 num) external onlyRole(IRoleManager(roleManager).SET_CE_TOKEN_METHOD()) {
         transferTimestampWait = num;
     }
 
