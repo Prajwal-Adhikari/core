@@ -463,7 +463,7 @@ contract Pool is
         
         uint256 debtAmount;
         uint256 ceAmount;
-        for (uint256 i = 0; i < loopCount; ) {
+        for (uint256 i ; i < loopCount; ) {
             tokenAmount = tokenAmount.mul(borrowRatio).div(1e18);
             uint256 fee;
             if (feeEnable) {
