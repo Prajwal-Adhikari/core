@@ -657,8 +657,8 @@ contract Core is Initializable, ContextUpgradeable, ReentrancyGuardUpgradeable {
             revert InvalidSender(TAG, msg.sender);
         if(! useAsCollateralDisabled[from][id])
             checkHealth(from);
-        totalDepositPerPoolPerUser[to][id] = amount;
-        totalWithdrawPerPoolPerUser[from][id] = amount;
+        totalDepositPerPoolPerUser[to][id] += amount;
+        totalWithdrawPerPoolPerUser[from][id] += amount;
         _addToken(to, id);
         _removeToken(from, id);
     }
