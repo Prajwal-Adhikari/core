@@ -253,8 +253,8 @@ contract Core is Initializable, ContextUpgradeable, ReentrancyGuardUpgradeable {
                 uint256 ceAmountTreasury = tokenAmountTreasury.mul(1e18).div(
                     pool.ceScaled
                 );
-                ICEToken(pool.ceToken).mintInChain(treasury, ceAmountTreasury, chainId);
                 pool.ceSupply = pool.ceSupply.add(ceAmountTreasury);
+                ICEToken(pool.ceToken).mintInChain(treasury, ceAmountTreasury, chainId);
                 emit Data.MintToTreasury(id, tokenAmountTreasury, ceAmountTreasury);
             }
         }
