@@ -582,7 +582,6 @@ contract Pool is
 
     /**
      * @notice Sets the status of the collateral usage of the depositor
-     * This function can only be accessed by the account with role POOL.
      * @param poolId - id of the pool to change the status of
      * @param status - status if true collateral usage is disabled
      **/
