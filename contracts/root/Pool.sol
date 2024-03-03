@@ -463,7 +463,7 @@ contract Pool is
         
         uint256 debtAmount;
         uint256 ceAmount;
-        for (uint256 i = 0; i < loopCount; ) {
+        for (uint256 i ; i < loopCount; ) {
             tokenAmount = tokenAmount.mul(borrowRatio).div(1e18);
             uint256 fee;
             if (feeEnable) {
@@ -582,7 +582,6 @@ contract Pool is
 
     /**
      * @notice Sets the status of the collateral usage of the depositor
-     * This function can only be accessed by the account with role POOL.
      * @param poolId - id of the pool to change the status of
      * @param status - status if true collateral usage is disabled
      **/

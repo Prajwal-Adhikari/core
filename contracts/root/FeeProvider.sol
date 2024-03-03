@@ -94,7 +94,7 @@ contract FeeProvider is Initializable, ContextUpgradeable {
         if (poolId.length != liquidityFactor.length)
             revert ArgumentsMismatch(TAG);
 
-        for (uint256 i = 0; i < poolId.length; i++) {
+        for (uint256 i; i < poolId.length; i++) {
             OPTIMAL_GLOBAL_LIQUIDITY_FACTOR[chainId][poolId[i]] = liquidityFactor[i];
         }
     }
