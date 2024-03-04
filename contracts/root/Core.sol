@@ -640,9 +640,11 @@ contract Core is Initializable, ContextUpgradeable, ReentrancyGuardUpgradeable {
         uint256 tokenAmountInSrc,
         uint256 tokenAmountInDest
     ) external nonReentrant onlyRole(IRoleManager(roleManager).POOL()) {
-        if (tokenAmountInDest > tokenAmountInSrc) {
+        if (tokenAmountInDest > tokenAmountInSrc)
             revert ExcessLiquidityInDest(TAG);
-        }
+        
+        if (chainLiquidity[srcChainId][id] < tokenAmountInSrc)
+            revert NotEnoughLiquidity(TAG, srcChainId, id, chainLiquidity[srcChainId][id] , tokenAmountInSrc);
         chainLiquidity[srcChainId][id] -= tokenAmountInSrc;
         chainLiquidity[destChainId][id] += tokenAmountInDest;
         totalLiquidity[id] -= tokenAmountInSrc.sub(tokenAmountInDest);
