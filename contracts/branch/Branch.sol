@@ -258,16 +258,9 @@ contract Branch is
             revert PoolNotEnabled(TAG, id);
         if(amount == 0)
             revert InvalidTokenAmount(TAG);
-        uint256 liquidity;
+
         _pay(pools[id].token, amount, id, TYPE_DEPOSIT, route, airdropAmount);
-        if(pools[id].token == address(0)){
-            liquidity = address(this).balance;
-        }else{
-            liquidity = IERC20Upgradeable(pools[id].token).balanceOf(address(this));
-        }
-        if (liquidity > capAmount[id]) {
-            revert LiquidityCapReached(TAG, id);
-        }
+
         emit Deposit(_msgSender(), id, amount, route, airdropAmount);
         emit SendToken(_msgSender(), id, amount);
     }
@@ -294,16 +287,9 @@ contract Branch is
             revert PoolNotEnabled(TAG, id);
         if(amount == 0)
             revert InvalidTokenAmount(TAG);
-        uint256 liquidity;
+
         _pay(pools[id].token, amount, id, TYPE_REPAY, route, airdropAmount);
-        if(pools[id].token == address(0)){
-            liquidity = address(this).balance;
-        }else{
-            liquidity = IERC20Upgradeable(pools[id].token).balanceOf(address(this));
-        }
-        if (liquidity > capAmount[id]) {
-            revert LiquidityCapReached(TAG, id);
-        }
+        
         emit Repay(_msgSender(), id, amount, route, airdropAmount);
         emit SendToken(_msgSender(), id, amount);
     }
@@ -438,6 +424,16 @@ contract Branch is
             );
             uint256 tokenBalanceAfter = IERC20Upgradeable(token).balanceOf(address(this));
             buildAmount = tokenBalanceAfter.sub(tokenBalanceBefore);
+        }
+        
+        uint256 liquidity;
+        if(pools[id].token == address(0)){
+            liquidity = address(this).balance;
+        }else{
+            liquidity = IERC20Upgradeable(pools[id].token).balanceOf(address(this));
+        }
+        if (liquidity > capAmount[id]) {
+            revert LiquidityCapReached(TAG, id);
         }
         uint256 remoteAmount = _buildRemoteAmount(
                 buildAmount,
