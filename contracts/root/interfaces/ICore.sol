@@ -11,6 +11,13 @@ interface ICore {
     function setRoleManager(address roleManagerAddress) external;
 
     /**
+     * @notice Sets the treasury address.
+     * This function can only be accessed by the account with role SET_CORE_METHOD.
+     * @param _treasury - treasury wallet address.
+     **/
+    function setTreasury(address _treasury) external;
+
+    /**
      * @notice Registers a new pool in the protocol.
      * This function can only be accessed by account with role INIT_POOL.
      * @param id - id of the pool to be created
@@ -334,4 +341,12 @@ interface ICore {
         address user,
         bytes32[] memory _poolIds
     ) external view returns (uint256[] memory, uint256[] memory);
+
+    /**
+     * @notice Returns the health factors of the user list
+     * @param userList - wallet addresses of users for which the health factor is calculated.
+     **/
+    function healthFactorList(
+        address[] memory userList
+    ) external view returns (Data.HealthData[] memory);
 }

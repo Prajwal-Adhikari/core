@@ -111,6 +111,18 @@ contract Core is Initializable, ContextUpgradeable, ReentrancyGuardUpgradeable {
     }
 
     /**
+     * @notice Sets the treasury address.
+     * This function can only be accessed by the account with role SET_CORE_METHOD.
+     * @param _treasury - treasury wallet address.
+     **/
+    function setTreasury(
+        address _treasury
+    ) external onlyRole(IRoleManager(roleManager).SET_CORE_METHOD()) {
+        treasury = _treasury;
+    }
+
+
+    /**
      * @notice Sets the status of the collateral usage of a user
      * This function can only be accessed by the account with role POOL.
      * @param user - address of the depositor
@@ -295,7 +307,7 @@ contract Core is Initializable, ContextUpgradeable, ReentrancyGuardUpgradeable {
                 health.factor = MAX_HEALTH_FACTOR;
             }
         } 
-    }  
+    }
 
     /**
      * @notice Updates the global protocol states after receiving deposit information
@@ -378,7 +390,7 @@ contract Core is Initializable, ContextUpgradeable, ReentrancyGuardUpgradeable {
             uint256 ceAmount = ICEToken(pool.ceToken).burn(user, burnAmount - balanceInChainId);
             burnAmount = balanceInChainId.add(ceAmount); // for handling precision
                     }
-
+        
         //maintaining precision and removing dust values
         tokenAmount = burnAmount.mul(pool.ceScaled).div(1e18);
         totalWithdrawPerPoolPerUser[user][id] += tokenAmount;
@@ -889,6 +901,22 @@ contract Core is Initializable, ContextUpgradeable, ReentrancyGuardUpgradeable {
             configDatas[i] = config;
         }
         return configDatas;
+    }
+
+    /**
+     * @notice Returns the health factors of the user list
+     * @param userList - wallet addresses of users for which the health factor is calculated.
+     **/
+    function healthFactorList(
+        address[] memory userList
+    ) external view returns (Data.HealthData[] memory) {
+        uint256 len = userList.length;
+        Data.HealthData[] memory healthDatas = new Data.HealthData[](len);
+        for (uint256 i; i < len; i++) {
+            healthDatas[i] = healthFactor(userList[i]);
+        }
+        return healthDatas;
+
     }
 
 }
