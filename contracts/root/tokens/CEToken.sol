@@ -55,6 +55,7 @@ contract CEToken is ERC20Upgradeable,ReentrancyGuardUpgradeable {
     error DeadChain(string contractTAG, bytes32 chainId);
     error NotEnoughCeTokens(string contractTAG, address user);
     error InsufficientBalance(string contractTAG, address user);
+    error InvalidTokenAmount(string contractTAG);
 
     /**
      * @dev Modifier that checks if caller has a specific role.
@@ -160,6 +161,8 @@ contract CEToken is ERC20Upgradeable,ReentrancyGuardUpgradeable {
         address to,
         uint256 amount
     ) internal nonReentrant override {
+        if(amount == 0)
+            revert InvalidTokenAmount(TAG);
         if(block.timestamp <= transferTimestampRelease[from])
             revert TransferTooSoonAfterMint(TAG, block.timestamp, transferTimestampRelease[from]);
 
