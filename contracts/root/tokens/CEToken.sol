@@ -182,6 +182,8 @@ contract CEToken is ERC20Upgradeable,ReentrancyGuardUpgradeable {
 
         for (uint256 i; i < chainIds.length; i++) {
             amountPerChain = balancePerChain[from][chainIds[i]].mul(ceAmount).div(ceTokenBalance);
+            if (balancePerChain[from][chainIds[i]] < amountPerChain)
+                revert NotEnoughAmountInChain(TAG, from, chainIds[i]);
             balancePerChain[from][chainIds[i]] -= amountPerChain;
             balancePerChain[to][chainIds[i]] += amountPerChain;
             transferCeAmount += amountPerChain; // for handling precision
@@ -307,6 +309,7 @@ contract CEToken is ERC20Upgradeable,ReentrancyGuardUpgradeable {
 
         if (balancePerChain[from][chainId] < amount)
             revert NotEnoughAmountInChain(TAG, from, chainId);
+
         data = LocalBalance({fromBalance:balanceBeforeScaledExcludingDeadTokens(from),toBalance:0,currentTotalBalance:totalBalanceBeforeScaledExcludingDeadTokens()});
 
         balancePerChain[from][chainId] -= amount;
@@ -340,6 +343,7 @@ contract CEToken is ERC20Upgradeable,ReentrancyGuardUpgradeable {
             revert NotEnoughCeTokens(TAG, from);
         
         data = LocalBalance({fromBalance:balanceBeforeScaledExcludingDeadTokens(from),toBalance:0,currentTotalBalance:totalBalanceBeforeScaledExcludingDeadTokens()});
+
         uint256 amountPerChain;
         uint256 burnAmount;
         bytes32[] memory chainIds = chains[from];
@@ -348,7 +352,7 @@ contract CEToken is ERC20Upgradeable,ReentrancyGuardUpgradeable {
             if (!isChainDead[chainIds[i]]){
                 amountPerChain = balancePerChain[from][chainIds[i]].mul(amount).div(ceTokenBalance);
                 if (balancePerChain[from][chainIds[i]] < amountPerChain)
-                    revert NotEnoughAmountInChain(TAG, from,chainIds[i]);
+                    revert NotEnoughAmountInChain(TAG, from, chainIds[i]);
                 balancePerChain[from][chainIds[i]] -= amountPerChain;
                 totalBalancePerChain[chainIds[i]] -= amountPerChain;
                 if (balancePerChain[from][chainIds[i]] == 0) 
@@ -386,7 +390,7 @@ contract CEToken is ERC20Upgradeable,ReentrancyGuardUpgradeable {
             if (!isChainDead[chainIds[i]]){
                 amountPerChain = balancePerChain[from][chainIds[i]].mul(amount).div(ceTokenBalance);
                 if (balancePerChain[from][chainIds[i]] < amountPerChain)
-                    revert NotEnoughAmountInChain(TAG, from,chainIds[i]);
+                    revert NotEnoughAmountInChain(TAG, from, chainIds[i]);
                 balancePerChain[from][chainIds[i]] -= amountPerChain;
                 balancePerChain[to][chainIds[i]] += amountPerChain;
                 transferCeAmount += amountPerChain; // for handling precision
