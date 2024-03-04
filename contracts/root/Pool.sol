@@ -64,7 +64,7 @@ contract Pool is
     error InvalidTokenAmount(string contractTAG);
 	error InvalidRatio(string contractTAG);
     error InvalidLoopCount(string contractTAG);
-
+    error InvalidReceipientAddress(string contractTAG);
 
     /**
      * @dev Modifier that checks if caller has a specific role.
@@ -241,6 +241,9 @@ contract Pool is
         if(withdrawPause[id][chainId])
             revert WithdrawPaused(TAG, chainId, id);
 
+        if(_bytesToAddress(to) == address(0))
+            revert InvalidReceipientAddress(TAG);
+
         uint256 fee;
         if(all) {
             tokenAmount = ICore(core).getWithdrawableBalancePerPool(id,_msgSender());
@@ -331,6 +334,9 @@ contract Pool is
         if(actualAmount == 0)
             revert InvalidTokenAmount(TAG);
 
+        if(_bytesToAddress(to) == address(0))
+            revert InvalidReceipientAddress(TAG);
+
         bytes memory payload = abi.encodePacked(
             id,
             to,
@@ -389,6 +395,9 @@ contract Pool is
 
         if(borrowPause[id][chainId])
             revert BorrowPaused(TAG, chainId, id);
+        
+        if(_bytesToAddress(to) == address(0))
+            revert InvalidReceipientAddress(TAG);
 
         uint256 fee;
         if (feeEnable) {
