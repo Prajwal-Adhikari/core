@@ -53,6 +53,20 @@ library Data {
         uint256 ltsValue;
     }
 
+    struct LiquidationData {
+        uint256 borrowerCollateral;
+        uint256 liquidatorBurnAmount;
+        uint256 discount;
+        uint256 liqPercent;
+    }
+
+    struct GetLiquidationData{
+        uint256 borrowerDebtAmount;
+        uint256 amount;
+        uint256 collateralIdPrice;
+        uint256 debtIdPrice;
+    }
+
     //using to avoid stack too deep
     struct BorrowParams {
         uint256 liquidity;

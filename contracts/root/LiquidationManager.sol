@@ -41,6 +41,7 @@ contract LiquidationManager is
     error CollateralUsageDisabled(string contractTAG, address user, bytes32 poolId );
     error ChainIdNotConfigured(string contractTAG);
     error ArrayLengthMismatched(string contractTAG);
+    error InvalidTokenAmount(string contractTAG);
 
     /**
      * @dev Modifier that checks if caller has a specific role.
@@ -176,6 +177,9 @@ contract LiquidationManager is
         bytes32 debtId,
         uint256 borrowerCollateral
     ) external nonReentrant {
+
+        if(borrowerCollateral == 0)
+            revert InvalidTokenAmount(TAG);
         // whether liquidation is enable or not
         if(liquidationPause)
             revert LiquidationPaused(TAG);
@@ -273,5 +277,108 @@ contract LiquidationManager is
             params.burnLiquidatorCEAmount,
             discount
         );
+    }
+
+    function getLiquidationData(
+        address borrower,
+        bytes32 collateralId,
+        bytes32 debtId
+    ) public view returns (Data.LiquidationData memory liqData) {
+        Data.PoolData memory debtPool = ICore(core).pools(debtId);
+        Data.GetLiquidationData memory data = getPoolData(borrower,collateralId,debtId);
+    
+        if(ICore(core).useAsCollateralDisabled(borrower, collateralId)){
+            liqData.borrowerCollateral = 0;
+            liqData.liquidatorBurnAmount = 0;
+            liqData.discount = 0;
+            liqData.liqPercent = 0;
+            return liqData;
+        }
+        // calculate borrower's data including total collateral and total debt
+        Data.HealthData memory healthData = ICore(core).healthFactor(borrower);
+        Data.ConfigData memory config = ICore(core).configs(collateralId);
+        // whether borrower can be liquidated
+        if(healthData.factor < MAX_HEALTH_FACTOR) {
+            liqData.borrowerCollateral = 0;
+            liqData.liquidatorBurnAmount = 0;
+            liqData.discount = 0;
+            liqData.liqPercent = 0;
+            return liqData;
+        }
+        // calculate LTV, and using formula to calculate liquidate discount and closing factor
+        uint256 currentLTV = healthData.debtValue.mul(1e18).div(
+            healthData.collateralValue
+        );
+
+        uint256 discount;
+        uint256 liqPercent = 1e18;
+        if (currentLTV < 1e18) {
+            discount = 1e36 / currentLTV - 999000000000000000;
+            if (discount > config.liqMaxDiscount) {
+                discount = config.liqMaxDiscount;
+            }
+
+            uint256 numerator_a = (config
+                .liqClosingFac
+                .add(currentLTV)).mul(1e18);
+            uint256 numerator_b = (config
+                .liqClosingFac
+                .mul(currentLTV)).add((config.liqThreshold).mul(1e18));
+            if(numerator_a > numerator_b) {
+                liqPercent = numerator_a.sub(numerator_b).div(1e18 - config.liqThreshold);
+            }
+
+            if (liqPercent > 1e18) {
+                liqPercent = 1e18;
+            }
+        }
+     
+        Data.LiquidateParams memory params = _buildLiquidateParams(
+            collateralId,
+            debtId,
+            data.amount,
+            discount
+        );
+        
+        if( params.liqValue > healthData.collateralValue.mul(liqPercent).div(1e18)){
+            data.amount = healthData.collateralValue.mul(liqPercent);
+            data.amount = data.amount.div(data.collateralIdPrice);
+            params = _buildLiquidateParams(
+                    collateralId,
+                    debtId,
+                    data.amount,
+                    discount
+                );
+        }
+
+        if(params.burnBorrowerDebtAmount > data.borrowerDebtAmount ){
+            params.liqValue = data.borrowerDebtAmount.mul(debtPool.dtScaled).div(1e18 - discount);
+            data.amount = params.liqValue.mul(data.debtIdPrice).div(data.collateralIdPrice);
+            params = _buildLiquidateParams(
+                    collateralId,
+                    debtId,
+                    data.amount,
+                    discount
+                );
+
+        }
+
+        liqData.borrowerCollateral = data.amount;
+        liqData.liquidatorBurnAmount = params.burnLiquidatorCEAmount.mul(debtPool.ceScaled).div(1e18);
+        liqData.discount = discount;
+        liqData.liqPercent = liqPercent;
+        return liqData;
+    }
+
+    function getPoolData(address borrower,
+        bytes32 collateralId,
+        bytes32 debtId
+    ) internal view returns (Data.GetLiquidationData memory data){
+        Data.PoolData memory debtPool = ICore(core).pools(debtId);
+        Data.PoolData memory collateralPool = ICore(core).pools(collateralId);
+        data.borrowerDebtAmount = ICEToken(debtPool.debtToken).balanceBeforeScaled(borrower);
+        data.amount = ICEToken(collateralPool.ceToken).balanceOf(borrower);
+        data.collateralIdPrice  = oracle.getSinglePrice(collateralId);
+        data.debtIdPrice  = oracle.getSinglePrice(debtId);
     }
 }
