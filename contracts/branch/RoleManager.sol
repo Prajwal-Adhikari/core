@@ -31,11 +31,11 @@ contract RoleManagerBranch is Initializable, AccessControlUpgradeable {
         _disableInitializers();
     }
 
-    function initialize() public initializer {
+    function initialize(address _owner) public initializer {
         __AccessControl_init();
         // Grant the contract deployer the default admin role: it will be able
         // to grant and revoke any roles
-        _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _setupRole(DEFAULT_ADMIN_ROLE, _owner);
     }
 
     /**
