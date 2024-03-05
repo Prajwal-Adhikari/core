@@ -4,21 +4,13 @@ pragma solidity 0.8.22;
 import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
-import "./interfaces/IUniswapV3Factory.sol";
-import "./libraries/OracleLibrary.sol";
 import "./interfaces/IRoleManager.sol";
+import "./interfaces/IPriceFeed.sol";
 
 string constant TAG = "Oracle";
 
 interface IERC20 {
     function decimals() external view returns (uint8);
-}
-
-interface DexRouter {
-    function getAmountsOut(
-        uint256 amountIn,
-        address[] calldata path
-    ) external view returns (uint256[] memory amounts);
 }
 
 /**
@@ -27,24 +19,16 @@ interface DexRouter {
 **/
 contract Oracle is Initializable, ContextUpgradeable {
     uint8 public constant ROOT_DECIMALS = 18;
+    uint256 public GRACE_PERIOD_TIME;
+    address public roleManager;
+    address public priceFeed;
+    address public sequencerUptimeFeed;
 
     mapping(bytes32 => address) public aggregator;
-    mapping(bytes32 => address) public assetAddress;
-    mapping(bytes32 => bytes32) public stableCoinId;
-    mapping(bytes32 => bool) public isStableCoin;
-    mapping(bytes32 => bool) public fetchFromDex;
-    mapping(bytes32 => uint256) public prices;
-    mapping(bytes32 => uint24) public fee;
-    mapping(bytes32 => uint32) public timeInterval;
+    mapping(bytes32 => bool) public fetchFromPriceFeed;
     mapping(bytes32 => uint256) public maxValue;
     mapping(bytes32 => uint256) public minValue;
     mapping(bytes32 => uint256) public heartBeatValue;
-    
-
-    address public dexFactoryAddress;
-    address public roleManager;
-
-    event SetPrice(bytes32 symbol, uint256 price);
 
     error ChainlinkMalfunction(string contractTAG, bytes32 symbol);
     error RoundNotComplete(string contractTAG, bytes32 symbol);
@@ -53,6 +37,8 @@ contract Oracle is Initializable, ContextUpgradeable {
     error PoolNotExist(string contractTAG, bytes32 symbol);
     error PriceNotValid(string contractTAG, bytes32 symbol);
     error ArrayLengthMismatched(string contractTAG);
+    error SequencerDown(string contractTAG);
+    error GracePeriodNotOver(string contractTAG);
     
     /**
      * @dev Modifier that checks if caller has a specific role.
@@ -100,6 +86,17 @@ contract Oracle is Initializable, ContextUpgradeable {
     }
 
     /**
+     * @notice Configures price feed contract
+     * This function can only be accessed by the account with role SET_ORACLE_METHOD.
+     * @param _priceFeed - address of the price feed
+     **/
+    function setPriceFeed(
+        address _priceFeed
+    ) external onlyRole(IRoleManager(roleManager).SET_ORACLE_METHOD()) {
+        priceFeed = _priceFeed;
+    }
+
+    /**
      * @notice Configures min max value to check against the oracle price
      * @param _id - pool id of the asset
      * @param _maxValue - accepted max value of asset
@@ -135,82 +132,25 @@ contract Oracle is Initializable, ContextUpgradeable {
     }
 
     /**
-    * @notice Configures token address for asset with pool id `_id` 
+    * @notice Configures the grace period
     * This function can only be accessed by the account with role SET_ORACLE_METHOD.
-    * @param _id - pool id of the asset
-    * @param _assetAddress - address of the token
+    * @param  _gracePeriodTime - grace period
     **/
-    function setAssetAddress(
-        bytes32 _id,
-        address _assetAddress
+    function setGracePeriodTime(
+        uint256 _gracePeriodTime
     ) external onlyRole(IRoleManager(roleManager).SET_ORACLE_METHOD()) {
-        assetAddress[_id] = _assetAddress;
+        GRACE_PERIOD_TIME =  _gracePeriodTime;
     }
 
     /**
-    * @notice Configures stable coin id to be assosciated with asset with pool id `id` 
-    * which will be used as a pair for calculating price of that asset from the dex
+    * @notice Configures the sequencer uptime feed proxy address of L2 network
     * This function can only be accessed by the account with role SET_ORACLE_METHOD.
-    * @param _id - pool id of the asset
-    * @param _stable - pool id of the stable coin.
+    * @param _upTimeFeed - address of the uptimeFeed
     **/
-    function setStableCoinId(
-        bytes32 _id,
-        bytes32 _stable
+    function setSequencerUptimeFeed(
+        address _upTimeFeed
     ) external onlyRole(IRoleManager(roleManager).SET_ORACLE_METHOD()) {
-        stableCoinId[_id] = _stable;
-    }
-
-    /**
-    * @notice Configures if the asset is a stable coin or not
-    * This function can only be accessed by the account with role SET_ORACLE_METHOD.
-    * @param _id - pool id of the asset
-    * @param _status - true if its a stable coin
-    **/
-    function setStableCoinStatus(
-        bytes32 _id,
-        bool _status
-    ) external onlyRole(IRoleManager(roleManager).SET_ORACLE_METHOD()) {
-        isStableCoin[_id] = _status;
-    }
-
-    /**
-     * @notice Configures router address of the dex
-     * This function can only be accessed by the account with role SET_ORACLE_METHOD.
-     * @param _dexFactoryAddress - address of the dex factory contract.
-     **/
-    function setDexFactoryAddress(
-        address _dexFactoryAddress
-    ) external onlyRole(IRoleManager(roleManager).SET_ORACLE_METHOD()) {
-        dexFactoryAddress = _dexFactoryAddress;
-    }
-
-    /**
-     * @notice Sets fee and time interval.
-     * @param _id - Pool id of the asset.
-     * @param _fee - Fee.
-     * @param _timeInterval - Time interval.
-     **/
-    function setFeeAndTimeInterval(
-        bytes32 _id,
-        uint24 _fee,
-        uint32 _timeInterval
-    ) external onlyRole(IRoleManager(roleManager).SET_ORACLE_METHOD()) {
-        fee[_id] = _fee;
-        timeInterval[_id] = _timeInterval;
-    }
-
-    /**
-    * @notice Configures if the asset's price is to be fetched from dex or chainlink
-    * This function can only be accessed by the account with role SET_ORACLE_METHOD.
-    * @param _id - pool id of the asset
-    * @param _status - true if to be fetched from dex
-    **/
-    function setPriceSource(
-        bytes32 _id,
-        bool _status
-    ) external onlyRole(IRoleManager(roleManager).SET_ORACLE_METHOD()) {
-        fetchFromDex[_id] = _status;
+        sequencerUptimeFeed = _upTimeFeed;
     }
 
     /**
@@ -223,23 +163,14 @@ contract Oracle is Initializable, ContextUpgradeable {
         results = new uint256[](_symbols.length);
         uint256 price;
         for (uint256 i; i < _symbols.length; i++) {
-            if (fetchFromDex[_symbols[i]]) {
-                if (isStableCoin[_symbols[i]]) {
-                    price = getPriceFromChainlink(_symbols[i]);
-                    if(priceCheck(_symbols[i],price))
-                        revert PriceNotValid(TAG, _symbols[i]);
-                } else {
-                    price = getPriceFromDex(_symbols[i]);
-                    if(priceCheck(_symbols[i],price))
-                        revert PriceNotValid(TAG, _symbols[i]);     
-                }
+            if (fetchFromPriceFeed[_symbols[i]]) {
+                price = getPriceFromPriceFeed(_symbols[i]);
             } else {
                 price = getPriceFromChainlink(_symbols[i]);
-                if(priceCheck(_symbols[i],price))
-                    price = getPriceFromDex(_symbols[i]);
-                    if(priceCheck(_symbols[i],price))
-                        revert PriceNotValid(TAG, _symbols[i]); 
             }
+           
+           if(priceCheck(_symbols[i],price))
+                revert PriceNotValid(TAG, _symbols[i]); 
             results[i] = price;
         }
     }
@@ -251,26 +182,13 @@ contract Oracle is Initializable, ContextUpgradeable {
     function getSinglePrice(
         bytes32 _symbol
     ) external view returns (uint256 result) {
-            if (fetchFromDex[_symbol]) {
-                if (isStableCoin[_symbol]) {
-                    result = getPriceFromChainlink(_symbol);
-                    if(priceCheck(_symbol,result))
-                        revert PriceNotValid(TAG, _symbol);
-                       
-                } else {
-                    result = getPriceFromDex(_symbol);
-                    if(priceCheck(_symbol,result))
-                        revert PriceNotValid(TAG, _symbol);
-                }
+        if (fetchFromPriceFeed[_symbol]) {
+                result = getPriceFromPriceFeed(_symbol);
             } else {
-                result = getPriceFromChainlink(_symbol); 
-                if(priceCheck(_symbol,result)){
-                    result = getPriceFromDex(_symbol);
-                    if(priceCheck(_symbol,result))
-                        revert PriceNotValid(TAG, _symbol); 
-                }  
+                result = getPriceFromChainlink(_symbol);
             }
-            
+        if(priceCheck(_symbol,result))
+            revert PriceNotValid(TAG, _symbol);  
     }
     
     
@@ -297,6 +215,31 @@ contract Oracle is Initializable, ContextUpgradeable {
         bytes32 _symbol
     ) public view returns (uint256) {
         // prettier-ignore
+         (
+            /*uint80 roundID*/,
+            int256 answer,
+            uint256 startedAt,
+            /*uint256 updatedAt*/,
+            /*uint80 answeredInRound*/
+        ) = 
+        AggregatorV3Interface(
+            sequencerUptimeFeed
+        ).latestRoundData();
+
+        // Answer == 0: Sequencer is up
+        // Answer == 1: Sequencer is down
+        bool isSequencerUp = answer == 0;
+        if (!isSequencerUp) {
+            revert SequencerDown(TAG);
+        }
+
+        // Make sure the grace period has passed after the
+        // sequencer is back up.
+        uint256 timeSinceUp = block.timestamp - startedAt;
+        if (timeSinceUp <= GRACE_PERIOD_TIME) {
+            revert GracePeriodNotOver(TAG);
+        }
+
         (
             uint80 roundID,
             int256 basePrice,
@@ -331,44 +274,14 @@ contract Oracle is Initializable, ContextUpgradeable {
         return quotePrice;
     }
 
-    /**
-    * @notice Returns price of the asset fetched from dex
+     /**
+    * @notice Returns price of the asset fetched from price feed maintained
     * @param _symbol - pool id of the asset
     **/
-    function getPriceFromDex(
+    function getPriceFromPriceFeed(
         bytes32 _symbol
-    ) public view returns (uint256) {
-
-        address pool = IUniswapV3Factory(dexFactoryAddress).getPool(
-            assetAddress[_symbol],
-            assetAddress[stableCoinId[_symbol]],
-            fee[_symbol]
-        );
-        if(pool == address(0))
-            revert PoolNotExist(TAG, _symbol);
-
-        int24 tick = OracleLibrary.consult(pool, timeInterval[_symbol]);
-
-        uint8 baseDecimals = IERC20(assetAddress[_symbol]).decimals();
-        uint256 amountOut = OracleLibrary.getQuoteAtTick(
-            tick,
-            uint128(10 ** baseDecimals),
-            assetAddress[_symbol],
-            assetAddress[stableCoinId[_symbol]]
-        );
-
-        uint8 quoteDecimals = IERC20( assetAddress[stableCoinId[_symbol]]).decimals();
-        uint256 quotePrice = _scalePrice(
-            amountOut,
-            quoteDecimals,
-            ROOT_DECIMALS
-        );
-
-        uint256 stableCoinPrice = getPriceFromChainlink(stableCoinId[_symbol]);
-
-        quotePrice = (quotePrice * stableCoinPrice)/ (10 ** ROOT_DECIMALS );
-
-        return quotePrice;
+    ) public view returns (uint256 price) {
+        price = IPriceFeed(priceFeed).getPrice(_symbol);
 
     }
 
