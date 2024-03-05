@@ -33,6 +33,9 @@ contract FeeProvider is Initializable, ContextUpgradeable {
     address public core;
     address public roleManager;
 
+    event FeeDeducted(bytes32 chainId, bytes32 poolId, uint256 fee);
+    event RewardReceived(bytes32 chainId, bytes32 poolId, uint256 reward);
+
     error ArgumentsMismatch(string contractTAG);
     error NotEnoughLiquidity(string contractTAG, uint256 liquidity);
     error OutOfBoundBalance(string contractTAG);
@@ -114,6 +117,7 @@ contract FeeProvider is Initializable, ContextUpgradeable {
     {
         fee = getFeeAmount(chainId, poolId, amount);
         feeAmount[chainId][poolId] += fee;
+        emit FeeDeducted(chainId, poolId, fee);
     }
 
     /**
@@ -131,6 +135,7 @@ contract FeeProvider is Initializable, ContextUpgradeable {
     {
         reward = getRewardAmount(chainId, poolId, amount);
         feeAmount[chainId][poolId] -= reward;
+        emit RewardReceived(chainId, poolId, reward);
     }
 
     /**
